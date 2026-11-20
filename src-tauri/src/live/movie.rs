@@ -25,6 +25,7 @@ pub struct Event {
     pub tug_response: Option<f32>,
     pub phase: Phase,
     pub point: [f32; 2],
+    pub amount: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -46,19 +47,21 @@ impl Request {
         {
             return Err("Choose a wheel and a finite song duration".into());
         }
-        let mut held = [None; 2];
+        let mut held = [[None; 2]; 2];
         let mut previous = 0.;
         for event in &self.events {
             if event.layer_id != self.layer_id
                 || !(previous..=self.duration).contains(&event.time)
                 || event.point.iter().any(|v| !(0.0..=1.0).contains(v))
+                || !super::valid_amount(event.gesture, event.phase, event.amount)
                 || event
                     .tug_response
                     .is_some_and(|v| !(0.0..=1.0).contains(&v))
             {
                 return Err("Invalid wheel export event timing, track or coordinates".into());
             }
-            let anchor = &mut held[event.slide as usize];
+            let anchor =
+                &mut held[event.slide as usize][usize::from(event.gesture == Gesture::Pressure)];
             match event.phase {
                 Phase::Down => *anchor = Some(event.gesture),
                 Phase::Move if *anchor != Some(event.gesture) => {
@@ -128,6 +131,7 @@ mod tests {
             tug_response: Some(0.4),
             phase,
             point: [0.4, 0.5],
+            amount: None,
         }
     }
     fn request(events: Vec<Event>) -> Request {
@@ -168,5 +172,31 @@ mod tests {
         let mut wrong = event(0., Slide::Front, Phase::Down);
         wrong.layer_id = 1;
         assert!(request(vec![wrong]).validate().is_err());
+    }
+
+    #[test]
+    fn pressure_and_planar_motion_on_one_slide_have_independent_contacts() {
+        let force = |t, phase, amount| Event {
+            gesture: Gesture::Pressure,
+            amount,
+            ..event(t, Slide::Front, phase)
+        };
+        let mixed = vec![
+            event(0., Slide::Front, Phase::Down),
+            force(0.1, Phase::Down, Some(0.3)),
+            event(0.2, Slide::Front, Phase::Move),
+            force(0.3, Phase::Move, Some(0.62)),
+            force(0.4, Phase::Up, Some(0.)),
+            event(0.5, Slide::Front, Phase::Move),
+        ];
+        assert_eq!(request(mixed).validate().unwrap(), 23);
+        for invalid in [
+            force(0., Phase::Move, Some(0.4)),
+            force(0., Phase::Down, Some(1.1)),
+            force(0., Phase::Down, None),
+            force(0., Phase::Up, Some(0.8)),
+        ] {
+            assert!(request(vec![invalid]).validate().is_err());
+        }
     }
 }

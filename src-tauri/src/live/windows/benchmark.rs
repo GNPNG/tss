@@ -15,12 +15,17 @@ const RUNS: [(&str, Slide, Gesture); 8] = [
 ];
 const WARM: Duration = Duration::from_secs(2);
 const PERIOD: Duration = Duration::from_secs(12);
+pub(crate) fn pressure_trial() -> bool {
+    std::env::args_os().any(|arg| arg == "--pressure-trial")
+}
 
 pub(super) struct Benchmark {
     path: PathBuf,
     footprint_sampling: bool,
     index: usize,
     count: usize,
+    pressure: bool,
+    pressing: bool,
     began: Option<Instant>,
     stroke_started: Instant,
     motion: Option<capture::Capture>,
@@ -41,7 +46,11 @@ impl Benchmark {
             path,
             footprint_sampling,
             index: 0,
-            count: if std::env::args_os().any(|arg| arg == "--gesture-pair") {
+            pressure: pressure_trial(),
+            pressing: false,
+            count: if pressure_trial() {
+                1
+            } else if std::env::args_os().any(|arg| arg == "--gesture-pair") {
                 2
             } else {
                 RUNS.len()
@@ -59,6 +68,130 @@ impl Benchmark {
             results: Vec::new(),
             deadline: Instant::now() + Duration::from_secs(45),
         }
+    }
+    fn pressure_proof(&mut self, r: &mut LiveWheel, hwnd: HWND, c: &Config) -> Result<(), String> {
+        let frozen = |r: &mut LiveWheel| -> Result<Vec<u8>, String> {
+            r.render_offscreen(0.65)?;
+            Ok(r.capture_rgba8()?.2)
+        };
+        r.select_track(0);
+        let neutral = frozen(r)?;
+        let changed = |a: &[u8], b: &[u8]| {
+            a.chunks_exact(4)
+                .zip(b.chunks_exact(4))
+                .filter(|(x, y)| (0..3).any(|i| x[i].abs_diff(y[i]) >= 3))
+                .count()
+        };
+        let mut reports = Vec::new();
+        for (slide, name, point) in [
+            (Slide::Rear, "rear", [0.48, 0.52]),
+            (Slide::Front, "front-original", [0.48, 0.52]),
+            (Slide::Front, "front", [0.58, 0.41]),
+        ] {
+            let rec = macros::ProofRecorder::start();
+            scripted_mouse(hwnd, c.rect, WM_LBUTTONDOWN, point);
+            consume_mouse(r, slide, Gesture::Pressure, c.mouse_pressure)?;
+            std::thread::sleep(Duration::from_millis(
+                super::super::mouse_pressure::RAMP_MS + 8,
+            ));
+            consume_mouse(r, slide, Gesture::Pressure, c.mouse_pressure)?;
+            let coarse_level = MOUSE.with(|m| m.borrow().load.current().map(|(_, a)| a));
+            let settle = |r: &mut LiveWheel, wanted: Option<f32>| -> Result<(), String> {
+                let start = Instant::now();
+                while MOUSE.with(|m| m.borrow().load.current().map(|(_, v)| v)) != wanted {
+                    if start.elapsed() > Duration::from_millis(500) {
+                        return Err(format!("{name} pressure did not reach {wanted:?}"));
+                    }
+                    std::thread::sleep(Duration::from_millis(4));
+                    consume_mouse(r, slide, Gesture::Pressure, c.mouse_pressure)?;
+                }
+                Ok(())
+            };
+            let coarse_image = frozen(r)?;
+            settle(r, Some(c.mouse_pressure))?;
+            let pressed = frozen(r)?;
+            let hold = frozen(r)?;
+            r.select_track(c.layer_id);
+            let isolated = frozen(r)?;
+            r.select_track(0);
+            scripted_mouse(hwnd, c.rect, WM_LBUTTONUP, point);
+            consume_mouse(r, slide, Gesture::Pressure, c.mouse_pressure)?;
+            std::thread::sleep(Duration::from_millis(
+                super::super::mouse_pressure::RAMP_MS + 8,
+            ));
+            consume_mouse(r, slide, Gesture::Pressure, c.mouse_pressure)?;
+            settle(r, None)?;
+            let released = frozen(r)?;
+            let points = rec.finish_timed()?;
+            let mut target = c.clone();
+            target.slide = slide;
+            target.layer_id = 0;
+            let mut player = macros::Playback::default();
+            let mut reproduced = true;
+            let mut peak_checked = false;
+            for (_, s) in &points {
+                player.apply(
+                    Some(r),
+                    Some(&target),
+                    ReplayBatch {
+                        layer_id: 0,
+                        slide,
+                        gesture: Gesture::Pressure,
+                        tug_response: None,
+                        samples: vec![*s],
+                    },
+                )?;
+                if s.amount == Some(c.mouse_pressure) {
+                    reproduced &= frozen(r)? == pressed;
+                    peak_checked = true;
+                }
+                if matches!(s.phase, Phase::Up) {
+                    reproduced &= frozen(r)? == neutral;
+                }
+            }
+            let n = changed(&pressed, &neutral);
+            let bytes_changed =
+                |a: &[u8], b: &[u8]| a.iter().zip(b).filter(|(x, y)| x != y).count();
+            let report = json!({"slide":slide,"case":name,"requestedCenter":point,"positiveControl":true,
+                "afterCoarseWaitAmount":coarse_level,"coarseWaitVsSettledBytes":bytes_changed(&coarse_image,&pressed),
+                "pressedPixelsAtLeast3Codes":n,"holdMismatchedBytes":bytes_changed(&pressed,&hold),
+                "releaseMismatchedBytes":bytes_changed(&released,&neutral),"untouchedTrackMismatchedBytes":bytes_changed(&isolated,&neutral),
+                "replayPeakChecked":peak_checked,"replayByteIdentical":reproduced,
+                "recordedSamples":points.iter().map(|(t,s)|json!({"elapsedMs":t-points[0].0,"phase":s.phase,"center":s.point,"amount":s.amount})).collect::<Vec<_>>()});
+            std::fs::write(
+                self.path.with_extension(format!("pressure-{name}.json")),
+                serde_json::to_vec_pretty(&report).unwrap(),
+            )
+            .map_err(|e| e.to_string())?;
+            if n == 0
+                || pressed != hold
+                || isolated != neutral
+                || released != neutral
+                || !peak_checked
+                || !reproduced
+            {
+                return Err(format!("{name} center={point:?} changedPixels={n}, holdBytes={}, isolatedBytes={}, releasedBytes={}, replayPeak={peak_checked}, replayEqual={reproduced}",bytes_changed(&pressed,&hold),bytes_changed(&isolated,&neutral),bytes_changed(&released,&neutral)));
+            }
+            let [w, h] = r.preview_size();
+            let mut f =
+                std::fs::File::create_new(self.path.with_extension(format!("pressure-{name}.ppm")))
+                    .map_err(|e| e.to_string())?;
+            write!(f, "P6\n{w} {h}\n255\n").map_err(|e| e.to_string())?;
+            for row in pressed.chunks_exact(w as usize * 4) {
+                f.write_all(
+                    &row.chunks_exact(4)
+                        .flat_map(|p| [p[0], p[1], p[2]])
+                        .collect::<Vec<_>>(),
+                )
+                .map_err(|e| e.to_string())?;
+            }
+            reports.push(report);
+        }
+        r.select_track(c.layer_id);
+        r.forget_track(0);
+        self.proof = json!({"timeSeconds":0.65,"pressure":c.mouse_pressure,
+            "slideResults":reports,"size":r.preview_size()});
+        Ok(())
     }
     fn proof(&mut self, r: &mut LiveWheel, hwnd: HWND, c: &Config) -> Result<(), String> {
         // Editor layer IDs start at one. Keep the verification stroke and lens
@@ -82,11 +215,11 @@ impl Benchmark {
                 let a = i as f64 * std::f64::consts::FRAC_PI_2 / 36.;
                 point = [0.5 + 0.14 * a.cos(), 0.5 + 0.21 * a.sin()];
                 scripted_mouse(hwnd, c.rect, WM_MOUSEMOVE, point);
-                consume_mouse(r, c.slide, mode);
+                consume_mouse(r, c.slide, mode, c.mouse_pressure)?;
                 r.render_offscreen(0.65)?;
             }
             scripted_mouse(hwnd, c.rect, WM_LBUTTONUP, point);
-            consume_mouse(r, c.slide, mode);
+            consume_mouse(r, c.slide, mode, c.mouse_pressure)?;
             r.render_offscreen(0.65)?;
             let (_, _, after) = r.capture_rgba8()?;
             let points = recording.finish()?;
@@ -162,7 +295,11 @@ impl Benchmark {
         Ok(())
     }
     pub fn before(&mut self, r: &mut LiveWheel, hwnd: HWND, c: &Config) -> Result<(), String> {
-        let (wheel, slide, gesture) = RUNS[self.index];
+        let (wheel, slide, gesture) = if self.pressure {
+            ("violet-blue", Slide::Rear, Gesture::Pressure)
+        } else {
+            RUNS[self.index]
+        };
         if c.wheel != wheel || c.slide != slide || c.gesture != gesture {
             if Instant::now() > self.deadline {
                 return Err(format!(
@@ -173,10 +310,16 @@ impl Benchmark {
         }
         if self.began.is_none() {
             if self.index == 0 {
-                self.proof(r, hwnd, c)?;
+                if self.pressure {
+                    self.pressure_proof(r, hwnd, c)?;
+                } else {
+                    self.proof(r, hwnd, c)?;
+                }
             }
             if self.index < 2 {
-                let suffix = if self.index == 0 {
+                let suffix = if self.pressure {
+                    "pressure.frames"
+                } else if self.index == 0 {
                     "tug.frames"
                 } else {
                     "rotate.frames"
@@ -189,9 +332,24 @@ impl Benchmark {
             }
             self.stroke_started = Instant::now();
             self.began = Some(self.stroke_started);
-            scripted_mouse(hwnd, c.rect, WM_LBUTTONDOWN, [0.64, 0.5]);
+            if !self.pressure {
+                scripted_mouse(hwnd, c.rect, WM_LBUTTONDOWN, [0.64, 0.5]);
+            }
         }
         let phase = self.stroke_started.elapsed().as_secs_f64() * 2.35;
+        if self.pressure {
+            let held = self.stroke_started.elapsed().as_secs_f64() % 2.0 < 1.3;
+            let center = [0.48 + 0.055 * phase.sin(), 0.52 + 0.04 * phase.cos()];
+            let message = match (self.pressing, held) {
+                (false, true) => WM_LBUTTONDOWN,
+                (true, true) => WM_MOUSEMOVE,
+                (true, false) => WM_LBUTTONUP,
+                (false, false) => return Ok(()),
+            };
+            self.pressing = held;
+            scripted_mouse(hwnd, c.rect, message, center);
+            return Ok(());
+        }
         scripted_mouse(
             hwnd,
             c.rect,

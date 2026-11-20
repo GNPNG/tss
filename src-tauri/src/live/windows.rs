@@ -27,6 +27,7 @@ use windows_sys::Win32::{
 };
 
 mod benchmark;
+pub(super) use benchmark::pressure_trial;
 mod capture;
 mod macros;
 mod movie;
@@ -55,6 +56,7 @@ enum Command {
     Forget(u64),
     Record(bool, macros::Reply<f64>),
     Replay(ReplayBatch, macros::Reply<()>),
+    Perform(ReplayBatch, u64, macros::Reply<()>),
     Movie(movie::Job, macros::Reply<()>),
 }
 
@@ -86,6 +88,7 @@ impl Host {
                 return Err("Invalid feedback transport anchor".into());
             }
             if c.focus.is_some_and(|f| !(0.0..=1.0).contains(&f))
+                || !(0.0..=1.0).contains(&c.mouse_pressure)
                 || c.tug_response.is_some_and(|v| !(0.0..=1.0).contains(&v))
                 || !matches!(c.render_width, 640 | 960)
                 || c.layer_id == 0
@@ -151,23 +154,31 @@ impl Host {
 }
 
 enum PointerSample {
-    Press,
+    Press([f32; 2]),
     Motion([f32; 2], [f32; 2]),
-    Release,
+    Release([f32; 2]),
 }
 
 #[derive(Default)]
 struct DragInput {
     previous: Option<[f32; 2]>,
-    samples: Vec<PointerSample>,
+    samples: Vec<(u64, PointerSample)>,
+    load: super::mouse_pressure::MousePressure,
+    pressure_mode: bool,
     scripted: bool,
     recorder: macros::Recorder,
 }
 impl DragInput {
+    fn input(&mut self, phase: Phase, point: [f32; 2], sample: PointerSample) {
+        let t = macros::event_ms();
+        self.samples.push((t, sample));
+        if !self.pressure_mode {
+            self.recorder.push(phase, point);
+        }
+    }
     fn release(&mut self) {
         if let Some(point) = self.previous.take() {
-            self.recorder.push(Phase::Up, point);
-            self.samples.push(PointerSample::Release);
+            self.input(Phase::Up, point, PointerSample::Release(point));
         }
     }
 }
@@ -191,15 +202,13 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
                     WM_LBUTTONDOWN => {
                         m.release();
                         m.previous = Some(p);
-                        m.samples.push(PointerSample::Press);
-                        m.recorder.push(Phase::Down, p);
+                        m.input(Phase::Down, p, PointerSample::Press(p));
                     }
                     WM_MOUSEMOVE if wp & 1 != 0 => {
                         if let Some(old) = m.previous {
                             m.previous = Some(p);
                             if old != p {
-                                m.recorder.push(Phase::Move, p);
-                                m.samples.push(PointerSample::Motion(old, p));
+                                m.input(Phase::Move, p, PointerSample::Motion(old, p));
                             }
                         }
                     }
@@ -317,38 +326,80 @@ fn pump() {
     }
 }
 
-fn consume_mouse(engine: &mut LiveWheel, slide: Slide, gesture: Gesture) -> usize {
+fn consume_mouse(
+    engine: &mut LiveWheel,
+    slide: Slide,
+    gesture: Gesture,
+    pressure: f32,
+) -> Result<usize, String> {
     let mode = native_mode(gesture);
     MOUSE.with(|m| {
         let mut m = m.borrow_mut();
+        let DragInput {
+            samples,
+            load,
+            recorder,
+            ..
+        } = &mut *m;
+        let mut force = Vec::new();
         let mut n = 0;
-        for event in m.samples.drain(..) {
-            match event {
-                PointerSample::Press => engine.end_gesture(slide as u32),
-                PointerSample::Motion(from, to) => {
+        for (t, event) in samples.drain(..) {
+            match (mode, event) {
+                (Some(_), PointerSample::Press(_) | PointerSample::Release(_)) => {
+                    engine.end_gesture(slide as u32)
+                }
+                (Some(mode), PointerSample::Motion(from, to)) => {
                     engine.gesture(slide as u32, mode, from, to);
                     n += 1;
                 }
-                PointerSample::Release => engine.end_gesture(slide as u32),
+                (None, PointerSample::Press(p)) => {
+                    load.input(Phase::Down, p, pressure, t, &mut force)
+                }
+                (None, PointerSample::Motion(_, p)) => {
+                    load.input(Phase::Move, p, pressure, t, &mut force);
+                    n += 1;
+                }
+                (None, PointerSample::Release(p)) => {
+                    load.input(Phase::Up, p, pressure, t, &mut force)
+                }
             }
         }
-        n
+        if mode.is_none() {
+            load.advance(macros::now_ms(), &mut force);
+        }
+        if let Some((_, s)) = force.last() {
+            engine.set_slide_pressure(slide as u32, s.amount.unwrap(), s.point)?;
+        }
+        for (t, s) in force {
+            recorder.push_at(t, s);
+        }
+        Ok(n)
     })
 }
-fn native_mode(gesture: Gesture) -> SlideGesture {
+fn native_mode(gesture: Gesture) -> Option<SlideGesture> {
     match gesture {
-        Gesture::Tug => SlideGesture::Tug,
-        Gesture::Rotate => SlideGesture::Rotate,
+        Gesture::Tug => Some(SlideGesture::Tug),
+        Gesture::Rotate => Some(SlideGesture::Rotate),
+        Gesture::Pressure => None,
     }
 }
-fn finish_mouse(hwnd: HWND, engine: &mut LiveWheel, c: &Config) {
+fn finish_mouse(hwnd: HWND, engine: &mut LiveWheel, c: &Config) -> Result<(), String> {
     MOUSE.with(|m| m.borrow_mut().release());
-    consume_mouse(engine, c.slide, c.gesture);
+    consume_mouse(engine, c.slide, c.gesture, c.mouse_pressure)?;
+    if let Some(p) = MOUSE.with(|m| {
+        let mut m = m.borrow_mut();
+        let (t, s) = m.load.detach(macros::now_ms())?;
+        m.recorder.push_at(t, s);
+        Some(s.point)
+    }) {
+        engine.set_slide_pressure(c.slide as u32, 0., p)?;
+    }
     unsafe {
         if GetCapture() == hwnd {
             ReleaseCapture();
         }
     }
+    Ok(())
 }
 fn percentile(ms: &mut [f64], p: f64) -> f64 {
     if ms.is_empty() {
@@ -416,6 +467,8 @@ fn run(
     }
     let mut first_cmd = None;
     let mut playback = macros::Playback::default();
+    let mut known_tracks = std::collections::BTreeSet::<u64>::new();
+    let mut performers = std::collections::BTreeMap::<u64, macros::Playback>::new();
     let mut last_presented_field_time = 0.;
     let mut export_pause = Duration::ZERO;
     let mut program_anchor: Option<(Instant, f64, bool)> = None;
@@ -443,9 +496,12 @@ fn run(
                 m.borrow()
                     .samples
                     .iter()
-                    .any(|s| matches!(s, PointerSample::Press))
+                    .any(|s| matches!(s.1, PointerSample::Press(_)))
             }) {
-                playback.physical_press(c.slide);
+                playback.physical_press(c.slide, c.gesture);
+                if let Some(p) = performers.get_mut(&c.layer_id) {
+                    p.physical_press(c.slide, c.gesture);
+                }
             }
         }
         if unsafe { IsWindow(parent) } == 0 {
@@ -490,9 +546,10 @@ fn run(
                             if c.layer_id == job.request.layer_id
                                 && c.wheel == job.request.wheel =>
                         {
-                            finish_mouse(child.0, r, c);
+                            // Snapshot the operator's current pressure, including a held
+                            // contact or an in-flight release, before hiding the preview.
+                            consume_mouse(r, c.slide, c.gesture, c.mouse_pressure)?;
                             macros::flush(app, c)?;
-                            playback.release(r);
                             unsafe {
                                 ShowWindow(child.0, SW_HIDE);
                             }
@@ -515,14 +572,60 @@ fn run(
                     let _ = reply.try_send(result);
                 }
                 Command::Record(enabled, reply) => {
+                    if let (Some(r), Some(c)) = (engine.as_mut(), config.as_ref()) {
+                        consume_mouse(r, c.slide, c.gesture, c.mouse_pressure)?;
+                        macros::flush(app, c)?;
+                    }
+                    let changed = macros::recording() != enabled;
                     let result = macros::record(app, config.as_ref(), enabled);
+                    if changed {
+                        if let Ok(t) = &result {
+                            for (id, p) in &performers {
+                                p.signal(
+                                    app,
+                                    *id,
+                                    if enabled { Phase::Down } else { Phase::Up },
+                                    *t,
+                                )?;
+                            }
+                        }
+                    }
                     let _ = reply.try_send(result);
                 }
                 Command::Replay(batch, reply) => {
-                    let result = playback.apply(engine.as_mut(), config.as_ref(), batch);
+                    let result = if performers
+                        .get(&batch.layer_id)
+                        .is_some_and(|p| p.occupied(batch.slide, batch.gesture))
+                    {
+                        if batch.samples.iter().all(|s| matches!(s.phase, Phase::Up)) {
+                            Ok(())
+                        } else {
+                            Err("A performer has this slide control".into())
+                        }
+                    } else {
+                        playback.apply(engine.as_mut(), config.as_ref(), batch)
+                    };
+                    let _ = reply.try_send(result);
+                }
+                Command::Perform(batch, received, reply) => {
+                    let result = match (engine.as_mut(), config.as_ref()) {
+                        (Some(r), Some(c)) if known_tracks.contains(&batch.layer_id) => {
+                            let (id, slide, gesture) = (batch.layer_id, batch.slide, batch.gesture);
+                            let down = batch.samples.iter().any(|s| matches!(s.phase, Phase::Down));
+                            let result =
+                                macros::perform(&mut performers, r, c, batch, received, app);
+                            if down && result.is_ok() && c.layer_id == id {
+                                playback.physical_press(slide, gesture);
+                            }
+                            result
+                        }
+                        _ => Err("Select a native wheel before performing".into()),
+                    };
                     let _ = reply.try_send(result);
                 }
                 Command::Forget(id) => {
+                    performers.remove(&id);
+                    known_tracks.remove(&id);
                     if let Some(r) = engine.as_mut() {
                         r.forget_track(id);
                     }
@@ -536,9 +639,18 @@ fn run(
                     stats.projector_song_time = None;
                     if let (Some(r), Some(c)) = (engine.as_mut(), config.as_ref()) {
                         r.set_feedback(None)?;
-                        finish_mouse(child.0, r, c);
+                        finish_mouse(child.0, r, c)?;
                         macros::flush(app, c)?;
-                        playback.release(r);
+                        playback.release(r)?;
+                        for (id, p) in std::mem::take(&mut performers) {
+                            let mut p = p;
+                            if macros::recording() {
+                                p.signal(app, id, Phase::Up, macros::now_ms() as f64)?;
+                            }
+                            r.select_track(id);
+                            p.release(r)?;
+                        }
+                        r.select_track(c.layer_id);
                     }
                     unsafe {
                         ShowWindow(child.0, SW_HIDE);
@@ -551,6 +663,7 @@ fn run(
                     *shared.lock().map_err(|e| e.to_string())? = stats.clone();
                 }
                 Command::Set(Some(next)) => {
+                    known_tracks.insert(next.layer_id);
                     if config.as_ref() == Some(&next) {
                         continue;
                     }
@@ -604,11 +717,12 @@ fn run(
                             || old.gesture != next.gesture
                             || old.focus != next.focus
                             || old.tug_response != next.tug_response
+                            || old.mouse_pressure != next.mouse_pressure
                             || old.rect != next.rect
                         {
-                            finish_mouse(child.0, r, old);
+                            finish_mouse(child.0, r, old)?;
                             macros::flush(app, old)?;
-                            playback.release(r);
+                            playback.release(r)?;
                         }
                     }
                     if next.preview_hidden {
@@ -650,6 +764,8 @@ fn run(
                         samples.clear();
                         report = Instant::now();
                     }
+                    MOUSE
+                        .with(|m| m.borrow_mut().pressure_mode = next.gesture == Gesture::Pressure);
                     stats.adapter = r.adapter_name().to_owned();
                     [stats.width, stats.height] = r.preview_size();
                     stats.layer_id = next.layer_id;
@@ -693,7 +809,7 @@ fn run(
         if let Some(b) = bench.as_mut() {
             b.before(r, child.0, c)?;
         }
-        let drags = consume_mouse(r, c.slide, c.gesture);
+        let drags = consume_mouse(r, c.slide, c.gesture, c.mouse_pressure)?;
         macros::flush(app, c)?;
         stats.drags += drags as u64;
         let frame_time = start.elapsed().saturating_sub(export_pause);

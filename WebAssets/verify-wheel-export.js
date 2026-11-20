@@ -1,11 +1,11 @@
 // Bounded operator-invoked 4K integration proof. The actual encoder request,
 // selection grants, native renderer, and source-audio decoder are shared with
 // ordinary desktop exports. Commands bind paths from explicit process arguments.
-export async function verifyWheelExport(selection, duration, status, projector) {
+export async function verifyWheelExport(selection, duration, status, projector,performerDeck) {
   const invoke = window.__TAURI__.core.invoke;
   const facts = {};
   try {
-    const [selectionId,audioPath,outputPath,displays] = await invoke('select_wheel_export_fixture');
+    const [selectionId,audioPath,outputPath,displays,pressureExport] = await invoke('select_wheel_export_fixture');
     facts.attachedDisplays=displays;
     await window.tssImportAudio([selectionId,audioPath]);
     const seconds=duration();
@@ -36,7 +36,19 @@ export async function verifyWheelExport(selection, duration, status, projector) 
       events.push({time:end,layerId,slide,gesture,tugResponse:.4,phase:'up',point:points.at(-1)});
     }
     stroke('rear','tug',.25,.75,[[.41,.43],[.48,.48],[.56,.56],[.66,.65]]);
+    if (pressureExport) {
+      const point=[.48,.52];
+      for(const [time,phase,amount] of [[1.10,'down',0],[1.15,'move',.2],[1.20,'move',.48],[1.30,'move',.8],
+        [1.50,'move',.8],[1.55,'move',.48],[1.60,'move',.2],[1.65,'up',0]]) {
+        events.push({time,layerId,slide:'front',gesture:'pressure',phase,point,amount});
+      }
+      facts.frontPressurePeak=.8;
+    }
     stroke('front','rotate',1.10,1.60,[[.67,.50],[.64,.62],[.59,.73],[.5,.77]]);
+    events.sort((a,b)=>a.time-b.time);
+    const {verifyPerformers}=await import('./verify-performers.js');
+    const performerProof=await verifyPerformers(performerDeck,layerId);
+    if(performerProof)facts.performers=performerProof;
     status('Exporting the two-cue 4K verification sequence…');
     await window.__TAURI__.event.listen('tss-wheel-export-progress', ({payload}) =>
       status(`4K verification · ${payload.completed} / ${payload.total} frames`));

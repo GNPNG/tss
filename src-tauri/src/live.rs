@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::{State, WebviewWindow};
+#[cfg(any(windows, test))]
+mod mouse_pressure;
 pub mod movie;
 
 #[cfg(windows)]
@@ -31,6 +33,7 @@ pub enum Gesture {
     #[default]
     Tug,
     Rotate,
+    Pressure,
 }
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
@@ -45,6 +48,10 @@ pub enum Phase {
 pub struct GesturePoint {
     phase: Phase,
     point: [f32; 2],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    amount: Option<f32>,
+    #[serde(default, rename = "ageMs", skip_serializing)]
+    age_ms: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -55,6 +62,76 @@ pub struct ReplayBatch {
     gesture: Gesture,
     tug_response: Option<f32>,
     samples: Vec<GesturePoint>,
+}
+
+impl ReplayBatch {
+    fn validate(&self) -> Result<(), String> {
+        if self.layer_id == 0
+            || self.samples.is_empty()
+            || self.samples.len() > 512
+            || self.tug_response.is_some_and(|n| !(0.0..=1.0).contains(&n))
+            || self.samples.iter().any(|s| {
+                s.point.iter().any(|n| !(0.0..=1.0).contains(n))
+                    || s.age_ms.is_some_and(|n| !(0.0..=60_000.0).contains(&n))
+                    || !valid_amount(self.gesture, s.phase, s.amount)
+            })
+        {
+            return Err("Invalid performance track, sample, pressure or coordinates".into());
+        }
+        Ok(())
+    }
+}
+
+fn valid_amount(gesture: Gesture, phase: Phase, amount: Option<f32>) -> bool {
+    match (gesture, phase, amount) {
+        (Gesture::Pressure, Phase::Up, None | Some(0.0)) => true,
+        (Gesture::Pressure, Phase::Down | Phase::Move, Some(v)) => (0.0..=1.0).contains(&v),
+        (Gesture::Tug | Gesture::Rotate, _, None) => true,
+        _ => false,
+    }
+}
+
+#[tauri::command]
+pub async fn perform_live_wheel_gesture(
+    host: State<'_, Host>,
+    batch: ReplayBatch,
+) -> Result<(), String> {
+    batch.validate()?;
+    #[cfg(windows)]
+    return host.perform(batch).await;
+    #[cfg(not(windows))]
+    {
+        let _ = host;
+        Err("Native slide performance requires Windows.".into())
+    }
+}
+
+#[tauri::command]
+pub async fn set_live_wheel_pressure(
+    host: State<'_, Host>,
+    layer_id: u64,
+    slide: Slide,
+    amount: f32,
+    center: [f32; 2],
+    phase: Phase,
+    age_ms: Option<f64>,
+) -> Result<(), String> {
+    perform_live_wheel_gesture(
+        host,
+        ReplayBatch {
+            layer_id,
+            slide,
+            gesture: Gesture::Pressure,
+            tug_response: None,
+            samples: vec![GesturePoint {
+                phase,
+                point: center,
+                amount: Some(amount),
+                age_ms,
+            }],
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -76,6 +153,7 @@ pub async fn replay_live_wheel_gesture(
     host: State<'_, Host>,
     batch: ReplayBatch,
 ) -> Result<(), String> {
+    batch.validate()?;
     #[cfg(windows)]
     return host.replay(batch).await;
     #[cfg(not(windows))]
@@ -123,6 +201,8 @@ pub struct Config {
     #[serde(default)]
     gesture: Gesture,
     tug_response: Option<f32>,
+    #[serde(default = "default_pressure")]
+    mouse_pressure: f32,
     render_width: u32,
     rect: Rect,
     focus: Option<f32>,
@@ -132,6 +212,9 @@ pub struct Config {
     feedback_clock: Option<FeedbackAnchor>,
     #[serde(default)]
     preview_hidden: bool,
+}
+fn default_pressure() -> f32 {
+    0.5
 }
 
 #[derive(Clone, Default, Serialize)]
@@ -254,7 +337,11 @@ pub fn live_wheel_benchmark_config() -> Option<BenchmarkConfig> {
         return Some(BenchmarkConfig {
             wheel: "violet-blue",
             slide: Slide::Rear,
-            gesture: Gesture::Tug,
+            gesture: if windows::pressure_trial() {
+                Gesture::Pressure
+            } else {
+                Gesture::Tug
+            },
             render_width: 640,
             verify_export: crate::export_smoke::enabled(),
         });

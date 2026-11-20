@@ -93,6 +93,10 @@ pub(super) fn render(
             let pts = index as f64 / f64::from(FPS);
             while let Some(e) = events.next_if(|e| e.time <= pts) {
                 let slide = e.slide as u32;
+                if e.gesture == Gesture::Pressure {
+                    target.set_slide_pressure(slide, e.amount.unwrap_or(0.), e.point)?;
+                    continue;
+                }
                 let previous = &mut held[slide as usize];
                 match e.phase {
                     Phase::Down => {
@@ -105,7 +109,7 @@ pub(super) fn render(
                             .ok_or("Missing export gesture anchor")?;
                         target.gesture(
                             slide,
-                            native_mode(e.gesture),
+                            native_mode(e.gesture).ok_or("Expected a planar gesture")?,
                             e.tug_response.unwrap_or(0.4),
                             from,
                             e.point,

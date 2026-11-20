@@ -871,3 +871,4 @@ input[type=range].hue-slider {
 .feedback-settings { display: grid; gap: .25rem; min-width: 0; margin: .4rem 0; padding: .6rem; }
 .feedback-settings label { display: flex; justify-content: space-between; }
 .feedback-settings input { width: 100%; }
+#performer-deck{margin-top:.8rem}#performer-deck summary{cursor:pointer}#performer-deck fieldset{display:grid;gap:.5rem;min-width:0;margin:.6rem 0;padding:.55rem}#performer-deck label{display:grid;gap:.2rem}#performer-deck input,#performer-deck select{min-width:0;width:100%}#performer-deck output{display:block;overflow-wrap:anywhere}#performer-deck [hidden]{display:none}#performer-deck p{font-size:.85rem;line-height:1.4}#performer-deck button{margin:.2rem 0}

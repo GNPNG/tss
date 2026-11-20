@@ -50,8 +50,13 @@
               <label>Live resolution<select id="wheel-width"><option value="640">640 × 360</option><option value="960">960 × 540</option></select></label>
             </div>
             <div class="native-choices motion-control">
-              <label>Mouse action<select id="wheel-gesture"><option value="tug">Material tug</option><option value="rotate">Rotate slide</option></select></label>
+              <label>Mouse action<select id="wheel-gesture"><option value="tug">Material tug</option><option value="rotate">Rotate slide</option><option value="pressure">Press slide</option></select></label>
               <label>Material response<select id="tug-response"><option value="0">Heavy</option><option value="0.4">Medium</option><option value="1">Light</option></select></label>
+            </div>
+            <div class="focus-control" id="mouse-pressure-controls" hidden>
+              <label for="mouse-pressure">Mouse pressure</label>
+              <output id="mouse-pressure-value" for="mouse-pressure">50%</output>
+              <input id="mouse-pressure" type="range" min="0" max="100" step="1" value="50">
             </div>
             <div class="focus-control">
               <label for="wheel-focus">Projector focus</label>
@@ -60,6 +65,20 @@
               <div class="range-ends"><span>Rear slide</span><span>Front slide</span></div>
               <button class="button quiet" id="wheel-focus-reset" type="button">Restore wheel focus</button>
             </div>
+            <details id="performer-deck" hidden>
+              <summary>Performance surfaces</summary>
+              <fieldset id="performer-config">
+                <label>Listen on IP<input id="performer-bind" value="127.0.0.1"></label>
+                <label>Certificate hostname<input id="performer-host" value="localhost"></label>
+                <label>Port<input id="performer-port" type="number" min="0" max="65535" value="47892"></label>
+                <button type="button" id="performer-cert">Choose certificate</button><output id="performer-cert-name"></output>
+                <button type="button" id="performer-key">Choose private key</button><output id="performer-key-name"></output>
+              </fieldset>
+              <p>For a wireless surface, choose the laptop’s LAN IP and a hostname covered by a certificate trusted on the controller.</p>
+              <button type="button" id="performer-toggle">Start listener</button>
+              <div id="performer-pairing" hidden><label>Private pairing link<input id="performer-url" type="password" readonly></label><button type="button" id="performer-copy">Copy pairing link</button></div>
+              <div id="performer-devices"></div><output id="performer-status" role="status">Listener off.</output>
+            </details>
             <details id="video-feedback">
               <summary>Video feedback</summary>
               <label class="native-toggle"><input name="feedback-enabled" type="checkbox"> Feed the prior program image back into the wheel</label>

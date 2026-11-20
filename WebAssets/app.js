@@ -3,6 +3,7 @@ import { analyzeAudio, featuresAt } from './audio-features.js';
 import { NativeWheelSurface } from './native-wheel.js';
 import { NativeWheelExport } from './native-wheel-export.js';
 import { VideoFeedbackControls } from './video-feedback.js';
+import { installPerformerDeck } from './performer-host.js';
 import { ProjectorDeck } from './projector-output.js';
 import { initMacroDeck, songFingerprint } from './gesture-macros.js';
 
@@ -34,6 +35,7 @@ function liveSelection() {
   if (!windowsDesktop || !layer?.visible || !layer.nativeLive || state.exporting ||
       layer.customColors || !mathmosWheels.has(layer.palette)) return null;
   return { layerId: layer.id, wheel: layer.palette, slide: layer.slide, gesture: layer.gesture,
+    mousePressure: layer.mousePressure?.[layer.slide] ?? 0.5,
     tugResponse: layer.tugResponse[layer.slide], renderWidth: layer.renderWidth, focus: projectorFocus,
     ...feedbackDeck.config(projectorDeck?.enabled), keepPresenting:!!projectorDeck?.enabled };
 }
@@ -86,6 +88,12 @@ const wheelExporter = windowsDesktop ? new NativeWheelExport({
   getEvents: (id, duration) => macroDeck?.exportEvents(id, duration) ?? [],
   finishRecording: async () => { await macroDeck?.finishPendingRecording(); },
   pause, prepare: prepareWheel, sync: () => nativeSurface.sync(), status,
+}) : null;
+
+const performerDeck = windowsDesktop ? installPerformerDeck({
+  invoke:window.__TAURI__.core.invoke, listen:window.__TAURI__.event.listen,
+  selection:liveSelection, prepare:prepareWheel,
+  layers:()=>state.layers.filter(l=>l.nativeLive && !l.customColors && mathmosWheels.has(l.palette)),
 }) : null;
 
 function status(message) { byId('app-status').textContent = message; }
@@ -317,7 +325,7 @@ async function loadWheelPresets() {
         if (benchmark?.verifyExport) {
           const { verifyWheelExport } = await import('./verify-wheel-export.js');
           await nativeSurface.sync();
-          await verifyWheelExport(liveSelection(), () => state.audioBuffer?.duration, status, projectorDeck);
+          await verifyWheelExport(liveSelection(), () => state.audioBuffer?.duration, status, projectorDeck,performerDeck);
         }
       }
     }
@@ -342,7 +350,7 @@ function makeLayer() {
   canvas.height = preview.height;
   const id = state.nextId++;
   return { id, name: `Liquid ${id}`, visible: true, palette: 'orchid', colors: [...LIQUID_PALETTES.orchid], customColors: false, hue: 0, speed: 1, scale: 1, opacity: state.layers.length ? 0.7 : 1, canvas, renderer: null, nativeLive: windowsDesktop,
-    slide: 'rear', gesture: 'tug', tugResponse: { rear: 0.4, front: 0.4 }, renderWidth: 640 };
+    slide: 'rear', gesture: 'tug', tugResponse: { rear: 0.4, front: 0.4 }, mousePressure: { rear: 0.5, front: 0.5 }, renderWidth: 640 };
 }
 function selectLayer(id) {
   state.selected = id;
@@ -435,12 +443,17 @@ function renderControls() {
   byId('wheel-gesture').disabled = byId('wheel-slide').disabled = byId('wheel-width').disabled = !live;
   byId('tug-response').value = String(layer?.tugResponse[layer.slide] ?? 0.4);
   byId('tug-response').disabled = !live || layer.gesture !== 'tug';
+  byId('mouse-pressure-controls').hidden = !live || layer.gesture !== 'pressure';
+  const strength = Math.round(100 * (layer?.mousePressure?.[layer?.slide] ?? .5));
+  byId('mouse-pressure').value = strength;
+  byId('mouse-pressure-value').textContent = strength+'%';
   byId('wheel-focus').disabled = !live;
   updateFocusControl();
   preview.parentElement.classList.toggle('native-active', !!live);
   byId('preview-status').textContent = live ? 'NATIVE GPU · SELECTED WHEEL' : 'PROCEDURAL PREVIEW';
   byId('native-instruction').textContent = layer?.gesture === 'rotate'
     ? `Drag around the center to turn the ${layer.slide} glass slide.`
+    : layer?.gesture === 'pressure' ? `Press and hold the ${layer.slide} slide to compress it. Drag the contact point. Release to restore the gap.`
     : `Drag to tug the material in the ${layer?.slide ?? 'rear'} slide.`;
   byId('audio-note').hidden = !!live;
   for (const id of ['hue', 'speed', 'scale', 'opacity']) byId(id).disabled = !layer || !!live;
@@ -642,6 +655,15 @@ byId('wheel-gesture').addEventListener('change', (event) => {
 byId('tug-response').addEventListener('change', (event) => {
   const layer = selectedLayer();
   if (layer) { layer.tugResponse[layer.slide] = Number(event.target.value); renderControls(); }
+});
+byId('mouse-pressure').addEventListener('input', event => {
+  const layer = selectedLayer();
+  if (!layer) return;
+  const value = Number(event.target.value);
+  layer.mousePressure ??= {rear:.5, front:.5};
+  layer.mousePressure[layer.slide] = value / 100;
+  byId('mouse-pressure-value').textContent = value+'%';
+  nativeSurface?.sync();
 });
 byId('wheel-width').addEventListener('change', (event) => {
   const layer = selectedLayer();

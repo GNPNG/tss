@@ -3,6 +3,7 @@
 mod export;
 mod export_smoke;
 mod live;
+mod performer;
 
 use export::ExportManager;
 use std::path::PathBuf;
@@ -255,15 +256,23 @@ fn main() {
         .manage(SelectedPaths::default())
         .manage(ExportManager::default())
         .manage(live::Host::default())
+        .manage(performer::Performer::default())
         .manage(live::movie::ExportControl::default())
         .invoke_handler(tauri::generate_handler![
             export_smoke::select_wheel_export_fixture,
             export_smoke::finish_wheel_export_verification,
             live::set_live_wheel,
+            performer::choose_performer_tls,
+            performer::start_performer,
+            performer::start_performer_verification,
+            performer::performer_verification_step,
+            performer::stop_performer,
             live::set_projector_output,
             live::verify_projector_visibility,
             live::set_live_wheel_capture_enabled,
             live::replay_live_wheel_gesture,
+            live::perform_live_wheel_gesture,
+            live::set_live_wheel_pressure,
             live::forget_live_wheel_layer,
             live::live_wheel_stats,
             live::live_wheel_benchmark_config,

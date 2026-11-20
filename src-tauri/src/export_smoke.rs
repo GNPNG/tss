@@ -35,7 +35,7 @@ fn paths() -> Result<(PathBuf, PathBuf), String> {
 pub(crate) fn select_wheel_export_fixture(
     state: State<'_, SelectedPaths>,
     window: tauri::WebviewWindow,
-) -> Result<(u64, String, String, usize), String> {
+) -> Result<(u64, String, String, usize, bool), String> {
     let (audio, output) = paths()?;
     let audio = audio.canonicalize().map_err(|e| e.to_string())?;
     if !audio.is_file()
@@ -59,7 +59,13 @@ pub(crate) fn select_wheel_export_fixture(
         .available_monitors()
         .map_err(|e| e.to_string())?
         .len();
-    Ok((id, path, output.to_string_lossy().into_owned(), displays))
+    Ok((
+        id,
+        path,
+        output.to_string_lossy().into_owned(),
+        displays,
+        std::env::args_os().any(|arg| arg == "--verify-pressure-export"),
+    ))
 }
 
 #[tauri::command]
