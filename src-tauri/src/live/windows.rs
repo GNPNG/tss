@@ -31,6 +31,8 @@ mod capture;
 mod macros;
 mod movie;
 mod projector;
+mod visibility;
+use super::VisibilityProof;
 use benchmark::Benchmark;
 
 pub(super) fn benchmark_output() -> Option<PathBuf> {
@@ -47,6 +49,7 @@ fn output_arg(option: &str) -> Option<PathBuf> {
 }
 
 enum Command {
+    VerifyVisibility(macros::Reply<VisibilityProof>),
     Projector(bool, u32, macros::Reply<()>),
     Set(Option<Config>),
     Forget(u64),
@@ -417,8 +420,17 @@ fn run(
     let mut export_pause = Duration::ZERO;
     let mut program_anchor: Option<(Instant, f64, bool)> = None;
     let mut projector: Option<projector::Projector> = None;
+    let mut hidden_pacer = visibility::Pacer::default();
+    let mut offscreen_submissions = 0u64;
+    let mut visibility_probe: Option<visibility::Probe> = None;
     loop {
         pump();
+        if visibility_probe
+            .as_mut()
+            .is_some_and(|probe| probe.poll(offscreen_submissions))
+        {
+            visibility_probe = None;
+        }
         if projector.as_ref().is_some_and(|p| p.closed()) {
             projector = None;
             stats.projector_running = false;
@@ -441,6 +453,15 @@ fn run(
         }
         for command in first_cmd.take().into_iter().chain(rx.try_iter()) {
             match command {
+                Command::VerifyVisibility(reply) => {
+                    if let Some(p) = projector.as_ref().filter(|_| visibility_probe.is_none()) {
+                        visibility_probe = Some(visibility::Probe::new(parent, p.hwnd(), reply));
+                    } else {
+                        let _ = reply.try_send(Err(
+                            "Open a projector before running visibility verification".into(),
+                        ));
+                    }
+                }
                 Command::Projector(enabled, delay, reply) => {
                     let result = if enabled {
                         match engine.as_ref().filter(|_| config.is_some()) {
@@ -643,7 +664,8 @@ fn run(
         }
         let editor_hidden = config.as_ref().is_some_and(|c| c.preview_hidden)
             || unsafe { IsIconic(parent) != 0 || IsWindowVisible(parent) == 0 };
-        if config.is_none() || (editor_hidden && projector.is_none()) {
+        if config.is_none() || (editor_hidden && projector.as_ref().is_none_or(|p| !p.visible())) {
+            hidden_pacer.clear();
             previous = None;
             samples.clear();
             match rx.recv_timeout(Duration::from_millis(25)) {
@@ -652,6 +674,19 @@ fn run(
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
             }
             continue;
+        }
+        if editor_hidden {
+            let wait = hidden_pacer.wait(Instant::now());
+            if !wait.is_zero() {
+                match rx.recv_timeout(wait.min(Duration::from_millis(25))) {
+                    Ok(c) => first_cmd = Some(c),
+                    Err(mpsc::RecvTimeoutError::Timeout) => (),
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                }
+                continue;
+            }
+        } else {
+            hidden_pacer.clear();
         }
         let c = config.as_ref().unwrap();
         let r = engine.as_mut().unwrap();
@@ -672,6 +707,7 @@ fn run(
             });
         let did_present = if editor_hidden {
             r.render_program_offscreen(frame_time.as_secs_f64(), program_time)?;
+            offscreen_submissions += 1;
             false
         } else {
             r.render_with_program_time(&surface, frame_time.as_secs_f64(), program_time)?
@@ -708,7 +744,7 @@ fn run(
                 samples.push(now.duration_since(p).as_secs_f64() * 1000.);
             }
             previous = Some(now);
-        } else {
+        } else if !editor_hidden {
             std::thread::sleep(Duration::from_millis(2));
         }
         if let Some(b) = bench.as_mut() {
@@ -727,6 +763,9 @@ fn run(
                 samples.len() as f64 * 1000. / samples.iter().sum::<f64>()
             };
             stats.p95_ms = percentile(&mut samples, 0.95);
+            if !editor_hidden {
+                hidden_pacer.observed(stats.fps);
+            }
             samples.clear();
             report = now;
             *shared.lock().map_err(|e| e.to_string())? = stats.clone();

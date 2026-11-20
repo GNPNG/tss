@@ -261,6 +261,7 @@ fn main() {
             export_smoke::finish_wheel_export_verification,
             live::set_live_wheel,
             live::set_projector_output,
+            live::verify_projector_visibility,
             live::set_live_wheel_capture_enabled,
             live::replay_live_wheel_gesture,
             live::forget_live_wheel_layer,

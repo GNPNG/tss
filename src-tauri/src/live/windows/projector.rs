@@ -141,6 +141,16 @@ impl Projector {
     pub(super) fn reset(&mut self) {
         self.output.reset();
     }
+    pub(super) fn hwnd(&self) -> HWND {
+        self.window.0
+    }
+    pub(super) fn visible(&self) -> bool {
+        unsafe {
+            IsIconic(self.window.0) == 0
+                && IsWindowVisible(self.window.0) != 0
+                && !client(self.window.0).contains(&0)
+        }
+    }
     pub(super) fn closed(&self) -> bool {
         unsafe {
             GetWindowLongPtrW(self.window.0, GWLP_USERDATA) != 0 || IsWindow(self.window.0) == 0

@@ -53,6 +53,12 @@ export async function verifyWheelExport(selection, duration, status, projector) 
     facts.projectorPresents=projectorStats.projectorPresents;
     facts.projectorAgeMs=projectorStats.projectorAgeMs;
     if(!(projectorStats.projectorRunning && facts.projectorPresents>0)) throw Error('Projector did not present frames');
+    facts.minimize=await invoke('verify_projector_visibility');
+    const {hiddenMs,offscreenFrames,bothHiddenMs,bothHiddenFrames}=facts.minimize;
+    if (!(hiddenMs>0 && offscreenFrames>0 && offscreenFrames<=Math.ceil(hiddenMs*60/1000)+1 &&
+          bothHiddenMs>0 && bothHiddenFrames===0)) {
+      throw Error('Unexpected presentation activity during minimize/restore verification');
+    }
     el('projector').click();
     await projector.pending;
     facts.projectorClosed=!projector.enabled && el('projector').getAttribute('aria-pressed')==='false';

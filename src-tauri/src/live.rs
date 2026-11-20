@@ -158,6 +158,25 @@ pub struct Stats {
     projector_presents: u64,
 }
 
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct VisibilityProof {
+    hidden_ms: f64,
+    offscreen_frames: u64,
+    both_hidden_ms: f64,
+    both_hidden_frames: u64,
+}
+#[tauri::command]
+pub async fn verify_projector_visibility(host: State<'_, Host>) -> Result<VisibilityProof, String> {
+    #[cfg(windows)]
+    return host.verify_visibility().await;
+    #[cfg(not(windows))]
+    {
+        let _ = host;
+        Err("Projector visibility verification requires Windows.".into())
+    }
+}
+
 #[tauri::command]
 pub async fn set_projector_output(
     host: State<'_, Host>,
