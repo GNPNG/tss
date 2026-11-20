@@ -167,3 +167,50 @@ impl Drop for WheelMovie<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated software Vulkan ICD"]
+    fn movie_feedback_starts_empty_and_restores_the_live_echo() {
+        let size = [128, 72];
+        let mut r = crate::feedback_test::fixture(size);
+        r.set_feedback(Some(FeedbackSettings {
+            delay_ms: 50,
+            strength: 0.72,
+            zoom: 1.03,
+            rotation_degrees: 3.,
+        }))
+        .unwrap();
+        let frame = |r: &mut LiveWheel, field, pts| {
+            r.render_program_to(None, field, pts);
+            r.capture_rgba8().unwrap().2
+        };
+        let empty = frame(&mut r, 2.25, 0.);
+        r.reset_feedback_history();
+        frame(&mut r, 0.1, 0.);
+        frame(&mut r, 1.1, 0.06);
+        let live = frame(&mut r, 2.25, 0.12);
+        assert_ne!(live, empty);
+        r.reset_feedback_history();
+        frame(&mut r, 0.1, 0.);
+        frame(&mut r, 1.1, 0.06);
+        let mut movie = pollster::block_on(r.begin_movie(size, true)).unwrap();
+        movie
+            .frame(2.25, 0., |pixels| {
+                assert_eq!(pixels, empty.as_slice());
+                Ok(())
+            })
+            .unwrap();
+        movie
+            .frame(2.25, 0.06, |pixels| {
+                assert_ne!(pixels, empty.as_slice());
+                Ok(())
+            })
+            .unwrap();
+        drop(movie);
+        assert_eq!(frame(&mut r, 2.25, 0.12), live);
+    }
+}

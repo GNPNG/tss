@@ -19,7 +19,7 @@ The native viewport shows the two sealed slides on the selected track. Its fluid
 
 ## Export the selected wheel
 
-Open a local song, choose the live wheel, then select **Export selected wheel in 4K**. Choose a new MP4 filename. The current wheel material and focus apply throughout. Enabled gestures scheduled at a recording position, audio motif or lyric phrase replay in song order at 30 fps. **Export starting pose** offers three choices.
+Open a local song, choose the live wheel, then select **Export selected wheel in 4K**. Choose a new MP4 filename. Export finishes an open gesture recording before reading the schedule. A take recorded while the song was paused can be assigned a trigger in the gesture deck. The current wheel material and focus apply throughout. Enabled gestures scheduled at a recording position, audio motif or lyric phrase replay in song order at 30 fps. **Export starting pose** offers three choices.
 
 - **Automatic** starts from neutral slides and the beginning of the fluid cache when the song contains scheduled events for this track. An unscheduled wheel starts from its current poses and visible film position.
 - **Current pose and film position** copies the two live slides, then applies the scheduled events to that copy.

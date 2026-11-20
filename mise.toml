@@ -1,3 +1,6 @@
+[env]
+RUSTUP_TOOLCHAIN = "1.88.0"
+
 [tasks.dev]
 description = "Run The Sacred Swirls desktop application"
 run = "cargo run --manifest-path src-tauri/Cargo.toml"
