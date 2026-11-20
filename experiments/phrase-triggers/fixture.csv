@@ -1,0 +1,5 @@
+source,hit,start_sample,end_sample,gesture_at_75_percent
+timed-lyrics,1,48000,96000,84000
+timed-lyrics,2,192000,264000,246000
+audio-events,1,48000,96000,84000
+audio-events,2,192000,264000,246000

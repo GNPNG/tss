@@ -1,0 +1,1378 @@
+[
+  {
+    "group": "Audio and timing",
+    "name": "Vectorscan",
+    "model": "SIMD multi-pattern byte matching with registered start/end offsets",
+    "stack": "C ABI from C++ via libhs, hs_compile_lit_multi and hs_scan in block mode",
+    "application": "Scan normalized timed lyric tokens or discrete audio-event sequences against a library of DJ trigger patterns.",
+    "platform": "Native libhs 5.4.14 exercised on Intel macOS. A Windows, Linux or ARM deployment needs a compatible build and ISA validation.",
+    "scope": "A 3.7 kB native fixture compiles two literal patterns and maps matched UTF-8 byte ranges back to audio samples.",
+    "decision": "Use the native library when applying large sets of predeclared patterns. The editor discovers recurring material by grouping timed words and comparing band transients during import.",
+    "evidence": "Both pattern types matched the two expected occurrences, rejected an interrupted sequence, and mapped a recorded gesture to samples 84,000 and 246,000. Audio events in this native fixture are supplied labels. The editor has a separate PCM-to-candidate test.",
+    "sources": [
+      "[Vectorscan source and platforms](https://github.com/VectorCamp/vectorscan)",
+      "[Native fixture and results](../experiments/phrase-triggers/README.md)",
+      "[Editor discovery and regression](../experiments/phrase-cues/phrase-cues.test.mjs)"
+    ]
+  },
+  {
+    "group": "Audio and timing",
+    "name": "Symphonia",
+    "model": "Feature-gated demuxing and native audio decoding",
+    "stack": "Rust crates for MP4/M4A, MP3, AAC-LC and ALAC",
+    "application": "Candidate native playback or prescan decoder",
+    "platform": "Rust desktop targets; target codec matrix unmeasured",
+    "scope": "External package footprint and decoded-buffer peak unmeasured.",
+    "decision": "Evaluate while preserving current Web Audio decoding behavior.",
+    "evidence": "The register identifies incomplete HE-AAC support and requests codec-specific tests.",
+    "sources": [
+      "[Codec/format features](https://github.com/pdeljanov/Symphonia/blob/main/GETTING_STARTED.md)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Audio and timing",
+    "name": "TSS band-envelope prescan",
+    "model": "Two first-order low-pass filters with per-band RMS envelopes",
+    "stack": "JavaScript, Web Audio AudioBuffer",
+    "application": "30 Hz bass/mid/treble and full-band energy for live playback and export",
+    "platform": "Windows and macOS webviews",
+    "scope": "WebAssets/audio-features.js 2,407 B; four numbers per analysis frame, JS object overhead unmeasured.",
+    "decision": "Integrated baseline. Evaluate cue recommendations against human-marked phrases separately.",
+    "evidence": "Crossovers at 250 Hz and 2 kHz. Envelopes use per-channel energy and temporal smoothing.",
+    "sources": [
+      "[Audio analysis](../WebAssets/audio-features.js)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Audio and timing",
+    "name": "Web Audio API",
+    "model": "Platform codec decoding to PCM, scheduled playback",
+    "stack": "Web Audio AudioContext and decodeAudioData",
+    "application": "MP3/M4A import and transport clock driving visual playback",
+    "platform": "Windows WebView2 and macOS WKWebView, codec availability varies",
+    "scope": "WebAssets/app.js 30,424 B shared with other controls. Native codec footprint unmeasured.",
+    "decision": "Integrated. Validate MP3, AAC-LC, ALAC, HE-AAC variants, sample rates, delay and seek accuracy on both platforms.",
+    "evidence": "Application imports decoded audio into the webview; an M4A filename alone does not identify its codec.",
+    "sources": [
+      "[Editor and audio transport](../WebAssets/app.js)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Audio and timing",
+    "name": "aubio",
+    "model": "Onset and tempo tracking and pitch estimation",
+    "stack": "Native C library",
+    "application": "Candidate signal analysis for selection-based visual templates, repeats and clip alignment",
+    "platform": "Windows and macOS integration untested",
+    "scope": "External library size, timing error and runtime unmeasured.",
+    "decision": "Evaluate alongside the existing envelope prescan on representative tracks.",
+    "evidence": "No aubio dependency appears in the application Cargo manifest. Phrase segmentation and template matching still require their own evaluation.",
+    "sources": [
+      "[aubio source](https://github.com/aubio/aubio)",
+      "[App manifest](../src-tauri/Cargo.toml)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Boundary geometry",
+    "name": "Discregrid",
+    "model": "Cubic Lagrange discrete grid for querying continuous fields such as boundary signed distances",
+    "stack": "C++/Eigen, MIT",
+    "application": "Rigid wall boundary queries in a particle solver; optional solid geometry representation",
+    "platform": "Dependency built with SPlisHSPlasH on Intel Mac CPU",
+    "scope": "ddf20dc0: cubic_lagrange_discrete_grid.cpp 1,191 physical lines",
+    "decision": "Link through SPH if its boundary representation is selected. Modest integration; compare signed distance and normal error to analytical glass planes before use.",
+    "evidence": "Mac build contains compiled Discregrid. No separate changing-gap or projector-interface accuracy test.",
+    "sources": [
+      "[Source](https://github.com/InteractiveComputerGraphics/Discregrid/blob/ddf20dc0480874bf02e0bdc6ded76c1f101b17fb/discregrid/src/cubic_lagrange_discrete_grid.cpp)",
+      "[TSS study](../experiments/splishsplash-study/README.md)"
+    ]
+  },
+  {
+    "group": "Build and distribution",
+    "name": "Go and cgo",
+    "model": "Compiled peer services and native-library adapters",
+    "stack": "Go with optional C ABI calls via cgo; C++ supplied through a C interface",
+    "application": "Candidate compiled worker for streaming compute or offline media preparation, interoperating with the Rust host",
+    "platform": "Cross-target cgo builds require the target C compiler and matching libraries. Use native builds where those toolchains are available.",
+    "scope": "Proposed peer boundary. Payload ownership, serialization or shared-buffer transfer, package size and frame-time cost require measurement.",
+    "decision": "Prefer compiled Go for a peer or tool when it fits. Keep the Windows native preview in process in Rust and avoid spawning Node or Python interpreters in the production software.",
+    "evidence": "Architecture preference recorded. No Go peer benchmark or shipping Go binary in this proof.",
+    "sources": [
+      "[Official cgo documentation](https://pkg.go.dev/cmd/cgo)",
+      "[Native stage design](slide-computation-spec.md)"
+    ]
+  },
+  {
+    "group": "Build and distribution",
+    "name": "Rust, Cargo and mise",
+    "model": "Pinned native toolchain and task runner",
+    "stack": "Rust 1.88, Cargo.lock, mise tasks, Tauri 2 build protocol",
+    "application": "Repeatable development/build/test entry points and custom-protocol embedding",
+    "platform": "Intel macOS and x64 Windows targets; Windows release uses local MSVC",
+    "scope": "mise.toml 368 B, src-tauri/Cargo.lock 129,143 B. Toolchain footprint unmeasured.",
+    "decision": "Use Rust and Tauri for the native host and performance-sensitive integration. Development-only scripts stay outside the production render loop.",
+    "evidence": "The x64 MSVC custom-protocol release built on Windows and presented all seven wheel profiles on a physical Vulkan adapter.",
+    "sources": [
+      "[mise tasks](../mise.toml)",
+      "[Rust pin](../rust-toolchain.toml)",
+      "[Live build command](../live-wheel/README.md)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Build and distribution",
+    "name": "TCB release, updater and signing pattern",
+    "model": "Signed release/update artifacts and discovery",
+    "stack": "TCB Tauri configuration, Authenticode and updater signing. DNS design specified by owner.",
+    "application": "Reference for application distribution, trust and automatic discovery of releases",
+    "platform": "Windows/macOS implementations need platform-specific verification",
+    "scope": "TSS tauri.conf.json 696 B, bundle.active false. Signing and updater artifact sizes unmeasured.",
+    "decision": "Retain TCB as reference. Integration, certificate verification and DNS-based discovery remain open.",
+    "evidence": "Public TCB release configuration demonstrates HTTPS endpoints and separate signing jobs. It does not establish the required DNS discovery protocol.",
+    "sources": [
+      "[TCB release workflow](https://github.com/gnomatix/tcb/blob/main/.github/workflows/release.yml)",
+      "[TCB app configuration](https://github.com/gnomatix/tcb/blob/main/src-tauri/tauri.conf.json)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Build and distribution",
+    "name": "WinGet, Cargo, mise and Homebrew",
+    "model": "Platform-specific tool detection, installation and version management",
+    "stack": "winget on Windows, brew on macOS, Cargo/mise where applicable",
+    "application": "User-controlled optional dependencies for validation, transcoding and upscaling",
+    "platform": "Windows and macOS; package IDs and versions vary by manager",
+    "scope": "Four named tools. TSS installer implementation and package download sizes unmeasured.",
+    "decision": "Specified mechanisms. Verify local availability, versions, consent and tool behavior before integrated installation.",
+    "evidence": "The current repository contains mise tasks. Implementing the dependency installer is distinct from having an installed command.",
+    "sources": [
+      "[mise tasks](../mise.toml)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Capture and device control",
+    "name": "HIDAPI / Apple IOHIDManager / Windows Raw Input",
+    "model": "Identify physical input sources and collect device reports or host input events.",
+    "stack": "Native C HIDAPI; Apple IOKit and Windows user32 APIs.",
+    "application": "Evaluate separating a built-in and external trackpad, multiple mice and concurrently assigned performers.",
+    "platform": "Available report descriptors, device permissions and host aggregation determine which pressure data are visible. Bluetooth address alone does not guarantee an independent event stream.",
+    "scope": "HIDAPI public header 850 lines at inspection; one descriptor plus one event decoder per supported report is narrower.",
+    "decision": "Use OS APIs or HIDAPI per device. Record device identity and capability test evidence before promising pressure support.",
+    "evidence": "Candidate low-level input paths. Current Windows mouse integration uses WM messages.",
+    "sources": [
+      "[HIDAPI](https://github.com/libusb/hidapi)",
+      "[IOHIDManager](https://developer.apple.com/documentation/iokit/iohidmanager_h)",
+      "[Raw Input](https://learn.microsoft.com/windows/win32/inputdev/about-raw-input)"
+    ]
+  },
+  {
+    "group": "Capture and device control",
+    "name": "TSS GPU guard / NVIDIA SMI / native probes",
+    "model": "Exclusive scheduling, adapter identity, sampled utilization, memory and deadline handling.",
+    "stack": "Native Rust job monitor and nvidia-smi; Swift Metal probe; native Vulkan/DX12/Metal via wgpu.",
+    "application": "Run one guarded trial and distinguish the presentation adapter, render adapter and any compute-only device.",
+    "platform": "Windows and Mac have different observability and WSI. GPU utilization samples do not measure photon latency.",
+    "scope": "803-line Rust guard entry point; Metal arithmetic probe 42 lines. Safety, process trees and telemetry have nontrivial scope.",
+    "decision": "Use existing tooling. Benchmark actual presentation or capture separately from initialization and from GPU job telemetry.",
+    "evidence": "Compute probes and past GPU optical runs documented by adapter. They do not establish simultaneous multi-GPU rendering.",
+    "sources": [
+      "[Job control](../experiments/gpu-job-control-rust/README.md)",
+      "[GPU probe](../experiments/wgpu-probe/README.md)"
+    ]
+  },
+  {
+    "group": "Capture and device control",
+    "name": "TSS wireless performance surface",
+    "model": "Authenticated input sessions from multiple surfaces and their tagged event streams.",
+    "stack": "Node.js HTTPS server and browser client.",
+    "application": "Send a wireless iPad Pencil gesture to a chosen slide and target control.",
+    "platform": "Local network trust, tablet sensor support, timestamp alignment and input latency require measurement.",
+    "scope": "Prototype server.mjs 104 lines and client.mjs 41; device UX and deterministic replay are additional work.",
+    "decision": "Reuse verified session/identity handling. Run a two-performer test through to the rendered gesture.",
+    "evidence": "Isolated transport proof; physical concurrent control and renderer integration remain open.",
+    "sources": [
+      "[Surface study](../experiments/wireless-control/README.md)"
+    ]
+  },
+  {
+    "group": "Capture and device control",
+    "name": "WebKit Force Touch / W3C Pointer Events / Apple Pencil",
+    "model": "Pressure, motion and pointer lifecycle capture.",
+    "stack": "WebKit Force Touch JavaScript events, Pointer Events, native UIKit Pencil API.",
+    "application": "Map Pencil direction to a slide swirl, trackpad pressure to plate compression, and preserve device-timed input for replay.",
+    "platform": "Browser mouse pressure defaults do not prove a physical sensor. Validate each device and whether simultaneous streams are distinguishable.",
+    "scope": "102-line gesture-input.mjs adapter. Identity and synchronized multi-device recording are substantially more complex.",
+    "decision": "Use official APIs with explicit event provenance; compare replay against a physical multi-input performance.",
+    "evidence": "Isolated gesture normalization tests. Physical Pencil and multiple trackpad pressure streams remain unverified.",
+    "sources": [
+      "[Pointer Events](https://www.w3.org/TR/pointerevents3/)",
+      "[Apple Pencil](https://developer.apple.com/documentation/uikit/handling-input-from-apple-pencil)",
+      "[Gesture study](../experiments/gesture-input/README.md)"
+    ]
+  },
+  {
+    "group": "Editor and platform",
+    "name": "Apple WKWebView",
+    "model": "OS WebKit webview hosted by Wry",
+    "stack": "Tauri / Wry, Apple WKWebView",
+    "application": "Mac editor UI and Web Audio. A separate experiment records WebKit pressure events.",
+    "platform": "Intel macOS target",
+    "scope": "System runtime size unmeasured. TSS uses the common 8,209 B WebAssets/index.html.",
+    "decision": "Integrated shell dependency. Windows preview validation does not establish a native Mac preview.",
+    "evidence": "Tauri config declares one window. The input experiment documents separate hardware verification.",
+    "sources": [
+      "[App HTML](../WebAssets/index.html)",
+      "[WebKit gesture experiment](../experiments/gesture-input/README.md)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Editor and platform",
+    "name": "Microsoft Edge WebView2",
+    "model": "OS runtime hosting the editor HTML and Tauri IPC",
+    "stack": "WebView2 runtime, webview2-com-sys 0.38.2 and Wry",
+    "application": "Windows UI controls, timeline and audio playback. The native child owns wheel presentation.",
+    "platform": "Windows x64 build",
+    "scope": "WebAssets/native-wheel.js 2,860 B. Runtime installation and resident memory unmeasured.",
+    "decision": "Integrated as the Windows editor UI. Verify runtime prerequisites on target systems.",
+    "evidence": "Cross-linked GUI PE imports the official WebView2Loader.dll in the portable UCRT build.",
+    "sources": [
+      "[Native preview bridge](../WebAssets/native-wheel.js)",
+      "[Build/run instructions](../live-wheel/README.md)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Editor and platform",
+    "name": "TSS visual-layer editor and project state",
+    "model": "Ordered visual layers and editable controls",
+    "stack": "JavaScript application state over a Tauri host",
+    "application": "Select, add, hide, reorder and delete layers. Mouse target and focus apply to the selected native preview.",
+    "platform": "Windows and macOS for shared controls, native wheel on Windows",
+    "scope": "WebAssets/app.js 30,424 B shared. Serialized complete project size unmeasured.",
+    "decision": "Basic layer operations implemented. Boolean mask tracks, lossless history/undo, durable project merge and saved track templates require implementation.",
+    "evidence": "The register distinguishes current operations from requested saved projects and master timeline.",
+    "sources": [
+      "[Editor actions](../WebAssets/app.js)",
+      "[Computation specification](slide-computation-spec.md)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Editor and platform",
+    "name": "Tauri 2, Wry and tauri-plugin-dialog",
+    "model": "Native desktop host with an OS webview and Rust command bridge",
+    "stack": "Rust, Tauri 2.11.6, tauri-plugin-dialog 2.7.3, HTML/JS controls",
+    "application": "Editor window, file dialogs, selected-track control and export commands",
+    "platform": "Windows, macOS",
+    "scope": "src-tauri/src/main.rs 7,168 B, tauri.conf.json 696 B. These sizes describe project glue only.",
+    "decision": "Integrated. Current configuration creates one main window. Second-monitor projector routing remains open.",
+    "evidence": "The Windows target compiles with embedded WebAssets and its native live child. Per-monitor fullscreen and hotplug require OS testing.",
+    "sources": [
+      "[Desktop configuration](../src-tauri/tauri.conf.json)",
+      "[Locked crates](../src-tauri/Cargo.lock)",
+      "[Shell entry point](../src-tauri/src/main.rs)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Feedback and shader hosts",
+    "name": "ChromaGlass v1.2.0 gpuFluid.ts",
+    "model": "2D GPU fluid-field and dye transport used in a separate early TSS experiment",
+    "stack": "TypeScript/WebGL2 fluid implementation, historically MIT-licensed at commit 9e6c54f",
+    "application": "Evidence for independent dye fields and gesture disturbance. Its role is in the fluid experiment.",
+    "platform": "WebGL2 with supported floating-point rendering/readback. Current native Win32/wgpu wheel uses a different path.",
+    "scope": "TSS experiment gpu-fluid.ts 51,994 B, bundled gpu-fluid.js 37,228 B and pinned MIT notice 1,070 B.",
+    "decision": "Retain experiment provenance. It is neither the native wheel integration nor an optical camera-feedback rig.",
+    "evidence": "The experiment exposes the upstream dyeTexture and records four independent fields and a visual shortfall against the supplied slide reference.",
+    "sources": [
+      "[Local experiment and checks](../experiments/liquid-fluid/README.md)",
+      "[Pinned upstream gpuFluid.ts](https://github.com/jstevoh/chromaglass/blob/9e6c54fe274b775a9decbed282350b0adfb05b65/src/lib/gpuFluid.ts)",
+      "[Retained notice](../experiments/liquid-fluid/chromaglass-MIT.txt)",
+      "[Feedback candidate register](dependency-register.md#video-feedback-implementation-candidates)"
+    ]
+  },
+  {
+    "group": "Feedback and shader hosts",
+    "name": "ISFMSLKit",
+    "model": "Translate ISF shader programs and execute scene passes on Metal",
+    "stack": "Objective-C++, Apple Metal, bundled and submodule translation dependencies",
+    "application": "Possible Mac backend for the same authored ISF effects",
+    "platform": "macOS Metal. A separate Windows host is required.",
+    "scope": "Upstream ISFMSLScene.mm 40,549 B and ISFMSLScenePassTarget_priv.mm 2,383 B. Built framework size unmeasured.",
+    "decision": "Mac-specific candidate. Verify Radeon pass behavior, floating targets, embedding and dependency licensing.",
+    "evidence": "Upstream includes a test app, Metal scene and pass-target sources. No TSS hardware timing or cross-host parity test is established.",
+    "sources": [
+      "[ISFMSLKit](https://github.com/mrRay/ISFMSLKit)",
+      "[Framework source sizes](https://api.github.com/repos/mrRay/ISFMSLKit/contents/ISFMSLKit)",
+      "[Feedback candidate register](dependency-register.md#video-feedback-implementation-candidates)"
+    ]
+  },
+  {
+    "group": "Feedback and shader hosts",
+    "name": "Interactive Shader Format (ISF) persistent passes",
+    "model": "Named persistent targets retain frames across draws. PASSINDEX selects the pass and FLOAT controls target precision.",
+    "stack": "JSON shader metadata, fragment shaders, persistent/intermediate images, multipass host",
+    "application": "Previous-frame feedback and repeatable transforms for a separately routable visual layer",
+    "platform": "A specification. Actual host and backend determine platform support.",
+    "scope": "A 640×360 RGBA16F image requires 1,843,200 bytes of pixel payload. Two such images require 3,686,400 bytes excluding padding and other targets.",
+    "decision": "Candidate format. Specify cycle order, buffer age and multi-loop routing independently.",
+    "evidence": "The ISF primer demonstrates transformed feedback with persistent buffers. TSS has no integrated ISF feedback graph.",
+    "sources": [
+      "[ISF multipass and persistent buffers](https://docs.isf.video/primer_chapter_7.html)",
+      "[Feedback candidate register](dependency-register.md#video-feedback-implementation-candidates)"
+    ]
+  },
+  {
+    "group": "Feedback and shader hosts",
+    "name": "The Light Herder’s 4K analog feedback rig",
+    "model": "Cameras recapture displayed output through half-mirrored glass in multiple coupled optical loops",
+    "stack": "Physical cameras, 4K screens, mirrors and manual motion",
+    "application": "Artistic and engineering reference for a separate video-feedback layer with camera motion, mixing, gain and loop coupling",
+    "platform": "Physical rig. Proposed digital feedback layer would target the desktop application.",
+    "scope": "Creator identifies 4K in the title. Camera timing, exact loop delays, image throughput and GPU-equivalent resource budgets are unmeasured.",
+    "decision": "Use as an appearance/motion reference. Build measurable digital loops and compare behavior with the source.",
+    "evidence": "Creator identity and title verified through YouTube’s metadata. The register describes the rig and TSS routing requirements. A single previous-frame transform does not qualify the full multi-loop effect.",
+    "sources": [
+      "[The Light Herder’s video](https://www.youtube.com/watch?v=R1z3oM6h8uM)",
+      "[Feedback candidate register](dependency-register.md#video-feedback-implementation-candidates)"
+    ]
+  },
+  {
+    "group": "Feedback and shader hosts",
+    "name": "VVISF-GL",
+    "model": "OpenGL ISF renderer with document, scene and per-pass target implementation",
+    "stack": "C++ VVGL and VVISF, BSD-3-Clause",
+    "application": "Host candidate for persistent ISF feedback shaders in a native desktop process",
+    "platform": "The ISF integration index lists macOS, Windows, Linux and iOS. Renderer sharing with the TSS Vulkan path is untested.",
+    "scope": "Upstream VVISF/src/ISFScene.cpp 45,793 B and ISFPassTarget.cpp 13,967 B. Built library and VRAM unmeasured.",
+    "decision": "Evaluate native GL build, context ownership, transfer/copy cost and loop latency.",
+    "evidence": "Actual implementation sources name pass and scene state. Project integration, precision and sustained FPS remain unmeasured.",
+    "sources": [
+      "[VVISF-GL](https://github.com/mrRay/VVISF-GL)",
+      "[Source sizes](https://api.github.com/repos/mrRay/VVISF-GL/contents/VVISF/src)",
+      "[ISF integrations](https://isf.video/integrations/)",
+      "[Feedback candidate register](dependency-register.md#video-feedback-implementation-candidates)"
+    ]
+  },
+  {
+    "group": "Feedback and shader hosts",
+    "name": "interactive-shader-format-js",
+    "model": "JavaScript host for Interactive Shader Format",
+    "stack": "JavaScript, WebGL and packaged builds",
+    "application": "Reference implementation for authored effects and host behavior",
+    "platform": "WebGL environments. Target webviews and persistent target capabilities require verification.",
+    "scope": "Upstream dist/build.js 141,481 B and dist/build-worker.js 141,256 B. These are separate published-in-repo files, uncompressed.",
+    "decision": "Reference/candidate for testing effect behavior; Windows native wheel rendering stays on its own GPU surface.",
+    "evidence": "Upstream distribution includes browser and worker bundles. TSS has no verified camera-feedback layer using them.",
+    "sources": [
+      "[JavaScript ISF implementation](https://github.com/msfeldstein/interactive-shader-format-js)",
+      "[Distribution files](https://api.github.com/repos/msfeldstein/interactive-shader-format-js/contents/dist)",
+      "[Feedback candidate register](dependency-register.md#video-feedback-implementation-candidates)"
+    ]
+  },
+  {
+    "group": "Feedback and shader hosts",
+    "name": "nannou-org/isf",
+    "model": "Parse and serialize Interactive Shader Format data",
+    "stack": "Rust crate with structured ISF metadata",
+    "application": "Possible ISF asset reader for a native rendering host",
+    "platform": "Rust target portability. No GPU backend supplied by the parser.",
+    "scope": "Upstream src/lib.rs 13,096 B. Host render targets and execution footprint unmeasured.",
+    "decision": "Candidate metadata parser. A GPU host must still allocate persistent images, order passes and render.",
+    "evidence": "The repository documents parsing and provides fixtures. No feedback renderer is established by parser tests.",
+    "sources": [
+      "[Rust ISF parser](https://github.com/nannou-org/isf)",
+      "[Parser source](https://github.com/nannou-org/isf/blob/master/src/lib.rs)",
+      "[Feedback candidate register](dependency-register.md#video-feedback-implementation-candidates)"
+    ]
+  },
+  {
+    "group": "Feedback and shader hosts",
+    "name": "ossia score",
+    "model": "External multimedia sequencer with interactive shader processes",
+    "stack": "C++ creative application, ISF process and multiple graphics backends",
+    "application": "Candidate external performance tool for prototyping feedback routing and parameter automation",
+    "platform": "Windows, macOS, Linux. Integration and actual selected GPU untested.",
+    "scope": "Upstream top-level CMakeLists.txt 18,301 B. This is build metadata only. Binary, dependency closure and VRAM unmeasured.",
+    "decision": "Evaluate side-by-side or via explicit interchange, including GPLv3 distribution considerations.",
+    "evidence": "Official graphics documentation describes shader input and rendering. Interdependent feedback under TSS transport and layer scheduling remains unverified.",
+    "sources": [
+      "[ossia shader processes](https://ossia.io/score-docs/processes/shaders.html)",
+      "[Distribution](https://ossia.io/interactive-installations.html)",
+      "[Build declarations](https://github.com/ossia/score/blob/master/CMakeLists.txt)",
+      "[Feedback candidate register](dependency-register.md#video-feedback-implementation-candidates)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "Aphros",
+    "model": "Finite-volume incompressible flow with PLIC VOF advection and surface tension",
+    "stack": "C++, optional OpenCL linear solver; pinned MIT",
+    "application": "External validation for sharp two-phase interfaces",
+    "platform": "OpenCL components source-reviewed; full multiphase GPU path and device execution unverified",
+    "scope": "d8d3976e: solver/vof.ipp 793 physical lines, excluding mesh and pressure solver",
+    "decision": "Retain candidate. Moderate offline case configuration; full GPU port high complexity. Compare capillary oscillation and confined squeeze against Basilisk.",
+    "evidence": "Prior source audit established optional linear-solver support, with first-device selection. No target run.",
+    "sources": [
+      "[Upstream source](https://github.com/cselab/aphros/blob/d8d3976e2f48805097cab223bdb022eafa8c6534/src/solver/vof.ipp)",
+      "[Candidate study](gpu-fluid-candidates.md)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "Basilisk Hele–Shaw module",
+    "model": "Pressure-driven Darcy/Hele–Shaw volume flux with spatial mobility",
+    "stack": "Basilisk C, GPLv3 distribution",
+    "application": "Cheap reference for plate friction, radial squeezing and pressure-driven flow",
+    "platform": "CPU WSL fixture; module GPU performance unmeasured",
+    "scope": "20-10-26 snapshot: hele-shaw.h 67 physical lines; pressure solve is external",
+    "decision": "Retain controlled reference. Moderate work for prescribed gap and appropriate boundary flux; compare radial displacement and phase volume under a measured compression.",
+    "evidence": "Upstream WSL pressure-driven composition example produced fingering during a bounded run. It is separate from the two-phase VOF wheel solver.",
+    "sources": [
+      "[Hele–Shaw](https://basilisk.fr/src/hele-shaw.h)",
+      "[TSS study](../experiments/basilisk-wsl-study/README.md)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "Basilisk centered two-phase VOF",
+    "model": "Adaptive quadtree, geometric interface advection, incompressible projection, viscosity and curvature force",
+    "stack": "Basilisk C through qcc, pinned distribution includes GPLv3",
+    "application": "Independent dyed oil/water gap per instance; feed signed distances to projector optics",
+    "platform": "CPU verified on WSL and Intel Mac; no demonstration of the complete solve on either GPU",
+    "scope": "20-10-26 snapshot ab82d30e: centered.h 471, vof.h 400, tension.h 94 physical lines",
+    "decision": "Use existing solver. Per-fluid density, viscosity, interfacial tension and fixed gap are wired. Dynamic gap and subgrid film drainage are additional models; test volume conservation and filmed same-gap mergers.",
+    "evidence": "Independent Windows WSL CPU runs produced 96 states per slide. Two measured PDMS-water presets produced distinct numeric trajectories.",
+    "sources": [
+      "[Centered solver](https://basilisk.fr/src/navier-stokes/centered.h)",
+      "[Surface tension](https://basilisk.fr/src/tension.h)",
+      "[TSS study](../experiments/slide-look-study/solver.md)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "Basilisk log-conformation and FENE-P",
+    "model": "Polymer conformation tensor, relaxation and polymeric extra stress; Oldroyd-B or finite extensibility",
+    "stack": "Basilisk C, GPLv3 distribution",
+    "application": "PVA-borate slime if measured stress relaxation and shear thinning support the chosen law",
+    "platform": "Same CPU solver ecosystem; viscoelastic TSS run and GPU use unverified",
+    "scope": "20-10-26 snapshot: log-conform.h 592, fene-p.h 29 physical lines",
+    "decision": "Link as a per-slide constitutive option. Moderate coupling and fitting effort; fit viscosity components plus relaxation spectrum, then compare step-shear relaxation and filament thinning.",
+    "evidence": "Stock Oldroyd-B pressure-step case ran at 16², 32² and 64² on the Intel Mac CPU. At t/λ=1.2 the fine grid reached 2.55113 against 2.55066 analytically. Calibrated slime and its coupling to an oil interface remain open.",
+    "sources": [
+      "[Stress evolution](https://basilisk.fr/src/log-conform.h)",
+      "[FENE-P](https://basilisk.fr/src/fene-p.h)",
+      "[Material measurements](../live-wheel/materials/specialty.json)",
+      "[Measured startup response](../experiments/basilisk-study/README.md#viscoelastic-pressure-step-reference)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "Basilisk sandbox granular rheology",
+    "model": "Continuum dense-grain friction μ(I) with pressure and strain-rate dependent viscosity",
+    "stack": "Basilisk C community sandbox, separate file licensing to confirm before distribution",
+    "application": "Dry grain flow reference for magic sand; submerged grains require wetting, entrained air and cohesion",
+    "platform": "Basilisk sandbox source available; no TSS target run",
+    "scope": "granular.h 280 physical lines in fetched sandbox source; mutable upstream",
+    "decision": "Retain constitutive reference. Large extension for immersed hydrophobic grains; compare dry column collapse first, then submerged shape retention, trapped air and breakup.",
+    "evidence": "Only source reviewed. No evidence this module reproduces hydrophobic sand or its optical appearance.",
+    "sources": [
+      "[Rheology](https://basilisk.fr/sandbox/M1EMN/Exemples/granular.h)",
+      "[Column test](https://basilisk.fr/sandbox/M1EMN/Exemples/granular_column.c)",
+      "[Granular measurements](../live-wheel/materials/specialty.json)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "Basilisk sandbox solidification / Stefan problem",
+    "model": "Heat diffusion in solid and liquid; latent heat and heat-flux jump drive a moving phase boundary",
+    "stack": "Basilisk C community sandbox, separate file licensing to confirm",
+    "application": "Wax melting/solidification boundary reference; optical scattering needs a separate phase-dependent model",
+    "platform": "No TSS target run",
+    "scope": "solidification_mwe.c 322 physical lines in fetched sandbox example; relies on additional modules",
+    "decision": "Retain thermal reference. Moderate test harness, substantial extension from the pure-substance front to the measured wax melting interval; compare front trajectory and energy balance.",
+    "evidence": "Source-reviewed plane ice/water front, not a wax run. Oil-wheel optics and viscosity proofs used no phase-change model.",
+    "sources": [
+      "[Solid/liquid example](https://basilisk.fr/sandbox/qmagdelaine/phase_change/1_elementary_body/solidification_mwe.c)",
+      "[Measured wax](../live-wheel/MATERIAL-MODELS.md)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "FluidX3D",
+    "model": "OpenCL lattice Boltzmann with optional liquid/free-surface tracking and GPU ray rendering",
+    "stack": "C++ and OpenCL, source-available noncommercial terms at inspected commit",
+    "application": "Single-liquid/free-surface visual study; two specified liquids require additional physics",
+    "platform": "OpenCL documented upstream; target Radeon/Windows slide benchmark unverified",
+    "scope": "cc40a383: src/lbm.cpp 1,451 physical lines excluding device kernels and graphics",
+    "decision": "Retain research with license restriction. High extension cost for two coupled materials; evaluate only its represented free-surface case and quantify interface error.",
+    "evidence": "Previous review found uncoupled gas in the free-surface model. No native TSS run.",
+    "sources": [
+      "[Upstream source](https://github.com/ProjectPhysX/FluidX3D/blob/cc40a3837ede8d996eb1092b8584c360237b0797/src/lbm.cpp)",
+      "[License at revision](https://github.com/ProjectPhysX/FluidX3D/blob/cc40a3837ede8d996eb1092b8584c360237b0797/LICENSE.md)",
+      "[Candidate study](gpu-fluid-candidates.md)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "Ludwig",
+    "model": "Binary/ternary free-energy lattice Boltzmann and wall wetting boundary models",
+    "stack": "C, MPI/OpenMP; CUDA/HIP source backends, BSD-3-Clause",
+    "application": "Independent droplet and wetting validation reference",
+    "platform": "Observed serial Intel Mac CPU; CUDA/HIP known upstream, target runs unverified",
+    "scope": "78d83c51: symmetric.c 500 physical lines for the symmetric free-energy model",
+    "decision": "Retain offline comparator. Moderate wall/slide setup, high cost for a new Metal port; first compare static droplet equilibrium, mass and wall contact angle.",
+    "evidence": "32³ CPU droplet ran 20 steps and produced phase and velocity checkpoints. No projector integration.",
+    "sources": [
+      "[Upstream source](https://github.com/ludwig-cf/ludwig/blob/78d83c5151ff1d4c4201a96b266a08e97047cae6/src/symmetric.c)",
+      "[TSS study](../experiments/liquid-fluid/ludwig-reference/README.md)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "OpenFOAM multiphaseInterFoam",
+    "model": "Multiple incompressible, immiscible fluids with volume-fraction capture, surface tension and pressure coupling",
+    "stack": "C++, OpenFOAM v2306, GPLv3-or-later source header",
+    "application": "High-resolution reference cases for multi-fluid wetting and squeeze between plates",
+    "platform": "Documented OpenFOAM solver; hardware execution for TSS unverified",
+    "scope": "v2306: multiphaseInterFoam.C source listing reaches line 163; included solver headers and libraries additional",
+    "decision": "Retain external offline reference. Moderate case setup, large embedding/port effort. Compare mass, pressure drop and interface shape across several gaps.",
+    "evidence": "Documented upstream capabilities only. No local measured GPU or closed-slide validation.",
+    "sources": [
+      "[Upstream source](https://api.openfoam.com/2306/multiphaseInterFoam_8C_source.html)",
+      "[Project evaluation](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "SPlisHSPlasH",
+    "model": "SPH with multiple fluid models, boundary adhesion and optional elastic solid forces",
+    "stack": "C++/Eigen/OpenMP, MIT; separate CPU and optional CUDA neighbor searches",
+    "application": "Offline particle motion and elastic-solid references, including candidate deformable inclusions",
+    "platform": "CPU verified on Intel Mac; CUDA neighbor search separate and untested here",
+    "scope": "dba6b26b: Akinci2013 tension .cpp 193, Kugelstadt2021 elasticity .cpp 2,327 physical lines",
+    "decision": "Retain native library. Moderate fixture integration; validating interfluid rather than same-phase tension or adding fluid stress relaxation is substantial. Test static angles, capillary rebound or measured stress relaxation for the chosen material.",
+    "evidence": "CPU kernel/state tests including a five-step single-fluid scene and 56 state assertions. No GPU evolution, oil-pair calibration or slime rheology.",
+    "sources": [
+      "[Source](https://github.com/InteractiveComputerGraphics/SPlisHSPlasH/blob/dba6b26b9387ab6bdd187d6df0a7c9d490d03500/SPlisHSPlasH/SurfaceTension/SurfaceTension_Akinci2013.cpp)",
+      "[Source](https://github.com/InteractiveComputerGraphics/SPlisHSPlasH/blob/dba6b26b9387ab6bdd187d6df0a7c9d490d03500/SPlisHSPlasH/Elasticity/Elasticity_Kugelstadt2021.h)",
+      "[TSS study](../experiments/splishsplash-study/README.md)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "Sailfish",
+    "model": "Shan–Chen multicomponent lattice Boltzmann with separately evolved component densities",
+    "stack": "Legacy Python 2.7 + Mako, generated OpenCL/CUDA; pinned source LGPL-3.0; check bundled licenses",
+    "application": "Independent offline oil/water reference, especially phase-field and forcing comparisons",
+    "platform": "Tested OpenCL on AMD Radeon Pro 5300M, Intel UHD 630 and Windows GTX 1650 Ti",
+    "scope": "b7140c58: lb_binary.py 517 physical lines; generated kernels separate",
+    "decision": "Retain measured baseline. High effort to replace host stack with a native equivalent. Reproduce bounded collision, pressure and mass tests first; include negative-density cases.",
+    "evidence": "Patched two-component runs executed on three GPUs. Some configurations failed numerical checks; no material-calibrated merger or live compositing proof.",
+    "sources": [
+      "[Upstream source](https://github.com/sailfish-team/sailfish/blob/b7140c580e1f4cb406dde947c8d8d5a8a6b2d79e/sailfish/lb_binary.py)",
+      "[TSS study](../experiments/sailfish-binary-study/README.md)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "Taichi-LBM3D dense two-phase",
+    "model": "Color-gradient two-component lattice Boltzmann with dense fields",
+    "stack": "Python/Taichi -> native backend kernels; MIT",
+    "application": "Candidate comparator for coupled oil/water interfaces",
+    "platform": "CPU and Metal typed uploads/readbacks and initialization; actual Metal adapter unreported",
+    "scope": "fe49e3f6: 2phase/lbm_solver_3d_2phase.py 664 physical lines, excluding Taichi compiler",
+    "decision": "Retain unresolved study. High cost to port collision, streaming and boundary pipeline. Verify normalized order parameter and sustained 32³ collision evolution with conservation checks.",
+    "evidence": "Original paths failed before step one. Patched staging initialized a 32³ CPU/Metal fixture; the bounded Metal collision test did not complete.",
+    "sources": [
+      "[Upstream source](https://github.com/yjhp1016/taichi_LBM3D/blob/fe49e3f609b2038cbf93c8bd453ffc5c2bf98e4c/2phase/lbm_solver_3d_2phase.py)",
+      "[TSS study](../experiments/taichi-metal-study/README.md)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "Taichi-LBM3D phase-change examples",
+    "model": "Separate thermal/solute lattice Boltzmann solver with latent-heat parameters and melting-cavity example",
+    "stack": "Python/Taichi, MIT; distinct source from dense 2phase solver",
+    "application": "Wax solid-liquid thermal comparison; sugar glass transition is a different material process",
+    "platform": "No TSS phase-change example executed on a target device",
+    "scope": "fe49e3f6: Phase_change/LBM_3D_SinglePhase_Solute_Solver.py 561 physical lines",
+    "decision": "Retain separate thermal reference. High port cost; verify conduction, enthalpy conservation and a melt-front fixture before applying measured wax thermal data.",
+    "evidence": "Earlier Taichi host-staging and Metal collision results apply to 2phase only; no result for these thermal examples.",
+    "sources": [
+      "[Upstream source](https://github.com/yjhp1016/taichi_LBM3D/blob/fe49e3f609b2038cbf93c8bd453ffc5c2bf98e4c/Phase_change/LBM_3D_SinglePhase_Solute_Solver.py)",
+      "[Upstream source](https://github.com/yjhp1016/taichi_LBM3D/blob/fe49e3f609b2038cbf93c8bd453ffc5c2bf98e4c/Phase_change/example_cavity_melting.py)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "idpy / idea.deploy",
+    "model": "Single-density Shan–Chen pseudopotential LBM and interface-force stencils",
+    "stack": "Python kernel generator, Metal/OpenCL/CUDA backends; MIT at pinned revision",
+    "application": "Single-fluid coexistence/interface relaxation benchmark",
+    "platform": "Confirmed target run on AMD Radeon Pro 5300M via Metal",
+    "scope": "28a09b07: MultiPhase.py 2,175 physical lines; supporting kernels separate",
+    "decision": "Retain reference. A coupled two-species implementation would be substantial new work. Compare density ratio, pressure jump and mass drift before extrapolating.",
+    "evidence": "Flat and radial density interfaces produced finite readbacks on Radeon; prescribed independent oil/water properties and confined plate forces unverified.",
+    "sources": [
+      "[Upstream source](https://github.com/lullimat/idea.deploy/blob/28a09b07c1217abe1d9a435f551cbc16b982986a/idpy/LBM/MultiPhase.py)",
+      "[TSS study](../experiments/idpy-metal/README.md)"
+    ]
+  },
+  {
+    "group": "Fluid mechanics",
+    "name": "lbmpy",
+    "model": "Symbolic lattice-Boltzmann model and collision generation, including two-component Shan–Chen and Allen–Cahn examples",
+    "stack": "Python/SymPy + pystencils 0.4.3; AGPLv3; generated-kernel notice requires review",
+    "application": "Offline reference for alternative interface models",
+    "platform": "Historical OpenCL path identified; no target multiphase run",
+    "scope": "358ebb11: tutorial 09_tutorial_shanchen_twocomponent.ipynb includes 143 code-cell source lines; excludes generator",
+    "decision": "Retain research. Moderate generation/integration effort and a distribution decision before using a kernel. Test two-component droplet and pair tension against a controlled comparator.",
+    "evidence": "Source review only. A single-phase Poiseuille test in upstream does not validate these multiphase examples.",
+    "sources": [
+      "[Upstream source](https://github.com/lssfau/lbmpy/blob/358ebb116071fd46801eb7cf250416c264ae21b1/doc/notebooks/09_tutorial_shanchen_twocomponent.ipynb)",
+      "[TSS study](../experiments/lbmpy-study/README.md)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "1etu / MeltGL",
+    "model": "Layer-local 2D free-surface level sets with curvature, pressure projection, image/video deformation and rendering.",
+    "stack": "TypeScript and WebGL2, GLSL ES 3.00 fragment programs, framebuffer ping-pong.",
+    "application": "Image/rotoscope distortions, per-layer snapshots, reduced-resolution pressure solving and controlled motion.",
+    "platform": "Browser WebGL2, Windows upstream build succeeded. Native lift requires maintaining each field texture, multigrid and restore ordering.",
+    "scope": "40 physical lines for the TypeScript multigrid V-cycle at simulation.ts 459–498. Full simulation host is 641 physical lines plus GLSL.",
+    "decision": "Select the layer organization and projection components. Reevaluate confined boundaries and heat transport against wax melt experiments before treating visual melting as phase change.",
+    "evidence": "Windows TSS study completed 14 workspace build tasks and 61 upstream integration tests. Those tests covered application logic and did not launch the GPU simulation.",
+    "sources": [
+      "[V-cycle](https://github.com/1etu/MeltGL/blob/c9a428421f6e4db6df70f8fc000ec9b764224ad6/Packages/DisplacementEngine/src/simulation.ts#L459-L498)",
+      "[Simulation shaders](https://github.com/1etu/MeltGL/blob/c9a428421f6e4db6df70f8fc000ec9b764224ad6/Packages/DisplacementEngine/src/shaders.ts)",
+      "[TSS build and evidence](../experiments/meltgl-study/README.md)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "Cake23 / Turing fluid",
+    "model": "Single-component reaction–diffusion pattern carried by a separate fluid texture.",
+    "stack": "JavaScript, WebGL and embedded GLSL fragment passes.",
+    "application": "Evolving patterned layer or geometric rotoscope fill coupled to flow and music.",
+    "platform": "Browser reference. Porting pass state requires explicit ping-pong order and resolution ratios.",
+    "scope": "59 physical lines inside shader-fs-advance and 31 inside shader-fs-advect on the inspected page, excluding surrounding script tags and blank end lines. Author specifies 512×256 flow and 1024×512 pattern.",
+    "decision": "Use its motion, scale separation and feedback math for an optional layer. Verify reuse terms for the standalone page before copying code.",
+    "evidence": "TSS Cake23 study validated Windows process containment on a fixture. The linked owner-supplied clip is retained as a motion reference; its provenance was not verified in this review.",
+    "sources": [
+      "[Author’s source and notes](https://cake23.de/turing-fluid.html)",
+      "[Owner-supplied motion reference](https://youtu.be/75CqxBOUKQw)",
+      "[TSS Cake23 study](../experiments/cake23-study/README.md)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "Cake23 / lavalamp template",
+    "model": "Feedback texture advancement, multiscale blur, advected pattern and particle passes.",
+    "stack": "C# Razor host template with JavaScript, WebGL and embedded GLSL.",
+    "application": "Optional evolving patterns, silhouettes and live-overlay backgrounds.",
+    "platform": "Original Windows host and browser graphics. Native port needs only the passes selected for the effect plus their feedback state.",
+    "scope": "105 physical lines inside shader-fs-advance, 26 in shader-fs-advect, 97 in shader-fs-composite. Counts exclude enclosing tags and blank end lines.",
+    "decision": "Reference or port the effect as an independent layer. Preserve the feedback update order in native textures. The name describes its aesthetic.",
+    "evidence": "TSS study builder selects this pinned template and verifies the original shader blocks and graphics host remain intact in its harness. No isolated solver throughput established here.",
+    "sources": [
+      "[Pinned template](https://github.com/Flexi23/Cake23/blob/af7b51e83709bcdd9cca33fc2aa2cbff6beb5460/Cake23/WebTemplates/lavalamp.cshtml)",
+      "[TSS extraction and verification](../experiments/cake23-library-study/build-study.mjs)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "Cake23 / reaction-diffusion-spot-worms template",
+    "model": "Feedback pattern with blur, advection and particle-related passes.",
+    "stack": "C# Razor, JavaScript and GLSL via WebGL.",
+    "application": "Spots, worms and traveling cellular boundaries on an independently composited visual layer.",
+    "platform": "Browser graphics; feedback passes can move to native render targets.",
+    "scope": "20 physical lines inside shader-fs-advance, 26 in shader-fs-advect and 66 in shader-fs-composite. Measurements exclude surrounding tags and blank end lines.",
+    "decision": "Port the pattern-update equation and its blur inputs together. Keep the new pattern from crossing sealed slides unless explicitly assigned as an overlay.",
+    "evidence": "The repository study builder identifies this variant separately from lavalamp and checks its shader blocks. TSS material calibration unmeasured.",
+    "sources": [
+      "[Pinned template](https://github.com/Flexi23/Cake23/blob/af7b51e83709bcdd9cca33fc2aa2cbff6beb5460/Cake23/WebTemplates/reaction-diffusion-spot-worms.cshtml)",
+      "[TSS study harness](../experiments/cake23-library-study/build-study.mjs)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "Codrops / WebGPU fluid simulations",
+    "model": "Author’s design account of WaterBall and WebGPU-Ocean, covering MLS-MPM and screen-space fluid rendering.",
+    "stack": "Article linking the TypeScript and WGSL projects below.",
+    "application": "Rationale for splitting simulation and reconstruction and for comparing different particle methods.",
+    "platform": "Documentation of browser WebGPU projects.",
+    "scope": "No separate library or standalone kernel in this article. Use the pinned source measurements in the two project entries.",
+    "decision": "Read for algorithm decisions. Use the source repositories for any native port.",
+    "evidence": "The author reports performance on specific hardware. These observations do not measure a TSS workload.",
+    "sources": [
+      "[Author’s article](https://tympanus.net/codrops/2025/02/26/webgpu-fluid-simulations-high-performance-real-time-rendering/)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "Evan Wallace / WebGL Water",
+    "model": "Height-field surface displacement with a separate caustic texture. Refracted grid locations yield floor irradiance from a differential-area ratio.",
+    "stack": "JavaScript, lightgl.js and embedded GLSL ES.",
+    "application": "Bounded caustic modulation under a curved meniscus, or a water-surface effect independent of the oil trajectory.",
+    "platform": "Browser WebGL. Fragment derivatives and offscreen targets also exist in native GPU APIs.",
+    "scope": "59 physical lines in renderer.js 228–286 for construction of the caustics shader, plus shared optical functions and separate surface mesh.",
+    "decision": "Select the caustic technique. Recompute normals, index contrast and receiving plane for glass and two liquid layers. The demonstration height field solves a different interface geometry.",
+    "evidence": "Project source inspected. The floor scene and its wavefront optics have no TSS hardware measurement.",
+    "sources": [
+      "[Caustic program](https://github.com/evanw/webgl-water/blob/73eda8be832b649367b25ea5690c1f0181bb56ad/renderer.js#L228-L286)",
+      "[Author’s demonstration](https://madebyevan.com/webgl-water/)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "Haxiomic / GPU Fluid Experiments",
+    "model": "Incompressible 2D flow with advection, pressure, dye and transported particles, using ping-pong targets.",
+    "stack": "Haxe/Lime, GLSL fragment shaders, published HTML5 WebGL demo.",
+    "application": "Adaptive fluid resolution, solver iteration count and particle count; brush and trail effects.",
+    "platform": "HTML5/WebGL reference. Compile-time targets in the original framework require their own validation.",
+    "scope": "32 physical lines in advect.frag. The pressure solve, pressure-gradient subtraction and adaptive host control are separate.",
+    "decision": "Selective port of the pass sequence and quality controls. Audit licensing before copying GPL source. Preserve distinct slide quantities in the native implementation.",
+    "evidence": "Source and published demo inspected. The TSS dependency register documents an impossible FPS-outlier condition in the original quality monitor.",
+    "sources": [
+      "[Advection kernel](https://github.com/haxiomic/GPU-Fluid-Experiments/blob/20210bd9e64884146a73e6cedc0c696ca50bd0fd/Source/shaders/glsl/fluid/advect.frag)",
+      "[Performance monitor](https://github.com/haxiomic/GPU-Fluid-Experiments/blob/20210bd9e64884146a73e6cedc0c696ca50bd0fd/Source/PerformanceMonitor.hx)",
+      "[Published experiment](https://haxiomic.github.io/GPU-Fluid-Experiments/html5/)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "PavelDoGreat / WebGL Fluid Simulation",
+    "model": "2D incompressible velocity grid with semi-Lagrangian advection, pressure iterations, RGB dye and splats.",
+    "stack": "JavaScript plus GLSL ES fragment programs over WebGL render targets.",
+    "application": "Cursor stirring and independently sized dye and velocity buffers for a low-cost motion layer.",
+    "platform": "Browser WebGL; small image passes can be translated to native GLSL or WGSL.",
+    "scope": "39 physical lines in the advection-program declaration including filter selection, script.js 746–784. Pressure projection requires additional iterative draws.",
+    "decision": "Port selected advection and input behavior. Colors sharing a transported dye texture need separate interface state to model stacked slides.",
+    "evidence": "Pinned MIT source inspected. Target-device performance and viscosity calibration for TSS unmeasured.",
+    "sources": [
+      "[Advection](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation/blob/a2d292931f19d9b3b9f564e23e6c32729d2121c3/script.js#L746-L784)",
+      "[TSS source review](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "Taichi Elements / MLS-MPM sand",
+    "model": "Material-point continuum with elastic and plastic branches. Sand projection acts on principal log strains via a friction-dependent yield return.",
+    "stack": "Taichi kernel DSL and solver host, SVD, grid stress transfer and per-particle deformation state.",
+    "application": "Dense sand, poured tracks and elastoplastic motifs. Validate dry slump and runout before adding submerged air-skin mechanics.",
+    "platform": "Taichi JIT project, separate from Taichi-LBM3D. A native library implementation could reuse the published constitutive algorithm and supply the surrounding MPM solver.",
+    "scope": "21 physical lines for sand_projection, mpm_solver.py 322–342. Grid transfers, deformation gradients and contact/boundary treatment are additional.",
+    "decision": "Use as a mechanics reference. The short return map alone cannot simulate grains. Pinned air, wetting hysteresis and trapped-air optics require additional models.",
+    "evidence": "No TSS run of Elements sand identified. Earlier Taichi-LBM3D initialization belongs to another codebase.",
+    "sources": [
+      "[Pinned plastic return](https://github.com/taichi-dev/taichi_elements/blob/d19678869a28b09a32ef415b162e35dc929b792d/engine/mpm_solver.py#L322-L342)",
+      "[Klar et al. sand constitutive model](https://www.cs.ucr.edu/~craigs/papers/2016-sand/paper.pdf)",
+      "[Separate TSS LBM experiment](../experiments/taichi-metal-study/README.md)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "Wumpf / Blub",
+    "model": "3D affine particle-in-cell (APIC) with implicit density and velocity projection, grid-based pressure and voxel boundaries.",
+    "stack": "Rust, wgpu 0.9 locked, GLSL compute and fullscreen rendering.",
+    "application": "Particle-grid transfer, collision bounds and surface display for a separate 3D effect.",
+    "platform": "Native desktop application requesting Vulkan and specific optional GPU features.",
+    "scope": "127 physical lines in transfer_gather_velocity.comp alone. Particle bins, pressure solves, grid transfers and voxelization run as interdependent passes.",
+    "decision": "Study the transfer and boundary algorithms. Lifting a kernel requires its particle layout and pressure-grid conventions. The single-fluid scene lacks granular or viscoelastic constitutive state. Porting the full application requires its pressure solver and voxelized-boundary machinery.",
+    "evidence": "TSS built the unchanged Windows executable. That check launched no GPU simulation.",
+    "sources": [
+      "[Pinned transfer kernel](https://github.com/Wumpf/blub/blob/939f346cf3a8e2173834d46fe6979ae42a0d4cc2/shader/simulation/transfer_gather_velocity.comp)",
+      "[TSS build and limitations](../experiments/blub-study/README.md)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "Wumpf / Notes on CFD",
+    "model": "Annotated CFD readings and comparisons of grid, particle and hybrid methods.",
+    "stack": "Markdown notes with references.",
+    "application": "Trace APIC, projection or boundary assumptions to the paper implementing each method.",
+    "platform": "Reference material for any backend.",
+    "scope": "352 physical lines of cfd.md at revision 744612b; executable kernel count is zero.",
+    "decision": "Use as a map of methods. Follow the cited papers for implementation and calibration.",
+    "evidence": "The author explicitly distinguishes recollection from sourced statements.",
+    "sources": [
+      "[Pinned notes](https://gist.github.com/Wumpf/b3e953984de8b0efdf2c65e827a1ccc3/744612b0b445b957290510da1684e846e5aefe2e)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "matsuoka-601 / WaterBall",
+    "model": "3D MLS-MPM fluid on a sphere with surface reconstruction in screen space.",
+    "stack": "TypeScript, WebGPU compute, WGSL.",
+    "application": "Spherical carrier motion or a decorative wet surface with independently adjustable reconstruction quality.",
+    "platform": "Browser WebGPU. Native wgpu can consume WGSL after matching bindings and resource layouts.",
+    "scope": "118 physical lines in mls-mpm/updateGrid.wgsl. Transfers, particle spawning and reconstruction are separate stages.",
+    "decision": "Extract a boundary or transfer pass for a spherical effect if needed. Retain the native slide model for plate confinement. Porting the complete system requires its atomic grid representation and simulation clock.",
+    "evidence": "Upstream sphere demo and source inspected. TSS target-device execution unmeasured.",
+    "sources": [
+      "[Grid update](https://github.com/matsuoka-601/WaterBall/blob/94130dced92b083ece104ff8fbaf559949d86635/mls-mpm/updateGrid.wgsl)",
+      "[Author’s implementation description](https://github.com/matsuoka-601/WaterBall/blob/94130dced92b083ece104ff8fbaf559949d86635/README.md)"
+    ]
+  },
+  {
+    "group": "Interactive motion and GPU methods",
+    "name": "matsuoka-601 / WebGPU-Ocean",
+    "model": "MLS-MPM particle-grid liquid and a selectable SPH mode, plus a screen-space liquid renderer.",
+    "stack": "TypeScript, WebGPU compute, WGSL.",
+    "application": "Compare particle-grid and neighbor-based cost, or reuse depth-based surface reconstruction for a separate water effect.",
+    "platform": "Browser WebGPU. Native reuse requires the compute dispatch and buffer contracts.",
+    "scope": "94 physical lines in the MLS-MPM second particle-to-grid pass p2g_2.wgsl. SPH is a separate solver.",
+    "decision": "Reuse a verified particle or image pass where it fits. The MLS-MPM fluid pipeline requires stress and contact closures before it can represent another mechanical material.",
+    "evidence": "The author reports a Mac SPH crash issue. No TSS run time or validated immiscible slide behavior for either mode.",
+    "sources": [
+      "[MLS-MPM stress transfer](https://github.com/matsuoka-601/WebGPU-Ocean/blob/3bd932778650b5e756ba2590969ed618313843ad/mls-mpm/p2g_2.wgsl)",
+      "[SPH and MLS-MPM modes](https://github.com/matsuoka-601/WebGPU-Ocean/blob/3bd932778650b5e756ba2590969ed618313843ad/README.md)"
+    ]
+  },
+  {
+    "group": "Kernel generation",
+    "name": "pystencils",
+    "model": "Stencil AST to native backend kernel generation and runtime launch support",
+    "stack": "Python, C/CUDA and historical OpenCL code generation; pinned AGPLv3",
+    "application": "Possible offline compiler for verified kernels, independent of which material model uses them",
+    "platform": "Only the historical OpenCL revision was inspected for this route",
+    "scope": "ddad5daf: kernelcreation.py 505 physical lines; separate backend and data-handler code",
+    "decision": "Retain coupled with the pinned lbmpy evaluation. Moderate integration effort; compare generated CPU and GPU results and review generated-code rights before distribution.",
+    "evidence": "Source inspected; later releases removed this OpenCL backend. No TSS multiphase run.",
+    "sources": [
+      "[Upstream source](https://github.com/lssfau/pystencils/blob/ddad5dafe6cb71c1a752a7a357536c4c8a0f55b8/pystencils/kernelcreation.py)",
+      "[TSS study](../experiments/lbmpy-study/README.md)"
+    ]
+  },
+  {
+    "group": "Live GPU, compositing and reconstruction",
+    "name": "AMD FidelityFX Super Resolution 1 / NVIDIA Image Scaling",
+    "model": "Spatial upsampling, including edge-directed reconstruction and optional sharpening.",
+    "stack": "Published GPU shader implementations; FSR1 EASU/RCAS and NIS scaling/sharpening.",
+    "application": "Second-pass comparison for structured foreground media or a marginally defocused plate. Preserve intentional optical softness.",
+    "platform": "Verify target shader precision, supported image representation and dispatch cost; nonlinear R'G'B' image algorithms are not drop-in filters for distance or transmission.",
+    "scope": "One or two effect passes depending on the path; upstream SDK and sample viewer exceed the kernel footprint. Port size TBD for the chosen backend.",
+    "decision": "Evaluate supplied kernels conditionally. Start without additional sharpening and reject halos, dark rims and temporal shimmer.",
+    "evidence": "New comparison candidates for the live-quality request. Neither is wired into TSS.",
+    "sources": [
+      "[FSR1](https://github.com/GPUOpen-Effects/FidelityFX-FSR)",
+      "[NIS](https://github.com/NVIDIAGameWorks/NVIDIAImageScaling)"
+    ]
+  },
+  {
+    "group": "Live GPU, compositing and reconstruction",
+    "name": "Hardware bilinear sampling / mipmapped trilinear filtering",
+    "model": "Spatial reconstruction of a reduced-rate plate; mipmap selection also filters minification.",
+    "stack": "wgpu samplers in WGSL or GLSL; native Vulkan, Metal and DX backends.",
+    "application": "Render out-of-focus slide transmittance at a reduced scale and sample it before combining plates; preserve a sharp neighboring interface.",
+    "platform": "Choose resolution from the circle of confusion, anisotropy and actual frame budget. Keep per-ray registration where it matters.",
+    "scope": "One sampler operation per lookup for bilinear; a mip chain uses extra memory. This describes call scope, not physical texel reads.",
+    "decision": "Use the native sampler first. Compare 1×, ½ and ¼ per slide against the same fully sampled focus state, including crossings and motion.",
+    "evidence": "Front locked to full resolution in a static, linear-absorption control. Half-linear-resolution rear with bilinear reconstruction measured 0.00236 full-frame linear RGB RMSE and 0.0180 crossing p95 against the full grid. GPU frame-time savings and moving optical terms remain unmeasured.",
+    "sources": [
+      "[wgpu sampler](https://docs.rs/wgpu/0.19.4/wgpu/struct.SamplerDescriptor.html)",
+      "[Live implementation](../live-wheel/README.md)",
+      "[Per-slide reconstruction study](../experiments/slide-look-study/approval/adaptive-focus/README.md)"
+    ]
+  },
+  {
+    "group": "Live GPU, compositing and reconstruction",
+    "name": "PixiJS",
+    "model": "2D masks, sprites, filters and displacement.",
+    "stack": "TypeScript/JavaScript, WebGL and WebGPU backends; GPU filter ecosystem.",
+    "application": "Authoring or external controller visualization; mask/fill methods inform native scene layers.",
+    "platform": "Host adapter preference is a hint. A browser choosing the iGPU supplies no timing for the dedicated GPU.",
+    "scope": "69-line Pixi study main.js; reimplementing an entire scene graph is large.",
+    "decision": "Use directly where a web controller is desired; reuse mask/fill data contracts for the native stage.",
+    "evidence": "A 20-frame Basilisk mask study exists. The guarded NVIDIA-target trial stopped at adapter verification.",
+    "sources": [
+      "[Filters](https://pixijs.com/8.x/guides/components/filters)",
+      "[Study](../experiments/slide-pixi-study/README.md)"
+    ]
+  },
+  {
+    "group": "Live GPU, compositing and reconstruction",
+    "name": "Skia image filters",
+    "model": "2D masks, blur, displacement and blend operations.",
+    "stack": "Native C++ Skia image filters; GPU execution depends on build/context.",
+    "application": "Compare a cached flat overlay, feedback warp or soft-plane filtering; preserve the optical compositor for colored intersections.",
+    "platform": "Backend interop, readback and color conversion can cost more than a filter. Verify zero-copy texture exchange.",
+    "scope": "Upstream SkImageFilters.h 654 physical lines when inspected; testing one filter is small, integrating a second graphics context costs more.",
+    "decision": "Test built-in filters on a reusable texture, native texture sampler as baseline. Avoid porting the full library.",
+    "evidence": "Source candidate; no TSS target-device timing.",
+    "sources": [
+      "[Image filters](https://api.skia.org/classSkImageFilters.html)"
+    ]
+  },
+  {
+    "group": "Live GPU, compositing and reconstruction",
+    "name": "TSS focus optics / paraxial camera / PBRT reference",
+    "model": "Finite-aperture thin-lens geometry and depth of field.",
+    "stack": "Optical reference math, PBRT C++ descriptions, TSS early JS and Rust reference studies.",
+    "application": "Predict blur from each slide's axial distance and select a lower render scale for the soft slide. Keep the other plate sharp.",
+    "platform": "Lens coefficients are scene assumptions. Thin-lens reference excludes aberrations and thick lens groups.",
+    "scope": "Initial thin-lens JS 41 lines, Rust reference 119 lines; approved shader has an independent shared-pupil implementation.",
+    "decision": "Use camera equations and measured focus endpoints. Keep early discontinued diagnostic distinct from the reference renderer.",
+    "evidence": "Current fixed frame study measured rear edge gradients 45.12→7.70 and front 9.88→69.76 through the rack focus.",
+    "sources": [
+      "[PBRT camera models](https://pbr-book.org/4ed/Cameras_and_Film/Projective_Camera_Models)",
+      "[Lens reference](../experiments/projector-lens-study/README.md)",
+      "[Focus measurements](../experiments/slide-look-study/approval/focus/README.md)"
+    ]
+  },
+  {
+    "group": "Live GPU, compositing and reconstruction",
+    "name": "TSS optical tracer / shared-flux studies",
+    "model": "Screen-space ray deflection, dye transmission, tile scheduling and two-vessel optics.",
+    "stack": "TSS Rust and WGSL via wgpu; earlier reference/data-prep tools.",
+    "application": "Reusable diagnostic for redistributed light, coordinate conventions and crossings in a proposed caustic plate.",
+    "platform": "Windows Vulkan and paired Metal/Vulkan diagnostic runs. A slow 4K offline film does not set the live budget.",
+    "scope": "167 lines in screen-rays.wgsl; 171 in tracer.wgsl. Rays, shared flux and tiled execution have different costs.",
+    "decision": "Reuse reference inputs and flux comparisons. Select a receiver-space pass only if its isolated and crossed-edge tests improve the look.",
+    "evidence": "The earlier paired render compared 921,600 pixels across GPUs. 59-frame shared-flux 4K diagnostic was encoded and checked.",
+    "sources": [
+      "[Optical audit](../experiments/optics-next/optical-audit.md)",
+      "[Shared flux](../experiments/optics-next/windows-shared-flux-evidence.md)"
+    ]
+  },
+  {
+    "group": "Live GPU, compositing and reconstruction",
+    "name": "Vello",
+    "model": "GPU vector rasterization, scene fills and image layers.",
+    "stack": "Rust Vello 0.1.0 and wgpu 0.19; GPU shaders supplied by the library.",
+    "application": "Render indexed bubble contours, silhouettes, star wipes and mask tracks. Pass optical transmission through a separate material operation.",
+    "platform": "Native WGPU backend and accumulator precision matter. Standard alpha compositing can lose colored transmission.",
+    "scope": "69-line native-slide-study main.rs; mask composition is modest, semantically correct optical overlap requires extra work.",
+    "decision": "Use built-in vector rasterization; compare matched contour boundaries and shared pixels against SDF plates.",
+    "evidence": "Native static mask study was written. Study record identifies it as unbuilt and undispatched.",
+    "sources": [
+      "[Vello](https://github.com/linebender/vello)",
+      "[Native study](../experiments/native-slide-study/README.md)"
+    ]
+  },
+  {
+    "group": "Live GPU, compositing and reconstruction",
+    "name": "libplacebo scaling kernels",
+    "model": "Separable and windowed spatial reconstruction, with configurable filter support.",
+    "stack": "libplacebo C API / GPU filters via Vulkan or FFmpeg.",
+    "application": "Compare native bilinear to a low-cost reconstruction filter before stacking soft layers. Test ringing at dyed boundaries.",
+    "platform": "Per-filter sample count, pass overhead and texture bandwidth matter on 4 GB devices.",
+    "scope": "One scaling stage per selected plate; no new scaler implementation required.",
+    "decision": "Use the filter registry. Only spend extra taps if a side-by-side focus sweep shows a worthwhile difference.",
+    "evidence": "Already used for projector output. Per-slide filter comparisons require their own evidence.",
+    "sources": [
+      "[Filter options](https://libplacebo.org/options/)"
+    ]
+  },
+  {
+    "group": "Live GPU, compositing and reconstruction",
+    "name": "scikit-image / SciPy subcell-interface reference",
+    "model": "Marching squares and nearest-segment reconstruction on a periodic scalar field.",
+    "stack": "Python/scikit-image and SciPy cKDTree, historical CPU study.",
+    "application": "Use previously generated subpixel results as a geometric oracle for in-plane edges and thin inclusions.",
+    "platform": "Reference only. A subcell reconstruction cannot recover drops missing from the original field.",
+    "scope": "One contour extraction plus nearest-segment distance over periodic tiles; local reconstruction/evaluation fixtures recorded.",
+    "decision": "Retain fixtures. Use native CImg/established contour code in the renderer and compare boundary error first.",
+    "evidence": "A/B screen and reconstruction evidence exists using saved Sailfish fields.",
+    "sources": [
+      "[Reconstruction](../experiments/subcell-interface-study/README.md)",
+      "[A/B proof](../experiments/subcell-interface-study/ab-screen-evidence.md)"
+    ]
+  },
+  {
+    "group": "Live GPU, compositing and reconstruction",
+    "name": "wgpu / Naga / SPIR-V",
+    "model": "Portable GPU device, texture, sampling, shader and presentation pipeline.",
+    "stack": "Rust wgpu 0.19.4; WGSL, GLSL through glslc/SPIR-V; Vulkan/Metal/DX12 across tests.",
+    "application": "Interpolate cached boundaries, warp the selected slide, then sample both planes through the pupil. Select adapters by supported limits.",
+    "platform": "Windows native live window; Rust core is portable. Test the actual surface, GPU, texture limits and latency. SwiftShader supplies a software validation path.",
+    "scope": "TSS core lib.rs about 826 lines in this snapshot, warp.wgsl 36; API-only probe 78 lines.",
+    "decision": "Use the backend, retain separate shader passes and compare buffered, presented frames at controlled input.",
+    "evidence": "Baseline Windows run on the GTX 1650 Ti Max-Q at 640×360 optics presented 3,366 frames across seven wheels at 39.92–40.00 FPS, with zero skipped acquires in the timed windows. The frozen rear drag changed 36,520 pixels by three or more codes.",
+    "sources": [
+      "[wgpu](https://github.com/gfx-rs/wgpu)",
+      "[Live renderer](../live-wheel/README.md)",
+      "[Frozen gesture](../experiments/slide-look-study/approval/live-gesture/README.md)",
+      "[Windows benchmark](../experiments/slide-look-study/approval/windows-live/benchmark.json)"
+    ]
+  },
+  {
+    "group": "Local agents and media suggestions",
+    "name": "Codex, Claude and agy client adapters",
+    "model": "Optional user-initiated prompt execution and returned media or tool results",
+    "stack": "External provider CLIs and image-generation services; client capabilities differ",
+    "application": "Validated prompts for user text or song lyrics, assets returned for operator review",
+    "platform": "External client installation, authentication, provider and OS dependent",
+    "scope": "Three named CLIs. Payload/binary sizes, model cost and response latency unmeasured.",
+    "decision": "Candidate adapters. Validate exact client/model/version and actual image capability, privacy boundary and prompt behavior individually.",
+    "evidence": "The dependency register names the clients and providers. Provider support cannot be inferred from a CLI name.",
+    "sources": [
+      "[TSS visual-advice use case](https://gitea.gnomatix.com/gnox/local-advisor/src/branch/main/use-cases/tss-visual-advice/README.md)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Local agents and media suggestions",
+    "name": "local-advisor and FunctionGemma",
+    "model": "Task-specific local-agent contract for structured suggestions",
+    "stack": "Local-advisor use-case template, FunctionGemma proposed for local model/structured calls",
+    "application": "Take timed lyrics and creative intent to suggested visual prompts or cue candidates",
+    "platform": "Local inference and hardware/backend qualifications pending",
+    "scope": "Six synthetic fixtures in the documented TSS use case. Model footprint, latency and output quality unmeasured in TSS.",
+    "decision": "Specified use case. Run the fixtures on actual pinned models and validate suggested cues before integration.",
+    "evidence": "Guide and TSS use case document an interface. Model execution and successful artist-facing prompt generation remain unverified.",
+    "sources": [
+      "[TSS visual-advice use case](https://gitea.gnomatix.com/gnox/local-advisor/src/branch/main/use-cases/tss-visual-advice/README.md)",
+      "[Local-agent use-case guide](https://gitea.gnomatix.com/gnox/local-advisor/src/branch/main/docs/local-agent-use-cases.md)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Local agents and media suggestions",
+    "name": "local-transcribe and whisper.cpp",
+    "model": "Offline ASR producing timed transcript segments",
+    "stack": "Specified local-transcribe project with whisper.cpp v1.9.5; faster-whisper was also proposed",
+    "application": "Optional timed lyrics and visual-prompt suggestions",
+    "platform": "Documented platform installers; integration and backend behavior need TSS tests",
+    "scope": "Documented JSON, SRT and Markdown outputs. Model files, latency and memory unmeasured in TSS.",
+    "decision": "Use the existing project interface and verify representative music. Evaluate faster-whisper separately if selected.",
+    "evidence": "Documented speech transcription does not establish accurate lyrics on mixed musical tracks or automatic cue alignment.",
+    "sources": [
+      "[local-transcribe README](https://gitea.gnomatix.com/gnpng/local-transcribe/src/branch/main/README.md)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Media and production",
+    "name": "FFmpeg demuxers, decoders and filtergraph",
+    "model": "Decode and transform prepared video, animated images and keyed layers",
+    "stack": "FFmpeg CLI, chromakey, scale, overlay and related filters",
+    "application": "Optional preprocessing for full-color animation, green-screen clips, GIF timing, alpha and rescaling",
+    "platform": "External CLI on Windows/macOS; capabilities depend on local build",
+    "scope": "Unmeasured per codec, filter, resolution and pixel format.",
+    "decision": "Candidate. Retain original assets, verify decoded alpha, transfer functions, framing and timebase.",
+    "evidence": "Chroma key handles prepared backgrounds. General subject segmentation, Igor recoloring and sound-linked transforms have separate acceptance cases.",
+    "sources": [
+      "[FFmpeg filters](https://ffmpeg.org/ffmpeg-filters.html#chromakey)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Media and production",
+    "name": "FFmpeg with libx264 and AAC",
+    "model": "Mux encoded video and audio from timestamped frames",
+    "stack": "Rust child process launching FFmpeg CLI, image2pipe PNG, H.264/libx264, AAC",
+    "application": "MP4 preview export with source audio, temporary-output handling and cancellation",
+    "platform": "Windows and macOS require an FFmpeg build exposing these encoders",
+    "scope": "src-tauri/src/export.rs 19,248 B including tests. External FFmpeg binary and codec sizes vary by build.",
+    "decision": "Integrated preview exporter. Retain distinct 16-bit master outputs and review actual FFmpeg distribution terms before bundling.",
+    "evidence": "Source sets CRF 18, yuv420p, AAC 256 kb/s, faststart and shortest. Export currently consumes frames from the editor export path.",
+    "sources": [
+      "[Rust exporter](../src-tauri/src/export.rs)",
+      "[FFmpeg x264 documentation](https://www.ffmpeg.org/general.html#x264)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Media and production",
+    "name": "ImageMagick 7",
+    "model": "Deterministic ICC conversion and image resampling",
+    "stack": "External magick command with profiles, Lanczos, TIFF/PNG and depth parameters",
+    "application": "Optional asset conversion and scaling to named Golden Nozzle output sizes",
+    "platform": "OS-specific installations on Windows and macOS; actual delegate/profile availability varies",
+    "scope": "docs/golden-nozzle-media-pipeline.md 4,370 B. Installed binary, delegates, ICC profiles and run time unmeasured.",
+    "decision": "Specified CLI pipeline. In-app validation/conversion remains open.",
+    "evidence": "Provided commands define CMYK TIFF conversion and 4,000×4,000 square digital output. Scaling alone provides no evidence of resolved image detail.",
+    "sources": [
+      "[Golden Nozzle pipeline](golden-nozzle-media-pipeline.md)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Media and production",
+    "name": "Little CMS",
+    "model": "ICC profile transforms",
+    "stack": "Little CMS C color-management engine",
+    "application": "Candidate prepress color conversion including CMYK workflows",
+    "platform": "Native desktop, target builds unmeasured",
+    "scope": "Package size, compiled footprint and transform cost unmeasured.",
+    "decision": "Candidate. Validate particular profiles, GCR, total area coverage and separation output.",
+    "evidence": "The project requires print deliverables distinct from display masters. Spot foil, overprint and plate geometry also need production checks.",
+    "sources": [
+      "[Little CMS](https://www.littlecms.com/color-engine/)",
+      "[Prepress requirements](golden-nozzle-media-pipeline.md)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Media and production",
+    "name": "OpenColorIO",
+    "model": "Config-driven display and scene color transforms",
+    "stack": "OpenColorIO native color-management library",
+    "application": "Candidate video/display transforms and explicit delivered color encoding",
+    "platform": "Windows and macOS integration untested",
+    "scope": "Config sizes, library footprint and processing throughput unmeasured.",
+    "decision": "Candidate. Validate working space, display transform and encoded metadata against the master specification.",
+    "evidence": "Rec.709 experiment and digital profile specify particular raster plates. Application integration remains open.",
+    "sources": [
+      "[OpenColorIO](https://opencolorio.org/)",
+      "[Rec.709 plate experiment](../experiments/rec709-plate/README.md)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Media and production",
+    "name": "Prepared masks and optional subject segmentation",
+    "model": "Time-varying alpha from keyed footage, exported masks or optional inference",
+    "stack": "User media plus external editing tools such as iMovie. Inference library unselected.",
+    "application": "Create silhouettes and masks for Igor gradients, colored clips, stills, GIFs and other layered visuals",
+    "platform": "App interchange targets Windows and macOS. Commercial editor integration untested.",
+    "scope": "No selected model, interface or inference footprint to measure.",
+    "decision": "Support prepared masks first. A semantic segmentation backend and tested commercial-tool interchange remain open.",
+    "evidence": "The register explicitly keeps chroma key and semantic segmentation separate and covers source media, synchronization and operator control.",
+    "sources": [
+      "[Layer computation specification](slide-computation-spec.md)",
+      "[TSS dependency register](dependency-register.md)"
+    ]
+  },
+  {
+    "group": "Neighborhood search",
+    "name": "CompactNSearch",
+    "model": "Fixed-radius neighbor search over point sets, supporting SPH particle interactions",
+    "stack": "C++, OpenMP, MIT",
+    "application": "Feed neighboring particle IDs to an optional SPH/material solver",
+    "platform": "CPU dependency in tested Intel Mac SPlisHSPlasH build",
+    "scope": "b40afcf4: src/CompactNSearch.cpp 738 physical lines",
+    "decision": "Link through existing SPH dependency if using that solver. Low integration effort, no independent material physics; compare neighbor sets against brute force at cell boundaries.",
+    "evidence": "CPU CompactNSearch selected for SPlisHSPlasH tests. No separately timed TSS search measured.",
+    "sources": [
+      "[Source](https://github.com/InteractiveComputerGraphics/CompactNSearch/blob/b40afcf47fe1963b363eba2371f04b42720fcb1d/src/CompactNSearch.cpp)",
+      "[TSS study](../experiments/splishsplash-study/README.md)"
+    ]
+  },
+  {
+    "group": "Neighborhood search",
+    "name": "TreeNSearch",
+    "model": "CPU octree-based fixed-radius neighbor lists for SPH and other point clouds",
+    "stack": "C++, MIT",
+    "application": "Alternative SPH neighbor search for uneven particle densities",
+    "platform": "CPU library; target integration and actual supported instruction set require checking",
+    "scope": "61cf111f: TreeNSearch/source/TreeNSearch.cpp 2,874 physical lines",
+    "decision": "Retain upstream optional selection. Low source integration, machine and problem-dependent performance. Check neighborhood parity, architecture support and real track size.",
+    "evidence": "Found as alternate in pinned SPlisHSPlasH CMake; no TSS build or timing.",
+    "sources": [
+      "[Source](https://github.com/InteractiveComputerGraphics/TreeNSearch/blob/61cf111f65c01f1d71fb5023ac72ce6bb0e8d6f9/TreeNSearch/source/TreeNSearch.cpp)",
+      "[Source](https://github.com/InteractiveComputerGraphics/SPlisHSPlasH/blob/dba6b26b9387ab6bdd187d6df0a7c9d490d03500/CMake/NeighborhoodSearch.cmake)"
+    ]
+  },
+  {
+    "group": "Neighborhood search",
+    "name": "cuNSearch",
+    "model": "CUDA fixed-radius particle-neighbor acceleration",
+    "stack": "C++ and CUDA kernels, MIT",
+    "application": "Optional NVIDIA neighbor search for particle-based materials",
+    "platform": "Requires CUDA for this backend. Windows CUDA tools were inventoried; backend untested",
+    "scope": "aba3da18: src/cuNSearchKernels.cu 233 physical lines excluding host, device buffers and utilities",
+    "decision": "Retain optional accelerator. Moderate GPU transfer/synchronization cost; compare exact neighbor sets and end-to-end time against CPU baseline, including transfers.",
+    "evidence": "Pinned by upstream SPlisHSPlasH CMake. No TSS device dispatch or full-GPU SPH claim.",
+    "sources": [
+      "[Source](https://github.com/InteractiveComputerGraphics/cuNSearch/blob/aba3da18cb4f45cd05d729465d1725891ffc33da/src/cuNSearchKernels.cu)",
+      "[Source](https://github.com/InteractiveComputerGraphics/SPlisHSPlasH/blob/dba6b26b9387ab6bdd187d6df0a7c9d490d03500/CMake/NeighborhoodSearch.cmake)"
+    ]
+  },
+  {
+    "group": "Projector optics and lighting",
+    "name": "BlendLuxCore",
+    "model": "Blender scene translation to LuxCore.",
+    "stack": "Blender add-on; Python host API and native LuxCore backend.",
+    "application": "A Blender-authored scene can serve as a separate LuxCore comparison for glass and other transmissive materials.",
+    "platform": "Requires mutually supported Blender/add-on/LuxCore versions. The standalone TSS LuxCore experiments used a different entry point.",
+    "scope": "Full scene exporter/add-on. TSS adapter size unmeasured.",
+    "decision": "Optional authoring integration. Verify a known scene transfers both slide boundaries and medium assignments.",
+    "evidence": "Upstream provides the integration; no TSS pass through this add-on.",
+    "sources": [
+      "[Upstream](https://github.com/LuxCoreRender/BlendLuxCore)"
+    ]
+  },
+  {
+    "group": "Projector optics and lighting",
+    "name": "Blender / Cycles",
+    "model": "Production path tracer with refractive caustics, dielectric BSDFs and scattering volumes.",
+    "stack": "C++ Cycles; Apache-2.0 renderer; Blender or standalone integration.",
+    "application": "Render a receiver illumination pass from the same curved slide geometry and a planar control. Also compare clear glass, tinted sugar and solid/molten wax.",
+    "platform": "CPU first. Match Blender/Cycles version to GPU backend. The 4.2 AMD Metal support statement is version-specific. Shadow caustics use caster/receiver/light flags and geometric normals.",
+    "scope": "Cycles shader.cpp 994 lines in Blender 4.5.16; scene and renderer span many components. Direct host integration is much larger than scene exchange.",
+    "decision": "Use Blender as an optional external pass; save linear EXR and cache it. Evaluate embedding Cycles only if scene-exchange latency becomes limiting.",
+    "evidence": "The two-slide C++ mesh exchange and Cycles CPU pass produced actual receiver EXRs and a registered 3840×2160 color composite. Enabled manifold sampling integrated to 87.63% of open-beam flux versus 98.45% with the estimator disabled at 96 spp. Deep dark rims and noisy bright samples remain under review.",
+    "sources": [
+      "[Cycles](https://www.cycles-renderer.org/)",
+      "[Shader source](https://raw.githubusercontent.com/blender/blender/v4.5.16/intern/cycles/scene/shader.cpp)",
+      "[Shadow caustics](https://docs.blender.org/manual/en/4.5/render/cycles/object_settings/object_data.html)",
+      "[Lighting inputs](../experiments/slide-look-study/approval/caustics/geometry/)",
+      "[Color pass and matched controls](../experiments/slide-look-study/approval/caustics/color-method.md)"
+    ]
+  },
+  {
+    "group": "Projector optics and lighting",
+    "name": "Blender / Mantaflow",
+    "model": "Grid-based fluid simulation with liquid meshes and domain caches.",
+    "stack": "Native Manta/Blender C++ integration; Blender fluid-domain settings.",
+    "application": "Prepare externally authored liquid motion or mesh sequences for a visual track.",
+    "platform": "Typically baked prior to rendering. Must demonstrate confined immiscible behavior before using for an oil gap.",
+    "scope": "Blender 4.5.16 MANTA_main.cpp integration file 2,450 lines; full solver and mesher are larger.",
+    "decision": "Use as an offline content-preparation option. Start with a small deforming inclusion and inspect exported mesh units and topology.",
+    "evidence": "No TSS run of a Mantaflow simulation identified.",
+    "sources": [
+      "[Blender integration](https://raw.githubusercontent.com/blender/blender/v4.5.16/intern/mantaflow/intern/MANTA_main.cpp)",
+      "[Fluid manual](https://docs.blender.org/manual/en/4.5/physics/fluid/index.html)"
+    ]
+  },
+  {
+    "group": "Projector optics and lighting",
+    "name": "Blender EEVEE",
+    "model": "Rasterized real-time scene shading and approximate reflected/transmitted lighting.",
+    "stack": "Blender native C++ draw engine and GPU shaders.",
+    "application": "Previsualize rigid scene or foreground geometry; compare a plate prepared externally with the live TSS projector.",
+    "platform": "Runs in Blender's graphics context. Compare the target hardware and the handling of overlapping refractive surfaces.",
+    "scope": "Whole render engine; no isolated TSS integration or timing measured.",
+    "decision": "Retain for reference and artist clip preparation. Benchmark the receiver pattern before substituting any particular pass for Cycles.",
+    "evidence": "Catalog candidate only.",
+    "sources": [
+      "[EEVEE manual](https://docs.blender.org/manual/en/4.5/render/eevee/introduction.html)"
+    ]
+  },
+  {
+    "group": "Projector optics and lighting",
+    "name": "CImg",
+    "model": "Image resampling and Euclidean distance transforms of separate phase coverages.",
+    "stack": "C++ header-only library; CImg v3.6.0 in study.",
+    "application": "Convert each reconstructed phase into a signed distance. Feed the live optics, or export the boundary for other lighting engines.",
+    "platform": "CPU preprocessing at chosen field resolution. Preserve units, polarity and separate channels.",
+    "scope": "61-line TSS pack-fields.cpp, including input/output and both channels.",
+    "decision": "Reuse the established transform. Cache results; avoid reconstructing distances from a flattened color image.",
+    "evidence": "Used to pack the independent oil trajectories and their fixed-field reference.",
+    "sources": [
+      "[CImg revision](https://github.com/GreycLab/CImg/tree/01230c15cfe23d5ffd9b1d1ba05aefdbcac6ab00)",
+      "[Packer](../experiments/slide-look-study/pack-fields.cpp)"
+    ]
+  },
+  {
+    "group": "Projector optics and lighting",
+    "name": "Filament",
+    "model": "Real-time material shading including transmission, absorption, IOR and thickness.",
+    "stack": "Native C++ engine, compiled material shaders, Metal/OpenGL/Vulkan backends.",
+    "application": "Try a glass or candy layer refracting a prepared background. Keep independent TSS slide composition for the overlap comparison.",
+    "platform": "Official v1.50.1 sample ran on Radeon Pro 5300M via Metal. Stock screened refraction may omit another transparent object.",
+    "scope": "Local generator 72 lines plus 63-line run driver; a whole render engine with many backend variants.",
+    "decision": "Use isolated material rendering before considering stack integration. Compare rear-only, front-only and together at the crossing.",
+    "evidence": "Tested stock configurations gave zero of 4,900 central pixels changed when the rear slab was added behind the front. Single-slab and focus controls changed pixels.",
+    "sources": [
+      "[Materials](https://google.github.io/filament/main/materials.html)",
+      "[Slab diagnostic](../experiments/filament-optics/README.md)",
+      "[Radeon test](filament-radeon-evaluation.md)"
+    ]
+  },
+  {
+    "group": "Projector optics and lighting",
+    "name": "LuxCoreRender — PATHCPU and PATHOCL",
+    "model": "Path-traced reflection, transmission, absorbing media and caustics.",
+    "stack": "Native C++ and OpenCL; LuxCore SDL; Apache-2.0.",
+    "application": "Offline reference for clear glass, tinted candy and a refracting oil meniscus. Feed independently reconstructed closed geometry and material media to the console or C++ API.",
+    "platform": "Windows NVIDIA PATHOCL stock scene ran. Mac Radeon OpenCL kernel build remains an issue. CPU transport and hardware film processing are separate settings.",
+    "scope": "Upstream glass.cpp 321 lines at samples-v2.11.2; local static slide scene 68 lines. Full engine integration high complexity.",
+    "decision": "Use the engine directly. Compare a fixed two-slide receiver against the flat control; qualify color and throughput separately.",
+    "evidence": "Stock GPU result and low-sample static CPU glass test exist. The geometry in the earlier CPU study missed the oil reference.",
+    "sources": [
+      "[Glass implementation](https://raw.githubusercontent.com/LuxCoreRender/LuxCore/samples-v2.11.2/src/slg/materials/glass.cpp)",
+      "[CPU slide test](../experiments/luxcore-slide-study/README.md)",
+      "[GPU stock scene](../experiments/luxcore-native-study/output/windows-gpu-full-scene-photographic-20261119/EVIDENCE.md)"
+    ]
+  },
+  {
+    "group": "Projector optics and lighting",
+    "name": "LuxCoreRender — RTPATHOCL",
+    "model": "Progressive interactive path tracing with preview sampling.",
+    "stack": "C++ engine; OpenCL; native API.",
+    "application": "Evaluate selected expensive optical shots and caching between scene edits.",
+    "platform": "Native render-thread settings differ from PATHOCL. GPU backend, scene edit/restart costs and serialization matter.",
+    "scope": "Local session probe 57 lines; cross-frame engine state and scene updates make embedding high effort.",
+    "decision": "Retain as a second-pass candidate. Time a fixed optical scene, then a single tracked geometry edit, before considering a live preset.",
+    "evidence": "Prior API and serialization studies; no measured sustained editor frame rate for this engine.",
+    "sources": [
+      "[Engine](https://github.com/LuxCoreRender/LuxCore/blob/samples-v2.11.2/src/slg/engines/rtpathocl/rtpathocl.cpp)",
+      "[API study](../experiments/luxcore-native-study/rtpath-api-study/BUILD-EVIDENCE.md)"
+    ]
+  },
+  {
+    "group": "Projector optics and lighting",
+    "name": "OpenEXR / Imath",
+    "model": "Linear floating-point exchange for signed distances, lighting and data passes.",
+    "stack": "Native C++ OpenEXR and Imath.",
+    "application": "Exchange separate fields and scene-linear receiver images with offline renderers.",
+    "platform": "Keep data textures untransformed and signed. Distinguish scene-linear color from distance channels. Matching native dependencies matter.",
+    "scope": "Two independent float field images per sample; exchange adapter is much smaller than a scene renderer.",
+    "decision": "Use directly. Verify a round trip, sign, coordinates, and channel values before compositing output.",
+    "evidence": "Native export of the fixed focus frame provides separate front and rear fields; see proof files.",
+    "sources": [
+      "[OpenEXR](https://openexr.com/)",
+      "[Export data](../experiments/slide-look-study/approval/caustics/geometry/)"
+    ]
+  },
+  {
+    "group": "Projector optics and lighting",
+    "name": "libplacebo / TSS projector hook",
+    "model": "Linear-light transmission through two dyed slides, with a shared pupil and independently set focal distances.",
+    "stack": "Native C libplacebo; GLSL user shader; Windows FFmpeg/Vulkan and TSS wgpu shader build.",
+    "application": "Keep the approved focus behavior. A neutral caustic gain can enter before display encoding; avoid counting the existing bright rim twice.",
+    "platform": "GPU backend and floating-point texture support matter. SwiftShader CPU validation is separate from on-device presentation FPS.",
+    "scope": "Shared optics.hook 203 lines; libplacebo custom shader API header 341 lines at v6.338.2.",
+    "decision": "Use the library directly for reference/offline and compile the same optical logic for the live GPU. Compare lighting variants at fixed fields.",
+    "evidence": "Seven offline 4K wheel videos. Fixed-state focus endpoints measured and shown to owner.",
+    "sources": [
+      "[libplacebo](https://libplacebo.org/)",
+      "[Current shader](../experiments/slide-look-study/optics.hook)",
+      "[Focus proof](../experiments/slide-look-study/approval/focus/README.md)"
+    ]
+  },
+  {
+    "group": "Surface reconstruction",
+    "name": "Splashsurf",
+    "model": "SPH particle reconstruction through sampled density and marching cubes, optional smoothing",
+    "stack": "Rust, native CLI/library, MIT",
+    "application": "Offline mesh bridge from particle-based materials into optical rendering",
+    "platform": "Windows and Intel Mac CPU reconstruction measured",
+    "scope": "0.14.1 at 56d3e6ac: core reconstruction.rs 194, marching_cubes.rs 400 physical lines; support modules additional",
+    "decision": "Use as an optional native bridge if particle materials selected. Moderate integration; compare mesh topology, volume, small-feature retention and motion continuity before tracing transmission.",
+    "evidence": "Windows CPU read 4,732 sample particles and wrote 130,932 vertices and 261,992 triangles. No live mesh-to-projector measurement.",
+    "sources": [
+      "[Source](https://github.com/InteractiveComputerGraphics/splashsurf/blob/56d3e6ac444cf8540c238a4391483955a9484210/splashsurf_lib/src/reconstruction.rs)",
+      "[TSS study](../experiments/splashsurf-windows-study/README.md)",
+      "[TSS study](../experiments/splashsurf-study/README.md)"
+    ]
+  },
+  {
+    "group": "Visual and optical references",
+    "name": "Mathmos wheels / Joshua Light Show / user-selected reference C",
+    "model": "Physical projected light, overlapping dyes, menisci, focus, droplets and performance motion.",
+    "stack": "Physical apparatus, supplied photos, archival film and video references.",
+    "application": "Use wheel photographs for spatial/color comparisons and footage for motion. The project logo supplies branding. Preserve clean live appearance.",
+    "platform": "Reference media depicts unknown fluids and camera processing. Still colors alone do not determine viscosity or physical absorption spectra.",
+    "scope": "Seven wheel colorways; six color-theme panels; photos and films have no implementation LOC.",
+    "decision": "Reference, no code port. Compare separated slide outputs and projected crossings; the owner approves the appearance.",
+    "evidence": "Owner reviewed the Violet / Blue focus proof positively. Other candidate material appearances require separate review.",
+    "sources": [
+      "[Mathmos demo](https://www.youtube.com/watch?v=SqM5iv0OoCg)",
+      "[Original 42 s reference](https://www.youtube.com/watch?v=fkv8hXnmKrQ&t=42s)",
+      "[Liquid Loops](https://www.moma.org/collection/works/200467)",
+      "[Wheel references](../experiments/slide-look-study/wheel-references.md)"
+    ]
+  }
+]
