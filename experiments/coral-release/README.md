@@ -38,4 +38,4 @@ Use a new output directory. Set `BASILISK` to the Basilisk `src` directory conta
 experiments/coral-release/reproduce.sh /path/to/new-coral-study
 ```
 
-The script checks 96 full-domain phase integrals and both connected-component trajectories. Both solves ran single-threaded on the Intel Mac CPU. The shipped gzip SHA-256 is `98c1a58eade1c8a27dd4f148abc3f8b031e495f3acdd55e85f217161bdb79b61`.
+The script checks 96 full-domain phase integrals per slide and checks front-slide connectivity in both representations. A clean regeneration using this script on the Intel Mac CPU reproduced the shipped gzip byte for byte. Its SHA-256 is `98c1a58eade1c8a27dd4f148abc3f8b031e495f3acdd55e85f217161bdb79b61`.
