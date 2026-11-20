@@ -63,7 +63,7 @@ fn map_readback(r: &LiveWheel) -> Vec<[u16; 4]> {
         .unwrap_or(&r.zero);
     read_rgba16(r, t, UV_SIZE)
 }
-fn read_rgba16(r: &LiveWheel, t: &Target, size: [u32; 2]) -> Vec<[u16; 4]> {
+pub(super) fn read_rgba16(r: &LiveWheel, t: &Target, size: [u32; 2]) -> Vec<[u16; 4]> {
     let [w, h] = size;
     let row = w * 8;
     assert_eq!(row % gpu::COPY_BYTES_PER_ROW_ALIGNMENT, 0);
@@ -99,7 +99,7 @@ fn read_rgba16(r: &LiveWheel, t: &Target, size: [u32; 2]) -> Vec<[u16; 4]> {
         .collect()
 }
 
-fn half(h: u16) -> f64 {
+pub(super) fn half(h: u16) -> f64 {
     let sign = if h >> 15 == 0 { 1. } else { -1. };
     let exp = (h >> 10) & 31;
     let frac = f64::from(h & 1023);

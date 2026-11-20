@@ -1,6 +1,24 @@
 # Confined-slide computation specification
 
-The graph below records the original integration plan. Two fixed-gap slide solves now drive seven offline color wheels, and the Windows editor has a native preview of those fields. The owner reviewed the Violet / Blue rack focus positively. The [640 × 360 Windows benchmark](../experiments/slide-look-study/approval/windows-live/README.md) measured 39.92–40.00 FPS. Calibrated same-slide merger behavior and variable plate compression still require verification. [Implementation evidence](https://gitea.gnomatix.com/gnpng/org/issues/5#issuecomment-5673) · [Focus proof](../experiments/slide-look-study/approval/focus/README.md) · [Project scope](https://gitea.gnomatix.com/gnpng/org/issues/3#issuecomment-5678)
+Two independent Basilisk slide solves supply the native Windows preview and the seven wheel themes. The pressure control deforms either solved field using a prescribed, volume-conserving plate gap. The owner approved the Violet / Blue rack focus. The earlier 640 × 360 Windows wheel benchmark measured 39.92–40.00 FPS. Calibrating physical sensor force to glass deflection and measuring same-slide coalescence remain open. [Pressure reference](../experiments/pressure-study/README.md) · [Windows wheel benchmark](../experiments/slide-look-study/approval/windows-live/README.md) · [Focus proof](../experiments/slide-look-study/approval/focus/README.md)
+
+## Native pressure path
+
+```mermaid
+flowchart LR
+    H["Pointer sample or recorded cue"] --> C["Rust host selects track, slide, XY and compression"]
+    C --> G["Local gap and radial map on the selected slide"]
+    R["Rear Basilisk phase atlas"] --> A["GPU material lookup per slide"]
+    F["Front Basilisk phase atlas"] --> A
+    G -->|"inverse map to unloaded material coordinates"| A
+    G -->|"gap, hence local thickness and optical mid-plane"| L["Optical shader"]
+    A -->|"independent boundaries and coverage"| L
+    P["Projector focal setting and pupil"] --> L
+    L -->|"per-ray transmissions multiplied, then averaged"| O["Editor, delayed projector or 4K export"]
+    B["Basilisk variable-gap Reynolds reference"] -.->|"checks lateral flux for a fixed contact center"| G
+```
+
+The live shader receives one pressure uniform per slide. It samples each original field in its own coordinates, including the slide's rotation and material tug. For optics, the selected gap scales absorption along the dyed path and changes the liquid mid-plane's distance from focus. The photographed wheel fit supplies the carrier tint. The independent CPU reference runs during model verification. The GPU evaluates the radial map directly during performance. [Native map](../live-wheel/src/pressure.rs) · [Field lookup](../live-wheel/src/fields.wgsl) · [Lens and transmission](../experiments/slide-look-study/optics.hook)
 
 ## Choosing methods for each material
 

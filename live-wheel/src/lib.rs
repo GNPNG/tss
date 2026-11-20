@@ -8,6 +8,7 @@ mod movie;
 pub use movie::WheelMovie;
 mod material;
 mod motion;
+mod pressure;
 pub use fields::bundled_fields;
 pub use motion::SlideGesture;
 use motion::SlidePose;
@@ -39,6 +40,7 @@ struct FramePair {
     rotation: [f32; 4],
     centers: [f32; 4],
     cache_rect: [f32; 4],
+    pressure: [[f32; 4]; 2],
 }
 
 struct Target {
@@ -652,6 +654,28 @@ impl LiveWheel {
         self.tracks.entry(self.active).or_default().slides[slide as usize].response = response;
         Ok(())
     }
+    /// Set one sealed slide's normalized contact load at a top-left-origin gate position.
+    /// The contact remains in glass coordinates when the slide subsequently rotates.
+    pub fn set_slide_pressure(
+        &mut self,
+        slide: u32,
+        amount: f32,
+        center: [f32; 2],
+    ) -> Result<(), String> {
+        if slide > 1
+            || !(0. ..=1.).contains(&amount)
+            || center.iter().any(|v| !(0. ..=1.).contains(v))
+        {
+            return Err("Expected slide 0 or 1, pressure and gate coordinates in [0, 1]".into());
+        }
+        let pose = &mut self.tracks.entry(self.active).or_default().slides[slide as usize];
+        pose.pressure = pressure::Pressure::new(
+            pose.rigid_point(center.map(f64::from)),
+            amount,
+            self.fields.view_to_cache(),
+        );
+        Ok(())
+    }
     pub fn end_gesture(&mut self, slide: u32) {
         if let Some(pose) = self
             .tracks
@@ -847,6 +871,7 @@ impl LiveWheel {
                 rotation: [r[0], r[1], f[0], f[1]],
                 centers: [rc[0], rc[1], fc[0], fc[1]],
                 cache_rect: self.fields.view_to_cache(),
+                pressure: poses.map(|p| p.pressure.shader(p.angle)),
             }),
         );
         let mut enc = self
@@ -879,7 +904,7 @@ impl LiveWheel {
             &fields,
         );
         // Keep the selected optical model continuous through first movement.
-        let integrate = self.footprint_sampling;
+        let integrate = self.footprint_sampling || poses.iter().any(|p| p.pressure.active());
         let optic_pipe = match (integrate, self.wheel == "violet-blue") {
             (true, true) => &self.footprint_baseline_pass,
             (true, false) => &self.footprint_palette_pass,
@@ -1002,6 +1027,8 @@ mod feedback_test;
 mod footprint_test;
 #[cfg(test)]
 mod software_test;
+#[cfg(test)]
+mod pressure_test;
 #[cfg(test)]
 mod warp_diagnostic;
 

@@ -430,12 +430,14 @@
     "model": "Pressure-driven Darcy/Hele–Shaw volume flux with spatial mobility",
     "stack": "Basilisk C, GPLv3 distribution",
     "application": "Cheap reference for plate friction, radial squeezing and pressure-driven flow",
-    "platform": "CPU WSL fixture; module GPU performance unmeasured",
+    "platform": "CPU WSL fingering fixture and Intel macOS single-threaded squeeze-film reference. The live shader evaluates the prescribed radial map on the GPU.",
     "scope": "20-10-26 snapshot: hele-shaw.h 67 physical lines; pressure solve is external",
-    "decision": "Retain controlled reference. Moderate work for prescribed gap and appropriate boundary flux; compare radial displacement and phase volume under a measured compression.",
-    "evidence": "Upstream WSL pressure-driven composition example produced fingering during a bounded run. It is separate from the two-phase VOF wheel solver.",
+    "decision": "Use the variable-mobility Poisson solve as an independent check of radial transport. Physical calibration of the glass under force and material-dependent transient response remain open.",
+    "evidence": "The WSL example produced pressure-driven fingering. A separate fixed-center squeeze-film reference on grids from 64² to 512² converged at second order. Finest-grid flux and center-pressure errors were 0.0056% and 0.0346% respectively. Release reversed the flux and a held gap produced zero flow.",
     "sources": [
       "[Hele–Shaw](https://basilisk.fr/src/hele-shaw.h)",
+      "[Variable-mobility solver](https://basilisk.fr/src/poisson.h)",
+      "[Squeeze reference and numerical results](../experiments/pressure-study/README.md)",
       "[TSS study](../experiments/basilisk-wsl-study/README.md)"
     ]
   },

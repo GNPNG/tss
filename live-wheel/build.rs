@@ -42,6 +42,19 @@ fn main() {
             String::from_utf8_lossy(&result.stderr)
         );
     };
+    // Only the test executable embeds this SPIR-V. It integrates the actual
+    // GLSL source map and gap over the sealed world, including off-screen liquid.
+    compile(
+        "pressure-volume-test",
+        &footprint,
+        "",
+        r#"void main() {
+            vec2 uv=(fieldUV-source.cacheRect.zw)/source.cacheRect.xy;
+            float r=clamp((255.0*sourceDistance(uv,false)-127.5)/3.0+0.5,0.0,1.0);
+            float f=clamp((255.0*sourceDistance(uv,true)-127.5)/3.0+0.5,0.0,1.0);
+            result=vec4(r,1.0-r,f,1.0-f)*vec4(vec2(pressureGap(uv,false)),vec2(pressureGap(uv,true)));
+        }"#,
+    );
     compile(
         "film-material",
         &footprint,

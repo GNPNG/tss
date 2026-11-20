@@ -100,6 +100,14 @@ impl LiveWheel {
 }
 
 impl WheelMovie<'_> {
+    pub fn set_slide_pressure(
+        &mut self,
+        slide: u32,
+        amount: f32,
+        center: [f32; 2],
+    ) -> Result<(), String> {
+        self.renderer.set_slide_pressure(slide, amount, center)
+    }
     pub fn end_gesture(&mut self, slide: u32) {
         self.renderer.end_gesture(slide);
     }

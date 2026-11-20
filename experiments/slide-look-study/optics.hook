@@ -112,6 +112,7 @@ vec3 apertureRay(vec2 uv, vec2 aperture, vec2 frontNormal, vec2 rearNormal,
 #ifdef TSS_WHEEL_PROFILE
     cyanDepth = mix(1.0,cyanDepth,depthVariation);
 #endif
+    cyanDepth *= pressureGap(frontUV,true);
 #endif
     float bend = rimSupport.g * 5.8 * bell(nearD - 1.2, 3.6);
     vec2 rearUV = uv + (aperture * rearBlur + frontNormal * bend) / slideUnits;
@@ -124,6 +125,7 @@ vec3 apertureRay(vec2 uv, vec2 aperture, vec2 frontNormal, vec2 rearNormal,
 #ifdef TSS_WHEEL_PROFILE
     pinkDepth = mix(1.0,pinkDepth,depthVariation);
 #endif
+    pinkDepth *= pressureGap(rearUV,false);
 #endif
     float frontPath, rearPath;
     vec3 front = transmit(nearD, dot(frontNormal, lampDirection), cyanAbsorption, cyanDepth, 1.15, rimSupport.g, frontPath);
@@ -185,6 +187,10 @@ vec4 hook() {
     }
 #endif
 
+#ifdef TSS_LIVE_FOOTPRINT
+    rearBlur += pressureDefocus(uv,false);
+    frontBlur += pressureDefocus(uv,true);
+#endif
     // Uniform-area radial strata, turned through the golden angle on the
     // half-circle. Antipodal pairs exactly center the pupil's first moment.
     // Fixed sample positions avoid temporal shimmer as the plates move.

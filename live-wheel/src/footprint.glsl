@@ -10,9 +10,36 @@ layout(set=0,binding=5,std140) uniform SourcePair {
     vec4 rotation;
     vec4 centers;
     vec4 cacheRect;
+    vec4 pressure[2];
 } source;
 layout(set=0,binding=6) uniform texture2D filmMaterial;
 const vec2 filmAspect = vec2(16.0/9.0, 1.0);
+// The squared-radius inverse map s0=s[1-a(1-s)^3] conserves both phase
+// volumes when the physical gap is h0 ds0/ds. Same inverse as fields.wgsl.
+vec2 pressurePoint(vec2 uv,vec4 press) {
+    if (press.w == 0.0) return uv;
+    vec2 d=uv-press.xy;
+    vec2 p=d*filmAspect;
+    float s=dot(p,p)*press.z;
+    if (s>=1.0) return uv;
+    float t=1.0-s;
+    return press.xy+d*sqrt(1.0-press.w*t*t*t);
+}
+float pressureGap(vec2 uv,bool front) {
+    vec4 press=source.pressure[front ? 1 : 0];
+    if (press.w == 0.0) return 1.0;
+    vec2 p=(uv-press.xy)*filmAspect;
+    float s=dot(p,p)*press.z;
+    float t=max(1.0-s,0.0);
+    return 1.0-press.w*t*t*(1.0-4.0*s);
+}
+float pressureDefocus(vec2 uv,bool front) {
+    // Nominal gap 1 mm, source-side glass fixed. The optical mid-plane moves by
+    // half the gap change. Convert the new conjugate to design-pixel pupil radius.
+    float ds=0.5*(1.0-pressureGap(uv,front));
+    float s=front ? 51.8 : 53.4;
+    return -(8.0*1600.0*1.8)*ds/(s*(s+ds));
+}
 vec4 rayMaterial(vec2 uv, bool front) {
     vec2 atlasSize = vec2(textureSize(sampler2D(filmMaterial,fieldSampler),0));
     vec2 inset = vec2(0.5,1.0)/atlasSize;
@@ -26,7 +53,7 @@ vec4 rayMaterial(vec2 uv, bool front) {
 vec2 filmSourceUV(vec2 uv, bool front) {
     vec2 cs = front ? source.rotation.zw : source.rotation.xy;
     vec2 centre = front ? source.centers.zw : source.centers.xy;
-    vec2 p = (uv - 0.5) * filmAspect;
+    vec2 p = (pressurePoint(uv,source.pressure[front ? 1 : 0]) - 0.5) * filmAspect;
     vec2 q = 0.5 + vec2(cs.x*p.x - cs.y*p.y, cs.y*p.x + cs.x*p.y) / filmAspect;
     vec2 localUV = 0.5 + (q-centre)*filmAspect/0.64;
     vec4 offset = textureLod(sampler2D(localWarp, fieldSampler),localUV,0.0);
@@ -42,11 +69,19 @@ float sourceDistance(vec2 uv, bool front) {
     float d = front ? mix(a.g,b.g,source.timeFraction) : mix(a.r,b.r,source.timeFraction);
     return d*edge.x*edge.y;
 }
-vec2 changedFootprint(vec2 sigma) {
+vec2 changedFootprint(vec2 sigma, vec2 uv) {
     // An unrotated, uncompressed identity mapping has unit singular values.
     // A rigid turn can also move a thin interface between intermediate texels.
     vec2 turn = vec2(length(source.rotation.xy-vec2(1,0)),
                      length(source.rotation.zw-vec2(1,0)));
+    for (int k=0; k<2; ++k) {
+        vec4 press=source.pressure[k];
+        if(press.w>0.0) {
+            vec2 p=(uv-press.xy)*filmAspect;
+            float t=max(1.0-dot(p,p)*press.z,0.0);
+            turn[k]=max(turn[k],press.w*t*t*t);
+        }
+    }
     return max(smoothstep(vec2(1.025),vec2(1.20),sigma),
                smoothstep(vec2(0.0003),vec2(0.002),turn));
 }
@@ -55,7 +90,7 @@ vec4 footprintField(vec2 p) {
     vec2 dist = abs((coarse.rg-0.5)*96.0);
     vec2 sigma = coarse.ba;
     vec2 guard = 12.0 + 3.0*sigma;
-    vec2 change = changedFootprint(sigma);
+    vec2 change = changedFootprint(sigma,p);
     if (change.x > 0.0 && dist.x <= guard.x) coarse.r = sourceDistance(p,false);
     if (change.y > 0.0 && dist.y <= guard.y) coarse.g = sourceDistance(p,true);
     return coarse;
@@ -72,7 +107,7 @@ float footprintSupport(vec2 uv,float pupil,vec2 pixelStep) {
     float pixelWidth = max(pixelStep.x*1280.0,pixelStep.y*720.0);
     vec2 inner = 4.0+(pupil+pixelWidth+4.0)*sigma;
     vec2 nearRim = 1.0-smoothstep(inner,inner+3.0,dist);
-    vec2 support = changedFootprint(f.ba)*nearRim;
+    vec2 support = changedFootprint(f.ba,uv)*nearRim;
     return max(support.x,support.y);
 }
 vec2 pixelStratum(int i) {

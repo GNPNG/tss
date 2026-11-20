@@ -15,6 +15,8 @@ The Windows host enumerates hardware adapters that can present to the editor and
 3. Select **640 × 360** or **960 × 540** under **Live resolution**. These cap the optical render width. A smaller viewport renders at its own width. The last pass scales the optical image to the stage.
 4. Move **Projector focus** between the rear and front planes. It overrides the default fitted focus across both slides and tracks. **Restore wheel focus** returns to the spatially varying focus used in the wheel study. **View study** opens the recorded reference. The live readout under the stage shows adapter, optical resolution, FPS and p95 frame interval.
 
+Plate pressure acts independently on each sealed slide. A press reduces the central gap, displaces liquid sideways and accommodates the displaced volume in a peripheral annulus. Release restores the underlying tug and rotation. [Native press/release movie, geometry and volume checks](../experiments/slide-look-study/approval/pressure/README.md)
+
 The native viewport shows the two sealed slides on the selected track. Its fluid trajectory advances on a performance clock. The gesture deck can replay live inputs against the song.
 
 ## Export the selected wheel

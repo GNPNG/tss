@@ -9,6 +9,7 @@ pub enum SlideGesture {
 }
 #[derive(Clone, Copy)]
 pub(crate) struct SlidePose {
+    pub pressure: crate::pressure::Pressure,
     pub angle: f64,
     pub center: [f64; 2],
     pub strength: [f64; 2],
@@ -18,6 +19,7 @@ pub(crate) struct SlidePose {
 impl Default for SlidePose {
     fn default() -> Self {
         Self {
+            pressure: Default::default(),
             angle: 0.,
             center: [0.5; 2],
             strength: [0.; 2],
@@ -31,11 +33,14 @@ impl SlidePose {
         let (s, c) = (-self.angle).sin_cos();
         [c as f32, s as f32]
     }
-    pub fn material_point(&self, p: [f64; 2]) -> [f64; 2] {
+    pub fn rigid_point(&self, p: [f64; 2]) -> [f64; 2] {
         let (s, c) = (-self.angle).sin_cos();
         let x = (p[0] - 0.5) * ASPECT;
         let y = p[1] - 0.5;
         [0.5 + (c * x - s * y) / ASPECT, 0.5 + s * x + c * y]
+    }
+    pub fn material_point(&self, p: [f64; 2]) -> [f64; 2] {
+        self.pressure.inverse(self.rigid_point(p)).0
     }
     pub fn end(&mut self) {
         self.start = None;
