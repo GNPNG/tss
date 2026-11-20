@@ -61,8 +61,8 @@ test('native capture, cue playback, overlap, mute, seek, and per-song recall', a
     assert.ok(take.events.every(e=>e.layerId===1));
   }
   playing=true;deck.transportChanged();position=1.01;deck.tick();position=1.65;deck.tick();await settle();
-  assert.deepEqual(calls.map(b=>b.slide),['rear','front']);
-  assert.deepEqual(calls[0].samples.map(s=>s.phase),['down','move']);
+  assert.deepEqual(calls.flatMap(b=>b.samples.map(s=>[b.slide,s.phase])),[
+    ['rear','down'],['front','down'],['rear','move'],['front','move']]);
   el('on').checked=false;el('on').fire('change');await settle();
   assert.equal(calls.at(-1).slide,'front');assert.equal(calls.at(-1).samples[0].phase,'up');
   position=1.95;deck.tick();await settle();
@@ -77,7 +77,7 @@ test('native capture, cue playback, overlap, mute, seek, and per-song recall', a
   position=0;deck.transportChanged();reply();await settle();
   assert.equal(calls.at(-1).samples[0].phase,'up');
   const count=calls.length;
-  position=5;deck.tick();await settle();assert.equal(calls.length,count);
+  position=5;deck.transportChanged();deck.tick();await settle();assert.equal(calls.length,count);
   await deck.songLoaded('different-song',null,()=>true);assert.equal(el('editor').hidden,true);
   await deck.songLoaded('song',null,()=>true);assert.equal(el('list').children.length,2);
 });
@@ -88,6 +88,49 @@ test('weighted rotation crosses the branch cut in slide coordinates', () => {
   const actual=scaledGesture(events,1.5).at(-1).point;
   const expected=point(3+1.5*(2*Math.PI-5.8));
   assert.ok(actual.every((n,i)=>Math.abs(n-expected[i])<1e-9));
+});
+
+test('a late live tick applies overlapping cues in the same order as a 4K export', async () => {
+  const take = (name, gesture, start, times) => ({
+    id:name,name,enabled:true,muted:[],duration:0.2,amount:1,step:0,cap:1,fit:false,
+    cue:'recording-position',songStart:start,
+    events:times.map((t,i) => ({
+      layerId:1,slide:'front',gesture,tugResponse:0.4,t,
+      phase:i===0?'down':i===times.length-1?'up':'move',
+      point:[[.75,.5],[.5,.75],[.25,.5],[.5,.25]][i],
+      ...(gesture==='pressure'?{amount:i===times.length-1?0:0.7}:{})
+    }))
+  });
+  const takes = [
+    take('first pressure','pressure',1,[0,.08,.12,.20]),
+    take('rotate glass','rotate',1,[0,.05,.10,.20]),
+    take('replace pressure','pressure',1.1,[0,.04,.2])
+  ];
+  const nodes=new Map(), calls=[];
+  globalThis.document={
+    getElementById(id){if(!nodes.has(id)) nodes.set(id,new Control());return nodes.get(id);},
+    createElement(){return new Control();}
+  };
+  globalThis.Option=class {};
+  globalThis.localStorage={getItem:()=>JSON.stringify({macros:takes}),setItem(){}};
+  let position=0;
+  const deck=initMacroDeck({listen:async()=>{},selection:()=>({layerId:1}),seek(){},
+    clock:()=>({position,playing:true}),
+    invoke:async(_, {batch})=>calls.push(...batch.samples.map(s=>({gesture:batch.gesture,...s})))
+  });
+  for (let order=0;order<2;++order) {
+    if (order) [takes[0],takes[1]]=[takes[1],takes[0]];
+    calls.length=0;position=0;
+    await deck.songLoaded('order-'+order,null,()=>true);
+    deck.transportChanged();
+    position=1;deck.tick();deck.tick(); // A cue on the exact frame boundary fires once.
+    position=1.32;deck.tick(); // Cross the replacement and both complete contact windows.
+    await new Promise(resolve=>setTimeout(resolve,0));
+    const exported=deck.exportEvents(1,2).map(({gesture,phase,point,amount})=>({
+      gesture,phase,point,...(gesture==='pressure'?{amount}:{})
+    }));
+    assert.deepEqual(calls,exported);
+  }
 });
 
 test('song state follows audio contents',async()=>{
@@ -114,4 +157,44 @@ test('offline performance uses the recording position, independent slides and co
   assert.deepEqual(at(4,'rear'),[]);
   assert.ok(Math.abs(output.find(e=>e.time===8).point[0]-.325)<1e-9);
   assert.deepEqual(songGestureEvents([rear],cues,8,10),[]);
+});
+
+test('simultaneous pressure and XY on the same slide preserve contact location, timing and independent amount', () => {
+  const id={layerId:3,slide:'front'};
+  const xy=(t,phase,x)=>({...id,t,phase,gesture:'tug',point:[x,.6]});
+  const pressure=(t,phase,amount)=>({...id,t,phase,gesture:'pressure',point:[.22,.71],amount});
+  const take=(events,at=2)=>({id:'take',events,enabled:true,muted:[],duration:1,cue:'recording-position',
+    songStart:at,fit:false,amount:1.5,step:0,cap:2});
+  const strokes=[xy(0,'down',.1),pressure(.1,'down',.4),xy(.2,'move',.3),pressure(.3,'move',.9),
+    xy(.4,'up',.3),pressure(.9,'up',0)];
+  const output=songGestureEvents([take(strokes)],[],3,5);
+  assert.deepEqual(output.filter(e=>e.gesture==='pressure').map(e=>[e.time,e.amount,e.point]),[
+    [2.1,.4*1.5,[.22,.71]], [2.3,1,[.22,.71]], [2.9,0,[.22,.71]]]);
+  assert.ok(Math.abs(output.find(e=>e.phase==='move'&&e.gesture==='tug').point[0]-.4)<1e-10);
+  const separate=songGestureEvents([take(strokes.filter(e=>e.gesture==='tug')),
+      take(strokes.filter(e=>e.gesture==='pressure'),2.1)],[],3,5);
+  assert.equal(separate.filter(e=>e.phase==='up').length,2);
+  assert.equal(separate.find(e=>e.gesture==='tug'&&e.phase==='up').time,2.4);
+});
+
+test('a timed stationary press records and releases without requiring drag motion',async()=>{
+  const nodes=new Map(),saved=new Map(),calls=[];
+  globalThis.document={getElementById(id){if(!nodes.has(id))nodes.set(id,new Control());return nodes.get(id);},createElement(){return new Control();}};
+  globalThis.localStorage={getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)};
+  globalThis.Option=class{};
+  let receive;
+  const deck=initMacroDeck({listen:async (_,cb)=>{receive=cb;},selection:()=>({layerId:4}),clock:()=>({position:1,playing:true}),
+    invoke:async (name,arg)=>{
+      if(name==='replay_live_wheel_gesture'){calls.push(arg);return;}
+      if(arg.enabled) {
+        receive({payload:{layerId:4,slide:'rear',gesture:'pressure',samples:[{phase:'down',timeMs:1010,amount:.8,point:[.37,.42]}]}});
+        return 1000;
+      } return 1500;
+    },seek(){}});
+  const record=document.getElementById('macro-record');
+  await record.fire('click');
+  await deck.finishPendingRecording();
+  const [take]=JSON.parse(saved.get('tss.gestures.v1.unsaved-session')).macros;
+  assert.deepEqual(take.events.map(e=>[e.t,e.phase,e.amount]),[[.01,'down',.8],[.5,'up',0]]);
+  assert.deepEqual(deck.exportEvents(4,3).map(e=>[e.time,e.phase,e.amount]),[[1.01,'down',.8],[1.5,'up',0]]);
 });

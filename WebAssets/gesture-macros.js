@@ -7,23 +7,26 @@ const scalePoint = (point, anchor, amount) => point.map((v, i) => clamp(anchor[i
 // XY distances are measured in units of slide height. Keep rotation angle
 // amplification continuous across the atan2 branch cut and multi-turn takes.
 export function scaledGesture(events, amount) {
-  let anchor = null, initialAngle = 0, previousAngle = 0, accumulated = 0;
+  const strokes = new Map();
   return events.map(e => {
     const point = e.point;
+    if (e.gesture === 'pressure') return {...e, amount: e.phase === 'up' ? 0 : clamp(e.amount * amount)};
+    const key = contactKey(e);
     const angle = Math.atan2(point[1] - .5, (point[0] - .5) * 16 / 9);
-    if (e.phase === 'down' || !anchor) {
-      anchor = point; initialAngle = previousAngle = angle; accumulated = 0;
+    if (e.phase === 'down' || !strokes.has(key)) {
+      strokes.set(key,{anchor:point, initialAngle:angle, previousAngle:angle, accumulated:0});
     }
+    const stroke=strokes.get(key);
     let next;
     if (e.gesture === 'rotate') {
-      const turn = angle - previousAngle;
-      accumulated += Math.atan2(Math.sin(turn), Math.cos(turn));
-      previousAngle = angle;
+      const turn = angle - stroke.previousAngle;
+      stroke.accumulated += Math.atan2(Math.sin(turn), Math.cos(turn));
+      stroke.previousAngle = angle;
       const radius = Math.hypot((point[0] - .5) * 16 / 9, point[1] - .5);
-      const a = initialAngle + amount * accumulated;
+      const a = stroke.initialAngle + amount * stroke.accumulated;
       next = [clamp(.5 + radius * Math.cos(a) * 9 / 16), clamp(.5 + radius * Math.sin(a))];
-    } else next = scalePoint(point, anchor, amount);
-    if (e.phase === 'up') anchor = null;
+    } else next = scalePoint(point, stroke.anchor, amount);
+    if (e.phase === 'up') strokes.delete(key);
     return { ...e, point: next };
   });
 }
@@ -35,7 +38,9 @@ export async function songFingerprint(bytes) {
 }
 
 const recordedCue = 'recording-position';
-const targetsFor = m => new Set(m.events.map(e => e.layerId + '/' + e.slide));
+const contactKey = e => e.layerId + '/' + e.slide + (e.gesture === 'pressure' ? '/pressure' : '/xy');
+const targetsFor = m => new Set(m.events.map(contactKey));
+const release = e => ({...e,phase:'up', ...(e.gesture === 'pressure' ? {amount:0} : {})});
 const intersects = (a,b) => [...a].some(target => b.has(target));
 
 function cueSchedule(macros, groups) {
@@ -90,10 +95,10 @@ export function songGestureEvents(macros,groups,layerId,songDuration) {
       const time=start+t*(end-start)/macro.duration;
       if(time>=cut) break;
       output.push({...e,time});
-      if(e.phase==='up') held.delete(e.slide);
-      else held.set(e.slide,e);
+      if(e.phase==='up') held.delete(contactKey(e));
+      else held.set(contactKey(e),e);
     }
-    if(cut<songDuration) for(const e of held.values()) output.push({...e,phase:'up',time:cut});
+    if(cut<songDuration) for(const e of held.values()) output.push({...release(e),time:cut});
   }
   return output.sort((a,b)=>a.time-b.time);
 }
@@ -105,7 +110,7 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
   let key = 'unsaved-session', groups = [], lyricGroups = [], recording = null;
   let selected = null, sequence = Promise.resolve(), previousSongTime = null;
   let captureTask=Promise.resolve();
-  let schedule = null;
+  let schedule = null, includePreviousStart = true;
   const current = () => all.get(selected);
   const candidates = () => [...groups, ...lyricGroups];
   const save = () => {
@@ -157,31 +162,40 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
       el('hits').append(label, jump);
     }
   }
-  // One pointer can occupy each slide. Different slides can replay at the same
-  // song time. A new gesture on the same slide takes ownership from the old take.
+  // Each slide has independently owned XY and pressure contacts.
   const players = new Set();
+  const retiring = new Set();
   const held = new Map();
-  const targetOf = e => e.layerId + '/' + e.slide;
+  const targetOf = contactKey;
   function enqueue(action) {
     sequence = sequence.then(action).catch(error => note(String(error)));
     return sequence;
   }
-  function stopPlayer(player) {
+  function stopPlayer(player, finishQueued = false) {
     if (player.cancelled) return;
-    player.cancelled = true;
+    // Cue replacement preserves samples due before the new cue. An operator
+    // stop or seek discards pending samples and releases the actual held contact.
+    player.cancelled = !finishQueued;
     players.delete(player);
+    retiring.add(player);
     enqueue(async () => {
-      for (const [target, contact] of held) {
-        if (contact.player !== player) continue;
-        try {
-          await invoke('replay_live_wheel_gesture', { batch: {
-            ...contact.header, samples: [{ phase: 'up', point: contact.point }]
-          } });
-        } finally { held.delete(target); }
-      }
+      try {
+        for (const [target, contact] of held) {
+          if (contact.player !== player) continue;
+          try {
+            await invoke('replay_live_wheel_gesture', { batch: {
+              ...contact.header, samples: [{ phase:'up',point:contact.point,
+                ...(contact.header.gesture==='pressure'?{amount:0}:{}) }]
+            } });
+          } finally { held.delete(target); }
+        }
+      } finally { retiring.delete(player); }
     });
   }
-  function stop() { for (const p of players) stopPlayer(p); }
+  function stop() {
+    for (const p of retiring) p.cancelled = true;
+    for (const p of players) stopPlayer(p);
+  }
   function send(player, header, samples) {
     ++player.pending;
     enqueue(async () => {
@@ -209,7 +223,7 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
     }
     const targets = targetsFor(m);
     for (const other of players) {
-      if (intersects(targets,other.targets)) stopPlayer(other);
+      if (intersects(targets,other.targets)) stopPlayer(other, !!hit);
     }
     const amount = Math.min(m.cap, m.amount + m.step * index);
     players.add({ id:m.id, events:scaledGesture(m.events, amount), next:0, start:startTime,
@@ -217,49 +231,88 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
       song:!!hit, targets, pending:0, cancelled:false });
     note(`Playing ${m.name} at ${amount.toFixed(2)}×`);
   }
-  function pump(player, now) {
-    const t = (now - player.start) * player.sourceDuration / Math.max(.001,player.duration);
-    while (player.next < player.events.length && player.events[player.next].t <= t) {
-      const e = player.events[player.next];
-      const header = {layerId:e.layerId,slide:e.slide,gesture:e.gesture,tugResponse:e.tugResponse};
-      const samples = [];
-      while (player.next < player.events.length && samples.length < 512) {
-        const next = player.events[player.next];
-        if (next.t > t || targetOf(next) !== targetOf(e) || next.gesture !== e.gesture || next.tugResponse !== e.tugResponse) break;
-        samples.push({phase:next.phase,point:next.point});
+  function pump(until, wallToSong, exclusive = false, active = players) {
+    const due = [];
+    for (const player of active) {
+      const start = player.start + (player.song ? 0 : wallToSong);
+      while (player.next < player.events.length) {
+        const e = player.events[player.next];
+        const time = start + e.t * player.duration / player.sourceDuration;
+        if (time > until || (exclusive && time === until)) break;
+        due.push({time, player, e});
         ++player.next;
       }
-      send(player,header,samples);
     }
+    // Rotating the glass and sampling a pressure center do not commute. Sort
+    // across takes first, then batch only adjacent samples for the same command.
+    due.sort((a,b) => a.time-b.time);
+    let batch;
+    for (const {player,e} of due) {
+      const {layerId,slide,gesture,tugResponse} = e;
+      if (!batch || batch.player !== player || batch.header.slide !== slide ||
+          batch.header.gesture !== gesture || batch.header.tugResponse !== tugResponse ||
+          batch.samples.length === 512) {
+        if (batch) send(batch.player,batch.header,batch.samples);
+        batch = {player, header:{layerId,slide,gesture,tugResponse}, samples:[]};
+      }
+      batch.samples.push({phase:e.phase,point:e.point,...(gesture==='pressure'?{amount:e.amount}:{})});
+    }
+    if (batch) send(batch.player,batch.header,batch.samples);
+  }
+  function beginCues(runs,wallToSong,layerId) {
+    const eligible = runs.filter(r=>r.macro.events.every(e=>e.layerId===layerId));
+    if (!eligible.length) return;
+    const start = eligible[0].start;
+    pump(start,wallToSong,true);
+    const incoming = new Set(eligible.flatMap(r=>[...targetsFor(r.macro)]));
+    // At equal song time, export visits takes in start/insertion order. Visit
+    // each original owner in that order, interleaving its release or sample
+    // before starting any new take. Pressure changes the coordinates of a tug.
+    for (const p of players) {
+      const end = p.start+(p.song?0:wallToSong)+p.duration;
+      if (end>start && intersects(p.targets,incoming)) stopPlayer(p,true);
+      else pump(start,wallToSong,false,[p]);
+    }
+    for (const r of eligible) startMacro(r.macro,start,r.hit,r.index);
   }
   function tick() {
     const c = clock();
+    const wallToSong = c.position - performance.now()/1000;
+    const layerId = selection()?.layerId;
+    for (const p of players) if (p.events[0].layerId !== layerId) stopPlayer(p);
     if (c.playing && previousSongTime !== null && c.position >= previousSongTime && !recording) {
       schedule ??= cueSchedule(all.values(),candidates());
-      for (let i=firstAtOrAfter(schedule,previousSongTime);i<schedule.length && schedule[i].start<c.position;++i) {
-        const run=schedule[i];
-        if (c.position<run.end) startMacro(run.macro,run.start,run.hit,run.index);
+      for (let i=firstAtOrAfter(schedule,previousSongTime);i<schedule.length && schedule[i].start<=c.position;) {
+        const first=i++, start=schedule[first].start;
+        while (i<schedule.length && schedule[i].start===start) ++i;
+        if (includePreviousStart || start!==previousSongTime)
+          beginCues(schedule.slice(first,i),wallToSong,layerId);
       }
+      includePreviousStart = false;
     }
     previousSongTime = c.playing ? c.position : null;
-    for (const p of players) {
-      if (p.events[0].layerId !== selection()?.layerId) stopPlayer(p);
-      else pump(p, p.song ? c.position : performance.now()/1000);
-    }
+    pump(c.position,wallToSong);
   }
   function finishRecording() {
     const take = recording;
     if (!take) return;
     recording = null;
     el('record').textContent = 'Record gesture';
-    if (!take.events.some(e => e.phase === 'move')) { note('No drag was captured.'); return; }
+    if (!take.events.some(e => e.phase === 'move' || e.gesture === 'pressure' && e.phase === 'down' && e.amount > 0)) { note('No gesture was captured.'); return; }
+    take.events.sort((a,b)=>a.timeMs-b.timeMs);
     const origin = take.origin ?? take.events[0].timeMs;
     const events = take.events.map(({timeMs, ...e}) => ({...e,t:Math.max(0,(timeMs-origin)/1000)}));
     const last = events.at(-1);
-    if (last.phase !== 'up') events.push({...last,phase:'up'});
+    const open = new Map();
+    for (const e of events) {
+      if (e.phase==='up') open.delete(contactKey(e));
+      else open.set(contactKey(e),e);
+    }
+    const duration=Math.max(.001,last.t,((take.end ?? origin)-origin)/1000);
+    for (const e of open.values()) events.push({...release(e),t:duration});
     const id = globalThis.crypto?.randomUUID?.() ?? 'take-' + Date.now() + '-' + all.size;
     const m = { id, name:`Gesture ${all.size+1}`, events, songStart:take.songStart,
-      duration:Math.max(.001,last.t,((take.end ?? origin)-origin)/1000), enabled:true, amount:1, step:0, cap:2, fit:true,
+      duration, enabled:true, amount:1, step:0, cap:2, fit:true,
       cue:Number.isFinite(take.songStart)?recordedCue:'', muted:[] };
     all.set(m.id,m); selected=m.id; render(); save(); note(`Saved ${m.name} · ${m.duration.toFixed(2)} s`);
   }
@@ -268,7 +321,8 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
     if (!recording || payload.layerId !== recording.layerId) return;
     for (const s of payload.samples) {
       recording.events.push({phase:s.phase,point:s.point,timeMs:s.timeMs,layerId:payload.layerId,
-        slide:payload.slide,gesture:payload.gesture,tugResponse:payload.tugResponse??.4});
+        slide:payload.slide,gesture:payload.gesture,tugResponse:payload.tugResponse??.4,
+        ...(payload.gesture==='pressure'?{amount:s.amount??0}:{})});
     }
   }).catch(error => { listenerError=error; note(String(error)); });
   async function finishPendingRecording(){
@@ -331,7 +385,7 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
   return {
     tick,
     async finishPendingRecording(){await captureTask;await finishPendingRecording();},
-    transportChanged(position=clock().position){stop();previousSongTime=clock().playing?position:null;},
+    transportChanged(position=clock().position){stop();includePreviousStart=true;previousSongTime=clock().playing?position:null;},
     exportEvents(layerId,duration){return songGestureEvents(all.values(),candidates(),layerId,duration);},
     async songLoaded(id,analysis,stillCurrent){
       stop();
@@ -342,7 +396,7 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
         if(recording===take) finishRecording();
       }
       if(!stillCurrent()) return;
-      previousSongTime=null;
+      previousSongTime=null;includePreviousStart=true;
       key=id;groups=audioCueGroups(analysis);restore();render();
     },
     importSidecar(file) {
