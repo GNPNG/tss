@@ -46,7 +46,9 @@ test('native capture, cue playback, overlap, mute, seek, and per-song recall', a
   deck.importSidecar(['verse.vtt','WEBVTT\n\n00:01.000 --> 00:02.000\nturn the wheel\n\n00:03.000 --> 00:04.000\nturn the wheel']);
   for(const side of ['rear','front']){
     slide=side;
-    await el('record').fire('click');await el('record').fire('click');
+    const armed=el('record').fire('click');
+    if(side==='front') await deck.finishPendingRecording();
+    else {await armed;await el('record').fire('click');}
     el('cue').value='lyric-turn the wheel';el('cue').fire('change');
     el('step').valueAsNumber=.5;el('step').max='3';el('step').fire('input');
     origin+=5000;
