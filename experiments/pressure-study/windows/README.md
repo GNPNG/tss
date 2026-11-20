@@ -31,3 +31,5 @@ The native wheel exported 60 frames at 3840 × 2160 and 30 FPS with Rec.709 H.26
 Two separately paired loopback HTTPS clients exercised the packaged Go listener, WebView2 controls and native recorder. The rear pressure channel reported 0 → 0.75 → 0 while the front received a Pencil down, move and up. The projector opened and closed on the single attached display. Physical Force Touch, Pencil, Wi-Fi and a second physical display remain hardware checks. [Editor report](webview.json)
 
 The release executable SHA-256 is `745b3178fe4ebfd6e2e48767bacdbb4434c83e70e46cff1ac9624d0407248bfd`. The performance-surface executable SHA-256 is `79ba0e928c13df5be07962167c4a1d1b825a7d6e752a41e2cea24d0a7f1eb982`. Both executables are unsigned. [Windows release](https://github.com/GNPNG/tss/releases/tag/v0.1.0-preview.2)
+
+The live capture contains 122 GPU readbacks spanning 3.008945 s. Its viewing copy uses their presentation timestamps with a final endpoint frame, yielding 123 encoded frames and 3.010 s. The prerelease asset carries this timing correction. [Live viewing copy](https://github.com/GNPNG/tss/releases/download/v0.1.0-preview.2/violet-blue-pressure.mp4)
