@@ -11,3 +11,14 @@ The Windows WebView2 run verified seven wheel options, the macro deck, the feedb
 To repeat the integrated test, launch the Windows editor with `--verify-wheel-export <absolute-path-to-two-slide-cues.m4a> <absolute-path-to-a-fresh-mp4>`. With the same process set `TSS_WHEEL_EXPORT_PROOF` to a new PPM path and `TSS_WHEEL_EXPORT_PROOF_FRAME=42`. The launcher uses the editor's asset grants and importer, native export command and projector controls. A sibling WebVTT is imported through the normal audio-import path. The diagnostic supplies the two scripted gesture series at the times above. [Verification UI](../../../../../../WebAssets/verify-wheel-export.js)
 
 Public telemetry uses a device ordinal within each run. All sampled times, device indices and numeric measurements retain their recorded values.
+
+An 8,192-sample Hann-windowed FFmpeg FFT found the same two peak frequencies in the separately decoded M4A and exported AAC. At 0.35 s the fitted peak was 219.963 Hz in each; at 1.20 s it was 330.083 Hz in each. The fit uses the log amplitudes of the strongest FFT bin and its two neighbors. The nominal bin width is 5.859 Hz. [Spectrum measurements](cue-spectrum.csv) · [FFmpeg FFT fixture](cue-spectrum.cpp)
+
+To reproduce, run in this directory with the FFmpeg CLI and libavutil development headers installed.
+
+```sh
+ffmpeg -i two-slide-cues.m4a -map 0:a:0 -ac 1 -ar 48000 -f f32le cue-source.f32le
+ffmpeg -i two-slide-cues.mp4 -map 0:a:0 -ac 1 -ar 48000 -f f32le cue-export.f32le
+c++ -std=c++17 -O2 cue-spectrum.cpp $(pkg-config --cflags --libs libavutil) -o cue-spectrum
+./cue-spectrum cue-source.f32le cue-export.f32le
+```

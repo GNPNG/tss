@@ -36,3 +36,5 @@ ffmpeg -framerate 24 -i "$TSS_FEEDBACK_CLIP_DIR/source-%03d.ppm" \
   -filter_complex '[0:v][1:v]hstack,format=yuv420p' -c:v libx264 -crf 16 \
   -movflags +faststart feedback-comparison.mp4
 ```
+
+The Windows WebView2 verification also opened the projector on the single attached monitor, presented 18 frames with transport paused, then closed it. Both audio routes were muted for this first hardware check. The run exposed device enumeration and sink selection APIs. Timing between independently driven physical output devices remains unmeasured. [Windows integration evidence](../windows-live/gesture-controls/export/README.md)
