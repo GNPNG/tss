@@ -2,7 +2,7 @@
 const root = `${process.cwd()}/experiments/gesture-input`;
 const allowed = new Map([
   ['/experiments/gesture-input/', ['index.html', 'text/html; charset=utf-8']],
-  ['/experiments/gesture-input/gesture-input.mjs', ['gesture-input.mjs', 'text/javascript; charset=utf-8']],
+  ['/experiments/gesture-input/gesture-input.mjs', ['../../performer/surface/gesture-input.mjs', 'text/javascript; charset=utf-8']],
 ]);
 Bun.serve({hostname: '127.0.0.1', port: 47892, fetch(request) {
   const entry = allowed.get(new URL(request.url).pathname);

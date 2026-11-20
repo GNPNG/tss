@@ -100,10 +100,11 @@
     "platform": "Cross-target cgo builds require the target C compiler and matching libraries. Use native builds where those toolchains are available.",
     "scope": "Proposed peer boundary. Payload ownership, serialization or shared-buffer transfer, package size and frame-time cost require measurement.",
     "decision": "Prefer compiled Go for a peer or tool when it fits. Keep the Windows native preview in process in Rust and avoid spawning Node or Python interpreters in the production software.",
-    "evidence": "Architecture preference recorded. No Go peer benchmark or shipping Go binary in this proof.",
+    "evidence": "The opt-in performance listener is a pure-Go executable. Its trusted loopback pairing and session-isolation tests ran on x64 Windows. Streaming GPU compute on a peer remains a separate candidate.",
     "sources": [
       "[Official cgo documentation](https://pkg.go.dev/cmd/cgo)",
-      "[Native stage design](slide-computation-spec.md)"
+      "[Native stage design](slide-computation-spec.md)",
+      "[Performance surface guide](performance-surfaces.md)"
     ]
   },
   {
@@ -208,10 +209,11 @@
     "platform": "Browser mouse pressure defaults do not prove a physical sensor. Validate each device and whether simultaneous streams are distinguishable.",
     "scope": "102-line gesture-input.mjs adapter. Identity and synchronized multi-device recording are substantially more complex.",
     "decision": "Use official APIs with explicit event provenance; compare replay against a physical multi-input performance.",
-    "evidence": "Isolated gesture normalization tests. Physical Pencil and multiple trackpad pressure streams remain unverified.",
+    "evidence": "Two synthetic performers paired via real HTTPS. A WebKit force input reached the rear-slide command at 75% compression and a Pencil stroke reached the front-slide command. Physical sensor delivery and two-trackpad identification still require device measurements.",
     "sources": [
       "[Pointer Events](https://www.w3.org/TR/pointerevents3/)",
       "[Apple Pencil](https://developer.apple.com/documentation/uikit/handling-input-from-apple-pencil)",
+      "[Two-surface input test](../performer/input-transport.test.mjs)",
       "[Gesture study](../experiments/gesture-input/README.md)"
     ]
   },

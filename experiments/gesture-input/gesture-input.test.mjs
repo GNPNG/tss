@@ -40,6 +40,18 @@ test('unavailable force thresholds retain raw force without claiming normalized 
   surface.dispatchEvent(event('webkitmouseforcechanged', {webkitForce: 1.25}));
   assert.equal(records[1].pressure, null); assert.equal(records[1].rawForce, 1.25);
 });
+test('unidentified WebKit force is applied only with one active mouse contact', () => {
+  const surface = new Surface(), records = [];
+  createGestureInput(surface, {onGesture: record => records.push(record)});
+  surface.dispatchEvent(pointer('pointerdown', {pointerId: 1}));
+  surface.dispatchEvent(pointer('pointerdown', {pointerId: 2}));
+  surface.dispatchEvent(event('webkitmouseforcechanged', {webkitForce: 1.75}));
+  assert.equal(records.length, 2);
+  surface.dispatchEvent(pointer('pointerup', {pointerId: 1}));
+  surface.dispatchEvent(event('webkitmouseforcechanged', {webkitForce: 1.75}));
+  assert.equal(records.at(-1).pointerId, 2);
+  assert.equal(records.at(-1).pressure, .75);
+});
 test('pen pressure, tilt, coalesced samples and cancellation retain a single pointer', () => {
   const surface = new Surface(); const records = [];
   createGestureInput(surface, {onGesture: (r) => records.push(r), getTime: () => 2});

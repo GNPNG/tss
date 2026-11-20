@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>The Sacred Swirls · Performance surface</title><link rel="stylesheet" href="/surface.css"><script type="module" src="/client.mjs"></script></head><body>
+<main><header><h1>Performance surface</h1><p id="connection" role="status">Disconnected</p></header>
+<form id="pair"><label>Performer name<input name="name" maxlength="60" autocomplete="off" required placeholder="Name on the deck"></label><label>Pairing secret<input name="secret" type="password" autocomplete="off" required></label><button>Connect</button></form>
+<section id="pad" aria-label="Touch and pressure input surface"><p id="instruction">Pair with the editor to perform.</p><i id="contact" hidden></i></section>
+<footer><output id="force">Pressure —</output><button id="disconnect" disabled>Disconnect</button></footer></main>
+</body></html>

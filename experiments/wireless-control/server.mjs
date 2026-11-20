@@ -9,7 +9,7 @@ const files = new Map([
   ['/', [new URL('index.html', here), 'text/html; charset=utf-8']],
   ['/client.mjs', [new URL('client.mjs', here), 'text/javascript; charset=utf-8']],
   ['/style.css', [new URL('style.css', here), 'text/css; charset=utf-8']],
-  ['/gesture-input.mjs', [new URL('../gesture-input/gesture-input.mjs', here), 'text/javascript; charset=utf-8']],
+  ['/gesture-input.mjs', [new URL('../../performer/surface/gesture-input.mjs', here), 'text/javascript; charset=utf-8']],
 ]);
 const MAX_BODY = 16384, MAX_BATCH = 32;
 

@@ -1,5 +1,7 @@
 # Gesture input experiment
 
+For the Windows editor’s paired Safari performance surface, including slide assignments and renderer controls, see [Performance surfaces](../../docs/performance-surfaces.md). This experiment exercises the same event-capture module in isolation.
+
 This is a standalone input diagnostic. It does not manipulate TSS's renderer, record or replay a project, provide a wireless connection, or constitute iPad support in the app. It captures WebKit Force Touch and standard pointer events into a device-neutral stream for future connection to the liquid simulation.
 
 Serve the repository root locally and open the diagnostic in Safari on a Mac with Force Touch:
