@@ -1,0 +1,42 @@
+[
+  {
+    "name": "lead",
+    "start": 0,
+    "end": 0.2,
+    "originalRms": 0,
+    "decodedRms": 0,
+    "correlation": null
+  },
+  {
+    "name": "rear",
+    "start": 0.25,
+    "end": 0.75,
+    "originalRms": 0.07337539370300694,
+    "decodedRms": 0.07288365274549401,
+    "correlation": 0.994127349698341
+  },
+  {
+    "name": "gap",
+    "start": 0.8,
+    "end": 1.05,
+    "originalRms": 0,
+    "decodedRms": 0,
+    "correlation": null
+  },
+  {
+    "name": "front",
+    "start": 1.1,
+    "end": 1.6,
+    "originalRms": 0.09190108601866412,
+    "decodedRms": 0.09190062872250097,
+    "correlation": 0.9999999636367598
+  },
+  {
+    "name": "tail",
+    "start": 1.7,
+    "end": 1.95,
+    "originalRms": 0,
+    "decodedRms": 0,
+    "correlation": null
+  }
+]

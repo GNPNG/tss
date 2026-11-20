@@ -1,0 +1,10 @@
+[package]
+name = "tss-native-slide-study"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vello = "=0.1.0"
+wgpu = "=0.19.4"
+pollster = "=0.3.0"
+image = { version = "=0.24.9", default-features = false, features = ["pnm", "png"] }

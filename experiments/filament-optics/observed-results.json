@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-19",
+  "release": "Filament v1.50.1",
+  "archiveSha256": "5545ab5a6cd92c6aeee992cef291540225a734a80a2e1cb68b3d2124e3d94fb9",
+  "viewerSha256": "44b20975ccd13875b7e31022abccb0c0e2729ae4aec6b2ef39a96766ddeb27a3",
+  "backend": "Metal",
+  "selectedDevice": "AMD Radeon Pro 5300M",
+  "viewport": { "width": 614, "height": 640 },
+  "roi": { "x0": 270, "x1": 340, "y0": 280, "y1": 350 },
+  "defaultFrontVsOverlap": { "count": 4900, "identical": 4900, "maxDifference": 0 },
+  "defaultClearVsRear": { "count": 4900, "identical": 0, "maxDifference": 157 },
+  "uberFrontVsOverlap": { "count": 4900, "identical": 4900, "maxDifference": 0 },
+  "focusComparison": { "changedChannels": 213504, "meanAbsoluteDifference": 6.775709995928339 }
+}

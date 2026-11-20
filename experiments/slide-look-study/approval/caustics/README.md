@@ -64,4 +64,4 @@ For each receiver pixel, the ray from lamp centre crosses the estimated mid-heig
 
 Disabling the lamp's Shadow Caustics raises the mean to 98.44% of the empty-beam result through the curved geometry, while greatly increasing per-pixel variance. The MNEE estimates lose appreciable flux along the contours. The finite crop also allows energy to leave the frame. The study demonstrates geometrically registered redistribution and exposes an estimator limitation. Absolute rim brightness needs independent transport benchmarking before use as calibrated gain.
 
-[Curved scene](state-048-curved.blend) · [Planar scene](state-048-flat.blend) · [Scene assembly](cycles_scene.py) · [Color comparison method](color-method.md)
+Generate both inspectable Blender scenes from the same [scene assembly](cycles_scene.py) and [measured geometry](geometry/) using the commands above. [Color comparison method](color-method.md)

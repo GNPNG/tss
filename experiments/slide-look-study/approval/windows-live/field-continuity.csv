@@ -1,0 +1,7 @@
+source,slide,width,height,min_dyed,max_dyed,max_adjacent_area_change,max_new_dyed,max_lost_dyed,max_new_carrier,max_lost_carrier
+cache-24Hz-roundtrip,rear,512,288,79620,80022,44,4,4,4,4
+cache-40Hz-roundtrip,rear,512,288,79539,80021,105,4,4,2,2
+VOF-24Hz-forward,rear,1024,576,317547,319044,96,10,9,10,9
+cache-24Hz-roundtrip,front,512,288,59113,59875,43,1,1,2,2
+cache-40Hz-roundtrip,front,512,288,59099,59874,75,1,1,2,2
+VOF-24Hz-forward,front,1024,576,235582,238611,78,7,6,3,2

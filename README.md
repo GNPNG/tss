@@ -19,7 +19,7 @@ Open a song, expand **Gesture macros** and select **Record gesture**. You can re
 
 The native wheel supports recursive video feedback and a separate audience window with adjustable A/V delay. The selected-wheel exporter renders 3840 × 2160 H.264/AAC from the native optics, song and scheduled gestures. [Projector and cue audio](experiments/projector-output/README.md) · [Feedback comparison](experiments/slide-look-study/approval/feedback/feedback-comparison.mp4)
 
-The GTX 1650 Ti Max-Q delivered 40.00 FPS during a material tug and 39.97 FPS during rigid rotation at 640 × 360 with finite-pixel optical sampling. Those rates measure successful FIFO presentations on that Windows laptop. The frozen-frame capture/replay test reproduced both 38-event gestures byte for byte. [Windows measurements and recordings](experiments/slide-look-study/approval/windows-live/gesture-controls/README.md)
+The GTX 1650 Ti Max-Q delivered 39.95–40.00 FPS across all seven wheels at 640 × 360 with finite-pixel optical sampling. Both Violet / Blue gesture tests ran at 40.00 FPS. All 3,843 measured presentations succeeded. The frozen-frame capture/replay test reproduced both 38-event gestures byte for byte. [Windows measurements and recordings](experiments/slide-look-study/approval/windows-live/gesture-controls/README.md)
 
 ## Experiments
 

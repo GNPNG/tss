@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gesture input diagnostic</title>
+<style>
+  :root {color-scheme:dark; font-family:system-ui,sans-serif; background:#171720; color:#f8f2e5}
+  body {max-width:62rem; margin:auto; padding:1.5rem; line-height:1.5}
+  canvas {display:block; width:100%; height:clamp(18rem, 55vh, 36rem); touch-action:none; border:1px solid #aa9271; background:#22242b; cursor:crosshair}
+  button {font:inherit; padding:.5rem 1rem; margin-top:1rem}
+  pre {white-space:pre-wrap; overflow-wrap:anywhere; background:#22242b; padding:1rem}
+</style>
+<h1>Gesture input diagnostic</h1>
+<p>Press and move on this surface. On a Force Touch trackpad, press harder while holding; on a supported tablet, use a pen. Values reflect received browser events.</p>
+<canvas id="surface" width="1000" height="600" aria-label="Gesture capture test surface"></canvas>
+<p id="state" aria-live="polite">Waiting for input.</p>
+<button id="clear" type="button">Clear</button>
+<pre id="record">No gesture received.</pre>
+<script type="module">
+  import {createGestureInput} from './gesture-input.mjs';
+  const surface = document.querySelector('#surface');
+  const ctx = surface.getContext('2d');
+  const paths = new Map();
+  let count = 0;
+  createGestureInput(surface, {
+    onGesture(record) {
+      count++;
+      document.querySelector('#state').textContent = `Received ${count} gesture records. Latest: ${record.phase} (${record.pointerType}).`;
+      document.querySelector('#record').textContent = JSON.stringify(record, null, 2);
+      const x = record.x * surface.width, y = record.y * surface.height;
+      const key = `${record.sourceId}:${record.pointerType}:${record.pointerId}`;
+      if (record.phase === 'down') paths.set(key, {x,y});
+      if (record.phase === 'move' && paths.has(key)) {
+        const previous = paths.get(key);
+        ctx.strokeStyle = '#67d0db'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(previous.x, previous.y); ctx.lineTo(x, y); ctx.stroke();
+        paths.set(key, {x,y});
+      }
+      if (record.phase === 'up' || record.phase === 'cancel') paths.delete(key);
+    },
+  });
+  document.querySelector('#clear').addEventListener('click', () => {
+    ctx.clearRect(0, 0, surface.width, surface.height); count = 0;
+    document.querySelector('#state').textContent = 'Waiting for input.';
+    document.querySelector('#record').textContent = 'No gesture received.';
+  });
+</script>
+</html>

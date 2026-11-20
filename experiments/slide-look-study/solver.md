@@ -33,7 +33,7 @@ At level 7, a five-state CPU comparison with the settings above gave identical i
 
 ## Recorded Windows run
 
-The two single-core runs completed sequentially on `flip` in the `agent-sandbox` WSL distribution. Each advanced 578 numerical timesteps and emitted 96 phase snapshots from time 0 to 3.9583333. The violet run took 41.52 s wall time, the cyan run took 47.27 s. Both retained phase occupancy within [0,1]. Maximum measured relative deviation of the full-domain phase integral was 4.27 × 10⁻⁷ on violet and 1.04 × 10⁻⁶ on cyan. These figures refer to conservation across the whole square, including the portions outside the displayed crop. Of 589,824 displayed coverage bytes, 145,774 violet samples and 90,347 cyan samples differed between frames 0 and 95. Per-frame measurements are in [the violet log](solver-violet.csv) and [the cyan log](solver-cyan.csv).
+The two single-core runs completed sequentially on the Windows test laptop in the `agent-sandbox` WSL distribution. Each advanced 578 numerical timesteps and emitted 96 phase snapshots from time 0 to 3.9583333. The violet run took 41.52 s wall time, the cyan run took 47.27 s. Both retained phase occupancy within [0,1]. Maximum measured relative deviation of the full-domain phase integral was 4.27 × 10⁻⁷ on violet and 1.04 × 10⁻⁶ on cyan. These figures refer to conservation across the whole square, including the portions outside the displayed crop. Of 589,824 displayed coverage bytes, 145,774 violet samples and 90,347 cyan samples differed between frames 0 and 95. Per-frame measurements are in [the violet log](solver-violet.csv) and [the cyan log](solver-cyan.csv).
 
 | Input or output | SHA-256 |
 |---|---|

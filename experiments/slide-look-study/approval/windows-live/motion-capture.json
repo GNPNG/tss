@@ -1,0 +1,29 @@
+{
+  "adapter": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design (Vulkan)",
+  "appliedMouseStrokes": 0,
+  "clock": "editor field sample time, actual seconds relative to first captured frame",
+  "configurations": [
+    {
+      "focus": null,
+      "renderWidth": 640,
+      "slide": "rear",
+      "t": 0.0,
+      "track": 1,
+      "wheel": "violet-blue"
+    }
+  ],
+  "elapsedSeconds": 8.0069902,
+  "focus": null,
+  "frames": 322,
+  "mouseTarget": "rear",
+  "retention": "every successful present before the eight-second endpoint",
+  "size": [
+    640,
+    360
+  ],
+  "source": "active editor optical target immediately following successful presentation",
+  "sourceStartSeconds": 0.9752534,
+  "successfulPresentsInWindow": 322,
+  "track": 1,
+  "wheel": "violet-blue"
+}

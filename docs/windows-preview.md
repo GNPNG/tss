@@ -7,6 +7,8 @@ Extract the Windows x64 portable ZIP and run `the-sacred-swirls.exe`. The native
 3. Use **Video feedback** to enable a recursive return and adjust delay, strength, zoom and rotation. **Projector** opens the audience picture. **Projector and audio outputs** sets the direct cue, audience route, presentation delay and audio trim. The audience audio starts off. Available separate audio devices depend on what Windows exposes to the installed WebView2 runtime.
 4. With a song loaded and a live wheel selected, export the native wheel at 3840 × 2160 with the selected song and scheduled gestures. Automatic starting pose uses neutral slides for scheduled gestures and the current pose for an unprogrammed wheel. The existing **Export 4K preview** button renders the procedural track composition. [Native wheel guide](../live-wheel/README.md)
 
+**Control availability.** Select a visible live Mathmos wheel to show native controls. **Material response** becomes available in **Material tug** mode. Native export enables after the song has decoded and the preceding export has finished. Tick **Video feedback** to edit its return settings. **Choose audience device** appears when the WebView2 runtime supports the output picker. The route menus list the endpoints Windows exposes.
+
 For MP4 export, install FFmpeg with the `libx264` and AAC encoders on the executable search path. If needed, run the following command in PowerShell, then relaunch the editor from a process that sees the new PATH. [WinGet package manifest](https://github.com/microsoft/winget-pkgs/tree/master/manifests/g/Gyan/FFmpeg)
 
 ```powershell

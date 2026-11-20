@@ -1,0 +1,221 @@
+{
+  "adapter": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design (Vulkan)",
+  "clock": "std::time::Instant after successful FIFO surface present returns",
+  "field": [
+    512,
+    288
+  ],
+  "footprintSampling": false,
+  "frozenGesture": {
+    "focusEndpointsChangedPixelsAtLeast3Codes": 52275,
+    "gestures": [
+      {
+        "changedPixelsAtLeast3Codes": 2393,
+        "gesture": "tug",
+        "recordedPoints": 38,
+        "replayChangedPixels": 0
+      },
+      {
+        "changedPixelsAtLeast3Codes": 168059,
+        "gesture": "rotate",
+        "recordedPoints": 38,
+        "replayChangedPixels": 0
+      }
+    ],
+    "height": 360,
+    "isolatedTrack": true,
+    "presented": false,
+    "repeatControlChangedPixels": 0,
+    "slide": "rear",
+    "timeSeconds": 0.65,
+    "width": 640
+  },
+  "input": "window-local scripted WM_LBUTTONDOWN/WM_MOUSEMOVE/WM_LBUTTONUP",
+  "maxFrameLatency": 2,
+  "wheels": [
+    {
+      "focus": null,
+      "fps": 39.94949049971093,
+      "gesture": "tug",
+      "mouseMovesApplied": 480,
+      "p50Ms": 25.0092,
+      "p95Ms": 25.6829,
+      "p99Ms": 26.307299999999998,
+      "presented": 480,
+      "preview": [
+        640,
+        360
+      ],
+      "secondsBetweenPresents": 11.990140399999994,
+      "skipped": 0,
+      "slide": "rear",
+      "surface": [
+        2571,
+        1444
+      ],
+      "tugResponse": 0.4000000059604645,
+      "wheel": "violet-blue"
+    },
+    {
+      "focus": null,
+      "fps": 39.99951433923008,
+      "gesture": "rotate",
+      "mouseMovesApplied": 481,
+      "p50Ms": 24.9973,
+      "p95Ms": 25.2196,
+      "p99Ms": 25.438499999999998,
+      "presented": 481,
+      "preview": [
+        640,
+        360
+      ],
+      "secondsBetweenPresents": 12.000145699999994,
+      "skipped": 0,
+      "slide": "rear",
+      "surface": [
+        2571,
+        1444
+      ],
+      "tugResponse": 0.4000000059604645,
+      "wheel": "violet-blue"
+    },
+    {
+      "focus": null,
+      "fps": 40.00008866686321,
+      "gesture": "tug",
+      "mouseMovesApplied": 481,
+      "p50Ms": 24.9976,
+      "p95Ms": 25.175800000000002,
+      "p99Ms": 25.4081,
+      "presented": 481,
+      "preview": [
+        640,
+        360
+      ],
+      "secondsBetweenPresents": 11.9999734,
+      "skipped": 0,
+      "slide": "front",
+      "surface": [
+        2571,
+        1444
+      ],
+      "tugResponse": 0.4000000059604645,
+      "wheel": "blue-red"
+    },
+    {
+      "focus": null,
+      "fps": 39.98248533910985,
+      "gesture": "rotate",
+      "mouseMovesApplied": 481,
+      "p50Ms": 24.993000000000002,
+      "p95Ms": 25.4395,
+      "p99Ms": 26.276899999999998,
+      "presented": 481,
+      "preview": [
+        640,
+        360
+      ],
+      "secondsBetweenPresents": 12.005256699999993,
+      "skipped": 0,
+      "slide": "front",
+      "surface": [
+        2571,
+        1444
+      ],
+      "tugResponse": 0.4000000059604645,
+      "wheel": "yellow-red"
+    },
+    {
+      "focus": null,
+      "fps": 39.91819619888434,
+      "gesture": "tug",
+      "mouseMovesApplied": 480,
+      "p50Ms": 24.9996,
+      "p95Ms": 25.528100000000002,
+      "p99Ms": 26.7424,
+      "presented": 480,
+      "preview": [
+        640,
+        360
+      ],
+      "secondsBetweenPresents": 11.999540200000004,
+      "skipped": 0,
+      "slide": "rear",
+      "surface": [
+        2571,
+        1444
+      ],
+      "tugResponse": 0.4000000059604645,
+      "wheel": "blue-green"
+    },
+    {
+      "focus": null,
+      "fps": 39.99362272880164,
+      "gesture": "rotate",
+      "mouseMovesApplied": 480,
+      "p50Ms": 25.0027,
+      "p95Ms": 25.2614,
+      "p99Ms": 25.8692,
+      "presented": 480,
+      "preview": [
+        640,
+        360
+      ],
+      "secondsBetweenPresents": 11.976909499999993,
+      "skipped": 0,
+      "slide": "rear",
+      "surface": [
+        2571,
+        1444
+      ],
+      "tugResponse": 0.4000000059604645,
+      "wheel": "blue-yellow"
+    },
+    {
+      "focus": null,
+      "fps": 39.96782514979321,
+      "gesture": "tug",
+      "mouseMovesApplied": 480,
+      "p50Ms": 25.0043,
+      "p95Ms": 25.5473,
+      "p99Ms": 26.657400000000003,
+      "presented": 480,
+      "preview": [
+        640,
+        360
+      ],
+      "secondsBetweenPresents": 11.984640099999996,
+      "skipped": 0,
+      "slide": "front",
+      "surface": [
+        2571,
+        1444
+      ],
+      "tugResponse": 0.4000000059604645,
+      "wheel": "violet-green"
+    },
+    {
+      "focus": null,
+      "fps": 39.990282694557614,
+      "gesture": "rotate",
+      "mouseMovesApplied": 481,
+      "p50Ms": 24.998,
+      "p95Ms": 25.4833,
+      "p99Ms": 26.1769,
+      "presented": 481,
+      "preview": [
+        640,
+        360
+      ],
+      "secondsBetweenPresents": 12.002915899999989,
+      "skipped": 0,
+      "slide": "front",
+      "surface": [
+        2571,
+        1444
+      ],
+      "tugResponse": 0.4000000059604645,
+      "wheel": "violet-red"
+    }
+  ]
+}
