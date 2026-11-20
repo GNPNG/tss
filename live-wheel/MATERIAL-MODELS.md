@@ -1,0 +1,26 @@
+# Slide material models
+
+Each sealed glass gap has its own two-phase volume fraction. Two drops of the dispersed phase can meet within one gap. A crossing between gaps changes transmitted light while preserving both interfaces. Wheel colors describe dyes. The material parameters describe the carrier and dispersed phases that move those dyes.
+
+## Oil and water
+
+The two reference pairs in [the material registry](materials/fluids-and-glass.json) use the same deionized water, with density 998 kg/m³ and dynamic viscosity 0.00089 Pa·s. The oil grades are specified at 25 °C and 1 atm. Table 1 reports pendant-drop interfacial tensions and their uncertainties. The authors give no separate tensiometry temperature. Supplier listings for both nominal grades give a refractive index of 1.403 at 20 °C on the sodium D line. [Experiment, Table 1 and Methods](https://doi.org/10.1038/s41467-021-26382-w) · [20 cSt supplier data](https://www.sigmaaldrich.com/US/en/product/aldrich/378348) · [1,000 cSt supplier data](https://www.sigmaaldrich.com/US/en/product/aldrich/378399)
+
+| PDMS grade | Oil density (kg/m³) | Oil dynamic viscosity (Pa·s) | Oil–water interfacial tension (mN/m) | Oil–air surface tension (mN/m) |
+|---|---:|---:|---:|---:|
+| 20 cSt | 950 | 0.019 | 40.9 ± 0.5 | 19.4 ± 0.7 |
+| 1,000 cSt | 970 | 0.970 | 40.8 ± 1.0 | 21.7 ± 0.2 |
+
+[The field solver](../experiments/slide-look-study/solver.c) uses a VOF interface, force density σ κ ∇f, and depth-averaged no-slip plate drag −12 μ u/(ρ h²). Its SI input accepts each phase’s density and dynamic viscosity, the tension of their shared interface, and the chosen plate gap. As an illustrative comparison at U = 10 mm/s, the oil-based capillary number μU/σ is 0.00465 for 20 cSt and 0.238 for 1,000 cSt. These predict different relative viscous and capillary stresses at the same speed. Halving the gap quadruples the drag coefficient. The GPU editor samples cached solutions and warps the selected slide under a drag. To change viscosity in the solved motion, generate fields for that pair. [Basilisk surface tension](https://basilisk.fr/src/tension.h)
+
+A same-gap VOF merger occurs once the intervening film is under-resolved. A physical merger time additionally depends on film drainage, interfacial mobility and surfactant formulation. Wall adhesion would require wetting data for the substrate, both fluids and the surface preparation, including advancing and receding contact angles. Those inputs are uncalibrated. [Measured drainage and coalescence of oil drops in water](https://pubmed.ncbi.nlm.nih.gov/22215134/)
+
+## Wax and glass
+
+| Specimen | Measurements available for a preset | Rendering or simulation requirement |
+|---|---|---|
+| Rubitherm RT35 | Density 860 kg/m³ solid at 15 °C, 770 kg/m³ liquid at 45 °C. Melting spans 32–38 °C. Both phases have thermal conductivity 0.2 W/(m·K). | A thermal solve would advance enthalpy H(T) and melt fraction, suppressing flow as solidification proceeds. The supplier’s 160 kJ/kg integrates **both** sensible and latent heat from 26–41 °C. Use the measured heating and cooling enthalpy curves when implementing this material. [RT35 datasheet](https://www.rubitherm.com/media/products/datasheets/Techdata_-RT35_EN_18042024.PDF) · [Enthalpy–porosity formulation](https://doi.org/10.1016/0017-9310(87)90317-6) |
+| Duna macrocrystalline paraffin, Szergényi sample 1 | At solidification, 52 °C, measured n = 1.4385 in liquid and ordinary/extraordinary crystal indices of 1.4730/1.5215. The liquid index at 80 °C was 1.4280. Wavelength unspecified. | These characterize a separate specimen. A crystalline image would also require phase-dependent scattering and crystal morphology. A glazing experiment measured increased diffuse transport in solid paraffin. [Refractometry](https://www.pp.bme.hu/ch/article/download/3199/2304/6957) · [PCM glazing measurements](https://iris.polito.it/retrieve/handle/11583/2505517/e384c430-fd6a-d4b2-e053-9f05fe0a1d67/1-s2.0-S1876610212015676-main.pdf) |
+| Clear SCHOTT N-BK7 | Room-temperature catalog n = 1.52238, 1.51680 and 1.51432 at 486.1, 587.6 and 656.3 nm. Internal transmission at 500 nm through 10 mm is 0.998. | Refraction uses the index ratio of each adjoining pair. At normal incidence an uncoated air/glass boundary reflects approximately 4.22% at 587.6 nm. Independently, the 500 nm bulk attenuation inferred from −ln(0.998)/0.010 is approximately 0.20 m⁻¹. The catalog transmission alone cannot separate absorption and scattering. [N-BK7 datasheet](https://media.schott.com/api/public/content/41e799d0bf874807a0bb8e702fbb75b5?v=54856406) · [Dielectric Fresnel equations](https://pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission) |
+
+The [live optics](../experiments/slide-look-study/optics.hook) multiply per-slide exponential RGB transmission along each sampled pupil ray. Wheel fits use effective optical densities, a measured-photo overlap correction, and a fitted rim displacement. The glass data can drive a future wavelength-dependent interface model. Wax phase transition, crystal scattering and measured glass dispersion each require additional implementation. The registry identifies the samples and leaves unavailable material coefficients null.

@@ -1,0 +1,169 @@
+// Offscreen export borrows the renderer exclusively and retains the preview textures and poses.
+use super::*;
+
+pub struct WheelMovie<'a> {
+    renderer: &'a mut LiveWheel,
+    original_optics: Option<Target>,
+    original_feedback: Option<feedback::Feedback>,
+    original_track: Option<Track>,
+    readback: gpu::Buffer,
+    row_bytes: u32,
+}
+
+// wgpu-core 0.19's Vulkan Maintain::Wait uses a 5 s cleanup wait. Offline
+// frames can exceed it. Poll the actual completion callback at both boundaries.
+fn wait_for_callback<T>(
+    device: &gpu::Device,
+    recv: std::sync::mpsc::Receiver<T>,
+) -> Result<T, String> {
+    loop {
+        device.poll(gpu::Maintain::Poll);
+        match recv.recv_timeout(std::time::Duration::from_millis(2)) {
+            Ok(result) => return Ok(result),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => (),
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+}
+
+impl LiveWheel {
+    pub async fn begin_movie(
+        &mut self,
+        size: [u32; 2],
+        current_pose: bool,
+    ) -> Result<WheelMovie<'_>, String> {
+        let [w, h] = size;
+        check_extent(size, self.device.limits().max_texture_dimension_2d)?;
+        let row_bytes = w.checked_mul(4).ok_or("Invalid movie dimensions")?;
+        if w == 0 || h == 0 || row_bytes % gpu::COPY_BYTES_PER_ROW_ALIGNMENT != 0 {
+            return Err(
+                "Movie width must align to 64 RGBA pixels and height must be positive".into(),
+            );
+        }
+        let bytes = u64::from(row_bytes) * u64::from(h);
+        if bytes > self.device.limits().max_buffer_size {
+            return Err("The selected GPU cannot read back a frame of this size".into());
+        }
+        let (done, recv) = std::sync::mpsc::channel();
+        self.queue.on_submitted_work_done(move || {
+            let _ = done.send(());
+        });
+        wait_for_callback(&self.device, recv)?;
+        self.device.push_error_scope(gpu::ErrorFilter::OutOfMemory);
+        let optics = Target::new(&self.device, "Movie optical output", size, COLOR_FORMAT);
+        let feedback = self
+            .feedback
+            .as_ref()
+            .map(|f| feedback::Feedback::new(&self.device, size, f.settings));
+        let readback = self.device.create_buffer(&gpu::BufferDescriptor {
+            label: Some("Reusable movie RGBA readback"),
+            size: bytes,
+            usage: gpu::BufferUsages::COPY_DST | gpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        if let Some(error) = self.device.pop_error_scope().await {
+            return Err(error.to_string());
+        }
+        let original_optics = Some(std::mem::replace(&mut self.optics, optics));
+        let original_feedback = std::mem::replace(&mut self.feedback, feedback);
+        let original_track = self.tracks.remove(&self.active);
+        if let Some(track) = &original_track {
+            let mut slides = track.slides;
+            for pose in &mut slides {
+                if current_pose {
+                    pose.end();
+                } else {
+                    let response = pose.response;
+                    *pose = SlidePose::default();
+                    pose.response = response;
+                }
+            }
+            let dirty = slides.iter().any(|p| p.strength != [0.; 2]);
+            self.tracks.insert(
+                self.active,
+                Track {
+                    slides,
+                    dirty,
+                    warp: None,
+                },
+            );
+        }
+        Ok(WheelMovie {
+            renderer: self,
+            original_optics,
+            original_feedback,
+            original_track,
+            readback,
+            row_bytes,
+        })
+    }
+}
+
+impl WheelMovie<'_> {
+    pub fn end_gesture(&mut self, slide: u32) {
+        self.renderer.end_gesture(slide);
+    }
+
+    pub fn gesture(
+        &mut self,
+        slide: u32,
+        mode: SlideGesture,
+        response: f32,
+        from: [f32; 2],
+        to: [f32; 2],
+    ) -> Result<(), String> {
+        self.renderer.set_tug_response(slide, response)?;
+        self.renderer.gesture(slide, mode, from, to);
+        Ok(())
+    }
+
+    /// The sink sees tightly packed, top-down sRGB RGBA8 until it returns.
+    pub fn frame(
+        &mut self,
+        field_time: f64,
+        song_time: f64,
+        sink: impl FnOnce(&[u8]) -> Result<(), String>,
+    ) -> Result<(), String> {
+        if !field_time.is_finite() || !song_time.is_finite() {
+            return Err("Invalid movie sample time".into());
+        }
+        let r = &mut self.renderer;
+        let [w, h] = r.preview_size();
+        r.render_program_to(None, field_time, song_time);
+        let mut encoder = r.device.create_command_encoder(&Default::default());
+        encoder.copy_texture_to_buffer(
+            r.optics.texture.as_image_copy(),
+            gpu::ImageCopyBuffer {
+                buffer: &self.readback,
+                layout: gpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(self.row_bytes),
+                    rows_per_image: Some(h),
+                },
+            },
+            extent([w, h], 1),
+        );
+        r.queue.submit(Some(encoder.finish()));
+        let slice = self.readback.slice(..);
+        let (send, recv) = std::sync::mpsc::channel();
+        slice.map_async(gpu::MapMode::Read, move |result| {
+            let _ = send.send(result);
+        });
+        wait_for_callback(&r.device, recv)?.map_err(|e| e.to_string())?;
+        let result = sink(&slice.get_mapped_range());
+        self.readback.unmap();
+        result
+    }
+}
+
+impl Drop for WheelMovie<'_> {
+    fn drop(&mut self) {
+        let r = &mut self.renderer;
+        r.optics = self.original_optics.take().unwrap();
+        r.feedback = self.original_feedback.take();
+        r.tracks.remove(&r.active);
+        if let Some(track) = self.original_track.take() {
+            r.tracks.insert(r.active, track);
+        }
+    }
+}

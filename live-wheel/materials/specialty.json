@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "description": "Reference properties for viscoelastic, glassy and granular slide materials. Each record describes one specimen or formulation.",
+  "conventions": {
+    "null": "A relevant property has no calibrated value for this specimen in the cited source. A numeric consumer must explicitly handle this case.",
+    "missing": "This record supplies no default for the property. Absence and null both differ from a measured zero.",
+    "range": "Endpoints describe the stated range only. They do not define a sampling distribution.",
+    "models": "Flow and optics model names are intended simulation treatments. Measurements belong to their named specimen and experimental scale."
+  },
+  "materials": [
+    {
+      "id": "slime-pva-borate-b3",
+      "name": "Slime · aqueous PVA–borate gel",
+      "source": "robb-smeulders-1997",
+      "specimen": "B3, prepared from separate aqueous solutions of GM14 poly(vinyl alcohol) and sodium borate.",
+      "formulation": {
+        "pvaMassPercent": 3.3,
+        "sodiumBorateMassPercent": 1.0,
+        "pvaHydrolysisPercentRange": [86, 89],
+        "solvent": "water"
+      },
+      "flow": {
+        "model": "transient-viscoelastic-network",
+        "measurementTemperatureC": 20,
+        "dominantRelaxationTimeS": 0.3,
+        "interpretation": "Approximate peak of the linear relaxation spectrum, from an eleven-mode fit across the series including B3. A one-mode approximation retains this characteristic time. The source observed age-dependent nonlinear response.",
+        "zeroShearViscosityPaS": null,
+        "singleModeModulusPa": null,
+        "interfacialTensionWithOilNPerM": null
+      },
+      "optics": {
+        "model": "transmissive-gel",
+        "refractiveIndex": null,
+        "spectralAbsorptionPerM": null
+      }
+    },
+    {
+      "id": "hard-candy-cast-sugar",
+      "name": "Hard candy · cast sugar optic",
+      "source": "sears-2019",
+      "specimen": "Uncolored hard candy optic made from table sugar, light corn syrup and distilled water. Cooled solid.",
+      "formulation": {
+        "partsAsReported": {"tableSugar": 2, "lightCornSyrup": 1, "distilledWater": 1},
+        "partsBasis": null,
+        "maximumCookingTemperatureF": 303,
+        "bubbleReleaseHoldTemperatureF": 275,
+        "bubbleReleaseHoldTimeMin": 5,
+        "coolingTimeInMoldMin": 20
+      },
+      "flow": {
+        "model": "rigid-inclusion",
+        "applicableState": "Cast and cured at the end of cooling, before moisture uptake or reheating.",
+        "glassTransitionTemperatureC": null,
+        "fractureToughnessPaSqrtM": null
+      },
+      "optics": {
+        "model": "transparent-dielectric",
+        "refractiveIndex": 1.5,
+        "refractiveIndexQualifier": "Approximate bulk index reported by the inventor. The patent defines approximate values to within 5%.",
+        "wavelengthNm": null,
+        "measurementTemperatureC": null,
+        "appearance": "Transparent with a slight golden tint.",
+        "spectralAbsorptionPerM": null
+      }
+    },
+    {
+      "id": "sucrose-glass-melt-quenched",
+      "name": "Hard sugar glass · melt-quenched sucrose",
+      "source": "bogdanova-2021",
+      "specimen": "Crystalline sucrose heated in a DSC pan and immediately cooled to produce the glass. Heating can discolor sucrose.",
+      "formulation": {
+        "initialSolid": "sucrose",
+        "maximumTemperatureC": 186,
+        "heatingRateCPerMin": 20,
+        "coolingRateMagnitudeCPerMin": 20
+      },
+      "flow": {
+        "model": "rigid-inclusion",
+        "applicableState": "Dry glass on performance timescales well below the measured transition.",
+        "glassTransitionTemperatureC": 68.44,
+        "glassTransitionMethod": "Midpoint on the second DSC scan at 10 °C/min.",
+        "heatCapacityStepJPerGPerK": 0.645,
+        "fractureToughnessPaSqrtM": null
+      },
+      "optics": {
+        "model": "bulk-dielectric",
+        "appearance": "The authors observed transparent yellow material after the second DSC scan.",
+        "refractiveIndex": null,
+        "spectralAbsorptionPerM": null
+      }
+    },
+    {
+      "id": "magic-sand-submerged",
+      "name": "Magic Sand · submerged coated grains",
+      "source": "karmakar-2017",
+      "specimen": "Commercial Magic Sand used by Karmakar and colleagues. Polyhedral grains with hydrophobic surface patches, immersed with trapped air.",
+      "formulation": {
+        "surfaceCoatingChemistry": null,
+        "meanSizeOfSelectedSieveClassUm": 500,
+        "rangeOfTestedClassMeansUm": [250, 2000]
+      },
+      "flow": {
+        "model": "frictional-grains-with-pinned-air-water-skin",
+        "measurementTemperatureC": null,
+        "skinInterfacialEnergyJPerM2": 0.05,
+        "skinInterfacialEnergyQualifier": "Approximate measured effective energy of the aggregate skin.",
+        "singleGrainWaterContactAngleDeg": {"equilibrium": 150, "advancing": 170, "receding": 120},
+        "contactAngleMethod": "Approximate angles for a water drop on a single grain. Advancing and receding values were obtained by tilting.",
+        "dryFrictionCoefficient": null
+      },
+      "optics": {
+        "model": "water-air-total-internal-reflection",
+        "applicableState": "The air-retaining skin gives the submerged aggregate its luster. Degassing removes the observed luster.",
+        "grainRefractiveIndex": null,
+        "grainSpectralAbsorptionPerM": null
+      }
+    },
+    {
+      "id": "hydrophobic-sand-paraffin-coated",
+      "name": "Hydrophobic sand · paraffin-coated silica",
+      "source": "gallo-2022",
+      "specimen": "Laboratory silica sand bearing a nanoscale paraffin coating.",
+      "formulation": {
+        "waxMassPerSandMass": {"wax": 1, "sand": 600},
+        "grainDiameterRangeUm": [100, 700],
+        "estimatedWaxThicknessNm": 20,
+        "bulkWaxMeltingRangeC": [60, 65]
+      },
+      "flow": {
+        "model": "frictional-grains-with-water-repellent-surface",
+        "contactAngleTemperatureC": null,
+        "singleGrainApparentWaterContactAngleDeg": 105,
+        "bedWaterContactAngleDeg": {"advancing": 160, "receding": 150},
+        "contactAngleMethod": "Approximate values. Condensed water microdroplets on individual grains, and added or withdrawn water on a packed bed for the two macroscopic angles.",
+        "dryFrictionCoefficient": null
+      },
+      "optics": {
+        "model": "coated-grains-with-pore-air",
+        "coatingRefractiveIndex": null,
+        "grainRefractiveIndex": null,
+        "grainSpectralAbsorptionPerM": null
+      }
+    }
+  ],
+  "sources": {
+    "robb-smeulders-1997": {
+      "title": "The rheological properties of weak gels of poly(vinyl alcohol) and sodium borate",
+      "url": "https://doi.org/10.1016/S0032-3861(96)00755-0",
+      "locator": "Experimental, Table 1, Figures 1a and 2, Discussion"
+    },
+    "sears-2019": {
+      "title": "Hard candy optics",
+      "url": "https://patents.google.com/patent/US10481310B2/en",
+      "locator": "Detailed description, Figure 7 and the sucrose-based formulation"
+    },
+    "bogdanova-2021": {
+      "title": "Hydration enthalpies of amorphous sucrose, trehalose and maltodextrins and their relationship with heat capacities",
+      "url": "https://doi.org/10.1039/D1CP00779C",
+      "locator": "Section 3.3.1, Figure 4, second scan of the melt-quenched sample"
+    },
+    "karmakar-2017": {
+      "title": "Mechanics of a granular skin",
+      "url": "https://doi.org/10.1103/PhysRevE.95.042903",
+      "locator": "Figures 1–3, Construction of a submerged free-standing column, Mechanical properties of the column"
+    },
+    "gallo-2022": {
+      "title": "Nature-Inspired Superhydrophobic Sand Mulches Increase Agricultural Productivity and Water-Use Efficiency in Arid Regions",
+      "url": "https://doi.org/10.1021/acsagscitech.1c00148",
+      "locator": "Results on grain and bed wettability, Methods on sand and wax properties"
+    }
+  }
+}

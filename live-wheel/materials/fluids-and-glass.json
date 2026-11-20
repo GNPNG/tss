@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "oil_water": "https://doi.org/10.1038/s41467-021-26382-w",
+    "oil_optics_20": "https://www.sigmaaldrich.com/US/en/product/aldrich/378348",
+    "oil_optics_1000": "https://www.sigmaaldrich.com/US/en/product/aldrich/378399",
+    "rt35": "https://www.rubitherm.com/media/products/datasheets/Techdata_-RT35_EN_18042024.PDF",
+    "wax_refractometry": "https://www.pp.bme.hu/ch/article/download/3199/2304/6957",
+    "glass": "https://media.schott.com/api/public/content/41e799d0bf874807a0bb8e702fbb75b5?v=54856406",
+    "glass_catalog_conditions": "https://media.schott.com/api/public/content/8afd09ccdf4243e890df9f875b1b5579?v=ce5367ec"
+  },
+  "oil_conditions": {
+    "phase_1": "Sigma-Aldrich silicone oil, PDMS",
+    "phase_2": "Deionized water, resistivity 18.2 megohm cm",
+    "mechanical_source": "oil_water, Table 1 and Methods, Materials",
+    "nominal_kinematic_viscosity_temperature_c": 25,
+    "nominal_kinematic_viscosity_pressure_atm": 1,
+    "tensiometry_method": "Pendant drop",
+    "tensiometry_temperature_c": null,
+    "note": "The Methods give 25 °C and 1 atm for the viscosity grades. They do not specify a separate bath temperature for pendant-drop measurements. Tension uncertainties reproduce the paper's ± values. Each optical source is the supplier listing for the corresponding nominal grade. The paper does not identify catalog numbers or lots."
+  },
+  "oils": [
+    {
+      "id": "pdms-water-20cst",
+      "kinematic_viscosity_cst": 20,
+      "density_kg_m3": 950,
+      "dynamic_viscosity_pa_s": 0.019,
+      "oil_water_interfacial_tension_n_m": 0.0409,
+      "oil_water_interfacial_tension_reported_plus_minus_n_m": 0.0005,
+      "oil_air_surface_tension_n_m": 0.0194,
+      "oil_air_surface_tension_reported_plus_minus_n_m": 0.0007,
+      "water_density_kg_m3": 998,
+      "water_dynamic_viscosity_pa_s": 0.00089,
+      "refractive_index": { "value": 1.403, "temperature_c": 20, "wavelength_nm": 589.3, "line": "sodium D", "source": "oil_optics_20" }
+    },
+    {
+      "id": "pdms-water-1000cst",
+      "kinematic_viscosity_cst": 1000,
+      "density_kg_m3": 970,
+      "dynamic_viscosity_pa_s": 0.970,
+      "oil_water_interfacial_tension_n_m": 0.0408,
+      "oil_water_interfacial_tension_reported_plus_minus_n_m": 0.0010,
+      "oil_air_surface_tension_n_m": 0.0217,
+      "oil_air_surface_tension_reported_plus_minus_n_m": 0.0002,
+      "water_density_kg_m3": 998,
+      "water_dynamic_viscosity_pa_s": 0.00089,
+      "refractive_index": { "value": 1.403, "temperature_c": 20, "wavelength_nm": 589.3, "line": "sodium D", "source": "oil_optics_1000" }
+    }
+  ],
+  "waxes": [
+    {
+      "id": "rubitherm-rt35",
+      "source": "rt35",
+      "melting_range_c": [32, 38],
+      "congealing_range_c_cooling_order": [38, 32],
+      "melting_peak_c": 35,
+      "congealing_peak_c": 35,
+      "solid": { "density_kg_m3": 860, "density_temperature_c": 15, "refractive_index": null },
+      "liquid": { "density_kg_m3": 770, "density_temperature_c": 45, "dynamic_viscosity_pa_s": null, "oil_water_interfacial_tension_n_m": null, "refractive_index": null },
+      "specific_heat_j_kg_k": 2000,
+      "thermal_conductivity_both_phases_w_m_k": 0.2,
+      "combined_latent_and_sensible_heat_j_kg": 160000,
+      "combined_heat_temperature_interval_c": [26, 41],
+      "combined_heat_reported_plus_minus_percent": 7.5,
+      "latent_heat_only_j_kg": null
+    },
+    {
+      "id": "duna-macrocrystalline-wax-sample-1",
+      "source": "wax_refractometry",
+      "description": "Szergényi, macrocrystalline petroleum paraffin sample 1, light fraction of Romashkino crude. Separate specimen from RT35.",
+      "wavelength_nm": null,
+      "method": "Temperature-controlled refractometry, wavelength unspecified in the paper",
+      "liquid_index": [
+        { "temperature_c": 80, "value": 1.4280 },
+        { "temperature_c": 52, "value": 1.4385 }
+      ],
+      "coexisting_crystal_indices": { "temperature_c": 52, "ordinary": 1.4730, "extraordinary": 1.5215 },
+      "absorption_spectrum_m_inv": null,
+      "scattering_spectrum_m_inv": null
+    }
+  ],
+  "glass": {
+    "id": "schott-n-bk7",
+    "source": "glass",
+    "index_conditions": "Catalog indices relative to normal air at room temperature. Source glass_catalog_conditions.",
+    "refractive_indices": [
+      { "wavelength_nm": 486.1, "line": "F", "value": 1.52238 },
+      { "wavelength_nm": 587.6, "line": "d", "value": 1.51680 },
+      { "wavelength_nm": 656.3, "line": "C", "value": 1.51432 }
+    ],
+    "internal_transmittance": [
+      { "wavelength_nm": 460, "path_m": 0.010, "value": 0.997 },
+      { "wavelength_nm": 500, "path_m": 0.010, "value": 0.998 },
+      { "wavelength_nm": 660, "path_m": 0.010, "value": 0.998 }
+    ],
+    "density_kg_m3": 2510,
+    "young_modulus_pa": 82000000000,
+    "poisson_ratio": 0.206,
+    "scattering_spectrum_m_inv": null
+  }
+}

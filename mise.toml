@@ -1,0 +1,11 @@
+[tasks.dev]
+description = "Run The Sacred Swirls desktop application"
+run = "cargo run --manifest-path src-tauri/Cargo.toml"
+
+[tasks.build]
+description = "Build The Sacred Swirls desktop application"
+run = "cargo build --release --manifest-path src-tauri/Cargo.toml"
+
+[tasks.test]
+description = "Run Rust tests"
+run = "cargo test --manifest-path src-tauri/Cargo.toml"

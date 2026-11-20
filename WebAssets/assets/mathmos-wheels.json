@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "wheels": [
+    {
+      "id": "violet-blue", "name": "Violet / Blue",
+      "swatches": { "carrier": "#D4CFDC", "rear": "#C579B2", "front": "#0EAAD6", "overlap": "#1771B5" },
+      "reference": "c881f248", "depthVariation": 1
+    },
+    {
+      "id": "blue-red", "name": "Blue / Red",
+      "swatches": { "carrier": "#E3DAE8", "rear": "#D51F29", "front": "#1864B0", "overlap": "#170F13" },
+      "reference": "e5a441c6", "depthVariation": 0.58
+    },
+    {
+      "id": "yellow-red", "name": "Yellow / Red",
+      "swatches": { "carrier": "#F5E9D1", "rear": "#F8D13D", "front": "#DA263B", "overlap": "#B71C2A" },
+      "rearRim": "#CE8F34", "reference": "80d8900c", "depthVariation": 0.62
+    },
+    {
+      "id": "blue-green", "name": "Blue / Green",
+      "swatches": { "carrier": "#DDE9DF", "rear": "#56B778", "front": "#16B6EA", "overlap": "#137547" },
+      "reference": "b530d099", "depthVariation": 0.75
+    },
+    {
+      "id": "blue-yellow", "name": "Blue / Yellow",
+      "swatches": { "carrier": "#E8EBD6", "rear": "#47A04D", "front": "#FCF16E", "overlap": "#077E4F" },
+      "rearRim": "#0193CB", "reference": "600a3498", "depthVariation": 0.80
+    },
+    {
+      "id": "violet-green", "name": "Violet / Green",
+      "swatches": { "carrier": "#F7E9D5", "rear": "#EAACC6", "front": "#AED2BA", "overlap": "#72749A" },
+      "reference": "49ee8ae4", "depthVariation": 0.87
+    },
+    {
+      "id": "violet-red", "name": "Violet / Red",
+      "swatches": { "carrier": "#FCEAEE", "rear": "#D92B8C", "front": "#DF1D3E", "overlap": "#D31A3E" },
+      "rearRim": "#A62E79", "reference": "1f674674", "depthVariation": 0.50
+    }
+  ]
+}

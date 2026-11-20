@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Sacred Swirls</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><button class="brand-logo" id="show-logo" aria-label="View The Sacred Swirls project logo"><img src="assets/tss-project-logo.jpeg" alt=""></button><div><strong>THE SACRED SWIRLS</strong><small>LIQUID LIGHT STUDIO</small></div></div>
+    <div class="project-name"><span class="project-label">CURRENT SESSION</span><span id="track-title">Untitled session</span></div>
+    <div class="top-actions"><button class="button quiet" id="projector" disabled title="Projector output is not available yet">Projector <span>↗</span></button><button class="button quiet" id="export" disabled title="8-bit development preview; production masters are under development">Export 4K preview</button><button class="button primary" id="open-audio">＋ &nbsp;Open audio</button><input type="file" id="audio-file" accept="audio/mpeg,audio/mp4,.mp3,.m4a" hidden></div>
+  </header>
+
+  <main>
+    <div class="workspace">
+      <section class="stage card" aria-label="Visual preview">
+        <div class="section-heading"><div><span class="eyebrow">LIVE CANVAS</span><h1>Liquid light</h1></div><span class="live-indicator"><i></i><span id="preview-status">PROCEDURAL PREVIEW</span></span></div>
+        <div class="preview-shell"><canvas id="preview" width="1280" height="720" aria-label="Liquid light preview"></canvas><div id="render-error" class="render-error" hidden></div><div class="preview-bottom"><span id="preview-resolution">1280 × 720</span><span>PROJECTED LIGHT</span></div></div>
+        <div class="native-performance" id="native-performance" hidden>
+          <span id="native-instruction">Drag to tug the material on the selected slide.</span>
+          <output id="native-frame-rate" aria-label="Native presentation statistics"></output>
+        </div>
+        <div class="native-choices" id="native-wheel-export" hidden>
+          <label>Export starting pose<select id="native-export-baseline">
+            <option value="auto">Automatic · neutral with a scheduled gesture</option>
+            <option value="current">Current pose and film position</option>
+            <option value="neutral">Neutral pose and film start</option>
+          </select></label>
+          <button class="button quiet" type="button" id="export-native-wheel" disabled>Export selected wheel in 4K</button>
+        </div>
+        <div class="stage-footer"><div class="source-info"><span class="disc">♫</span><div><strong id="source-name">No audio selected</strong><small id="source-meta">Open an MP3 or M4A to begin</small></div></div><div class="transport"><button class="icon-button" id="restart" title="Return to start" aria-label="Return to start" disabled>↤</button><button class="play-button" id="play" title="Play" aria-label="Play" disabled>▶</button><button class="icon-button" id="stop" title="Stop" aria-label="Stop" disabled>■</button></div><div class="clock"><span id="current-time">00:00</span><span class="clock-separator"> / </span><span id="total-time">00:00</span></div></div>
+      </section>
+
+      <aside class="controls card" aria-label="Selected layer controls">
+        <div class="section-heading controls-heading"><div><span class="eyebrow">LAYER SETTINGS</span><h2 id="selected-name">Liquid 1</h2></div><span class="setting-glyph">✳</span></div>
+        <div class="control-body">
+          <div class="control-label"><span>COLOR THEME</span><span class="secondary">Select a palette</span></div>
+          <div id="palette-grid" class="palettes" role="group" aria-label="Color theme"></div>
+          <label class="control-label wheel-heading" for="mathmos-wheel">MATHMOS OIL WHEELS</label>
+          <div class="wheel-controls">
+            <select id="mathmos-wheel" disabled><option value="" disabled>Choose a wheel</option></select>
+            <button class="button quiet" type="button" id="show-wheel-study" aria-haspopup="dialog" disabled>View study</button>
+          </div>
+          <div id="native-wheel-controls" hidden>
+            <label class="native-toggle"><input type="checkbox" id="live-wheel"> Live selected wheel</label>
+            <div class="native-choices">
+              <label>Mouse target<select id="wheel-slide"><option value="rear">Rear slide</option><option value="front">Front slide</option></select></label>
+              <label>Live resolution<select id="wheel-width"><option value="640">640 × 360</option><option value="960">960 × 540</option></select></label>
+            </div>
+            <div class="native-choices motion-control">
+              <label>Mouse action<select id="wheel-gesture"><option value="tug">Material tug</option><option value="rotate">Rotate slide</option></select></label>
+              <label>Material response<select id="tug-response"><option value="0">Heavy</option><option value="0.4">Medium</option><option value="1">Light</option></select></label>
+            </div>
+            <div class="focus-control">
+              <label for="wheel-focus">Projector focus</label>
+              <output id="wheel-focus-value" for="wheel-focus">Wheel setting</output>
+              <input id="wheel-focus" type="range" min="0" max="100" step="1" value="50">
+              <div class="range-ends"><span>Rear slide</span><span>Front slide</span></div>
+              <button class="button quiet" id="wheel-focus-reset" type="button">Restore wheel focus</button>
+            </div>
+            <details id="video-feedback">
+              <summary>Video feedback</summary>
+              <label class="native-toggle"><input name="feedback-enabled" type="checkbox"> Feed the prior program image back into the wheel</label>
+              <fieldset class="feedback-settings" disabled>
+                <legend>Loop controls</legend>
+                <label for="feedback-delay">Delay <output for="feedback-delay">100 ms</output></label>
+                <input id="feedback-delay" name="delay" type="range" min="25" max="450" step="5" value="100" data-unit=" ms">
+                <label for="feedback-strength">Strength <output for="feedback-strength">40%</output></label>
+                <input id="feedback-strength" name="strength" type="range" min="0" max="95" value="40" data-unit="%">
+                <label for="feedback-zoom">Zoom per return <output for="feedback-zoom">103%</output></label>
+                <input id="feedback-zoom" name="zoom" type="range" min="85" max="115" value="103" data-unit="%">
+                <label for="feedback-rotation">Rotation per return <output for="feedback-rotation">1°</output></label>
+                <input id="feedback-rotation" name="rotation" type="range" min="-12" max="12" step="0.5" value="1" data-unit="°">
+              </fieldset>
+            </details>
+          </div>
+          <div class="control-label pigment-heading"><span id="pigment-heading">COLOR LAYERS</span><span class="secondary">Edit each color</span></div>
+          <div id="pigment-colors" class="pigment-colors" role="group" aria-label="Individual liquid colors"></div>
+          <div class="control-divider"></div>
+          <div class="control-label"><span>COLOR WHEEL</span><span class="secondary" id="hue-label">0°</span></div>
+          <label class="slider-label" for="hue">Hue offset</label><input type="range" id="hue" min="0" max="360" value="0" class="hue-slider">
+          <div class="range-ends"><span>0°</span><span>360°</span></div>
+          <div class="control-divider"></div>
+          <div class="knobs"><label>FLOW SPEED <output id="speed-output">1.0×</output><input type="range" id="speed" min="0" max="2" step="0.05" value="1"></label><label>DETAIL SCALE <output id="scale-output">1.0×</output><input type="range" id="scale" min="0.4" max="2" step="0.05" value="1"></label><label>OPACITY <output id="opacity-output">100%</output><input type="range" id="opacity" min="0" max="1" step="0.01" value="1"></label></div>
+          <div class="audio-note" id="audio-note"><span class="note-icon">≈</span><div><strong>Music responsive</strong><p>Liquid movement responds to the audio as it plays.</p></div></div>
+        </div>
+      </aside>
+    </div>
+
+    <section class="timeline card" aria-label="Timeline">
+      <div class="timeline-header"><div><span class="eyebrow">ARRANGEMENT</span><h2>Timeline</h2></div><div class="timeline-actions"><span id="layer-count">1 visual layer</span><button id="add-layer" class="button add-layer">＋ &nbsp;Add visual layer</button></div></div>
+      <div class="timeline-content">
+        <div class="track-labels"><div class="ruler-label">TRACKS</div><div class="audio-label"><span class="track-symbol">♫</span><div><strong>AUDIO</strong><small>Master track</small></div></div><div id="layer-list"></div></div>
+        <div class="timeline-scroll"><div class="timeline-lanes"><div id="ruler" class="ruler" aria-hidden="true"></div><div class="wave-lane" id="seek-area" title="Click to seek"><canvas id="waveform"></canvas><div class="empty-wave" id="empty-wave">YOUR AUDIO WAVEFORM WILL APPEAR HERE</div></div><div id="visual-lanes"></div><div id="playhead" class="playhead" aria-hidden="true"></div></div></div>
+      </div>
+      <div class="timeline-footer"><span>Click the waveform to seek</span><span id="app-status" role="status" aria-live="polite">Ready</span></div>
+    </section>
+    <details class="timeline card macro-deck" id="projector-routing" hidden>
+      <summary>Projector and audio outputs</summary>
+      <div class="macro-controls">
+        <label>Projector delay (ms) <input id="program-delay" type="number" min="0" max="1000" step="25" value="500"></label>
+        <label>DJ cue <select id="cue-sink"><option value="">System default</option><option value="mute">Off</option></select></label>
+        <label>Audience audio <select id="audience-sink"><option value="mute">Off</option><option value="">System default</option></select></label>
+        <button id="audio-output-choose" class="button quiet" type="button" hidden>Choose audience device</button>
+        <label>Audience audio trim (ms) <input id="audio-trim" type="number" min="-250" max="250" step="5" value="0"></label>
+        <output id="projector-state" role="status"></output>
+      </div>
+    </details>
+    <details class="timeline card macro-deck" id="macro-deck" hidden>
+      <summary>Gesture macros</summary>
+      <div class="macro-controls">
+        <button class="button primary" type="button" id="macro-record">Record gesture</button>
+        <label>Saved gesture <select id="macro-list"></select></label>
+        <label>Timed lyrics <input type="file" id="macro-lyrics" accept=".vtt,.srt,.json"></label>
+        <p id="macro-cues"></p>
+        <fieldset id="macro-editor" hidden>
+          <legend>Playback</legend>
+          <label>Name <input id="macro-name" maxlength="80"></label>
+          <label><input id="macro-on" type="checkbox"> Macro on</label>
+          <button class="button quiet" type="button" id="macro-once">Play once</button>
+          <label>Gesture amount <output id="macro-amount-value" for="macro-amount"></output>
+            <input type="range" id="macro-amount" min="0" max="3" step=".05"></label>
+          <label>Trigger <select id="macro-cue"></select></label>
+          <label><input id="macro-fit" type="checkbox"> Fit gesture to phrase</label>
+          <label>Extra amount per hit <input type="number" id="macro-step" min="0" max="3" step=".05"></label>
+          <label>Maximum amount <input type="number" id="macro-cap" min="0" max="4" step=".05"></label>
+          <details><summary>Trigger occurrences</summary><div id="macro-hits"></div></details>
+        </fieldset>
+        <output role="status" id="macro-status"></output>
+      </div>
+    </details>
+  </main>
+  <dialog id="logo-dialog" class="logo-dialog" aria-label="The Sacred Swirls project logo"><button class="button quiet" id="close-logo">Close</button><img src="assets/tss-project-logo.jpeg" alt="The Sacred Swirls project logo with a golden emblem over liquid light and illustrated landmarks"></dialog>
+  <dialog id="wheel-study" class="wheel-study" aria-labelledby="wheel-study-name" aria-describedby="wheel-study-description">
+    <header><h2 id="wheel-study-name"></h2><button type="button" class="button quiet" id="close-wheel-study">Close</button></header>
+    <p id="wheel-study-description">Recorded native render of two independently simulated liquid slides.</p>
+    <video id="wheel-study-video" controls loop muted playsinline preload="none" aria-label="Oil wheel motion study"></video>
+    <p id="wheel-study-error" role="status" hidden>Could not play this wheel’s motion study.</p>
+  </dialog>
+  <script type="module" src="app.js"></script>
+  <dialog id="native-wheel-export-progress" aria-labelledby="native-export-title">
+    <h2 id="native-export-title">Exporting selected wheel</h2>
+    <output id="native-export-count" aria-live="polite">Preparing 4K render…</output>
+    <progress id="native-export-progress-bar" aria-label="Rendered frames"></progress>
+    <button class="button quiet" id="cancel-native-export" type="button">Cancel export</button>
+  </dialog>
+</body>
+</html>

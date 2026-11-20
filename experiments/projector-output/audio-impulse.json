@@ -1,0 +1,66 @@
+[
+  {
+    "sampleRate": 44100,
+    "delayMs": 0,
+    "trimMs": 0,
+    "cueSample": 32,
+    "audienceSample": 32,
+    "errorSamples": 0
+  },
+  {
+    "sampleRate": 44100,
+    "delayMs": 500,
+    "trimMs": 0,
+    "cueSample": 32,
+    "audienceSample": 22082,
+    "errorSamples": 0
+  },
+  {
+    "sampleRate": 44100,
+    "delayMs": 500,
+    "trimMs": -50,
+    "cueSample": 32,
+    "audienceSample": 19877,
+    "errorSamples": 0
+  },
+  {
+    "sampleRate": 44100,
+    "delayMs": 1000,
+    "trimMs": 250,
+    "cueSample": 32,
+    "audienceSample": 55157,
+    "errorSamples": 0
+  },
+  {
+    "sampleRate": 48000,
+    "delayMs": 0,
+    "trimMs": 0,
+    "cueSample": 32,
+    "audienceSample": 32,
+    "errorSamples": 0
+  },
+  {
+    "sampleRate": 48000,
+    "delayMs": 500,
+    "trimMs": 0,
+    "cueSample": 32,
+    "audienceSample": 24032,
+    "errorSamples": 0
+  },
+  {
+    "sampleRate": 48000,
+    "delayMs": 500,
+    "trimMs": -50,
+    "cueSample": 32,
+    "audienceSample": 21632,
+    "errorSamples": 0
+  },
+  {
+    "sampleRate": 48000,
+    "delayMs": 1000,
+    "trimMs": 250,
+    "cueSample": 32,
+    "audienceSample": 60032,
+    "errorSamples": 0
+  }
+]
