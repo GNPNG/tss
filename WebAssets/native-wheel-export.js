@@ -10,8 +10,8 @@ export function wheelMovieRequest(selection, duration, events, baseline) {
 }
 
 export class NativeWheelExport {
-  constructor({invoke, listen, selection, source, getEvents, pause, prepare, sync, status}) {
-    Object.assign(this, {invoke, listen, selection, source, getEvents, pause, prepare, sync, status});
+  constructor({invoke, listen, selection, source, getEvents, finishRecording, pause, prepare, sync, status}) {
+    Object.assign(this, {invoke, listen, selection, source, getEvents, finishRecording, pause, prepare, sync, status});
     const byId = id => document.getElementById(id);
     this.group = byId('native-wheel-export');
     this.button = byId('export-native-wheel');
@@ -53,6 +53,7 @@ export class NativeWheelExport {
       if (!outputPath) return;
       if (this.selection()?.layerId !== selection.layerId || this.selection()?.wheel !== selection.wheel ||
           this.source().audioPath !== audioPath || this.source().proceduralBusy) throw Error('The selected wheel or song changed.');
+      await this.finishRecording();
       this.pause();
       await this.prepare();
       const request = wheelMovieRequest(selection, duration, this.getEvents(selection.layerId, duration), this.pose.value);

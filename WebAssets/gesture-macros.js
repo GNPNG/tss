@@ -104,6 +104,7 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
   const all = new Map();
   let key = 'unsaved-session', groups = [], lyricGroups = [], recording = null;
   let selected = null, sequence = Promise.resolve(), previousSongTime = null;
+  let captureTask=Promise.resolve();
   let schedule = null;
   const current = () => all.get(selected);
   const candidates = () => [...groups, ...lyricGroups];
@@ -270,15 +271,19 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
         slide:payload.slide,gesture:payload.gesture,tugResponse:payload.tugResponse??.4});
     }
   }).catch(error => { listenerError=error; note(String(error)); });
+  async function finishPendingRecording(){
+    if (!recording) return;
+    const take=recording;
+    take.end=await invoke('set_live_wheel_capture_enabled',{enabled:false});
+    if(recording===take) finishRecording();
+  }
   async function record() {
     el('record').disabled = true;
     try {
       await ready;
       if (listenerError) throw listenerError;
       if (recording) {
-        const take = recording;
-        take.end = await invoke('set_live_wheel_capture_enabled',{enabled:false});
-        if (recording === take) finishRecording();
+        await finishPendingRecording();
       } else {
         const layer = selection();
         if (!layer) { note('Select a live Mathmos wheel first.'); return; }
@@ -296,7 +301,7 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
     } catch(e) { recording=null; el('record').textContent='Record gesture'; note(String(e)); }
     finally { el('record').disabled=false; }
   }
-  el('record').addEventListener('click',record);
+  el('record').addEventListener('click',()=>{captureTask=record();return captureTask;});
   el('list').addEventListener('change',()=>{selected=el('list').value;render();});
   el('once').addEventListener('click',async()=>{
     try { await prepare(); startMacro(current(),performance.now()/1000,null); }
@@ -325,6 +330,7 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
   restore(); render(); el('deck').hidden=false;
   return {
     tick,
+    async finishPendingRecording(){await captureTask;await finishPendingRecording();},
     transportChanged(position=clock().position){stop();previousSongTime=clock().playing?position:null;},
     exportEvents(layerId,duration){return songGestureEvents(all.values(),candidates(),layerId,duration);},
     async songLoaded(id,analysis,stillCurrent){

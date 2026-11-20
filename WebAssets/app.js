@@ -84,6 +84,7 @@ const wheelExporter = windowsDesktop ? new NativeWheelExport({
   invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: liveSelection,
   source: () => ({audioPath: state.audioPath, duration: state.audioBuffer?.duration, proceduralBusy: state.exporting}),
   getEvents: (id, duration) => macroDeck?.exportEvents(id, duration) ?? [],
+  finishRecording: async () => { await macroDeck?.finishPendingRecording(); },
   pause, prepare: prepareWheel, sync: () => nativeSurface.sync(), status,
 }) : null;
 
