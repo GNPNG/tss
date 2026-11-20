@@ -1,0 +1,242 @@
+//!HOOK MAIN
+//!BIND HOOKED
+//!DESC TSS transmitted light through two independently focused dye slides
+
+// Input is full-range RGB data tagged sRGB, sampled at MAIN before linearization.
+// R and G store independent signed distances. Positive is inside the dyed phase.
+// One design pixel is 1/720 of the image height. B is reserved.
+const vec2 slideUnits = vec2(1280.0, 720.0);
+// TSS_WHEEL_MATERIAL
+#ifdef TSS_FOCUS_PLANE
+#define TSS_LIVE_FOCUS 1
+#define liveFocus TSS_FOCUS_PLANE
+#endif
+#ifndef TSS_WHEEL_PROFILE
+const vec3 pinkAbsorption = vec3(0.24, 1.53, 0.49);
+const vec3 cyanAbsorption = vec3(5.02, 0.64, 0.165);
+#endif
+const vec2 lampDirection = vec2(-0.62, -0.785);
+
+vec2 distanceAt(vec2 uv) {
+    return (HOOKED_tex(uv).rg - vec2(0.5)) * 96.0;
+}
+
+float bell(float distance, float width) {
+    float x = distance / width;
+    return exp(-0.5 * x * x);
+}
+
+float opticalPatch(vec2 q, vec2 axes) {
+    vec2 r = q / axes;
+    return exp(-0.5 * dot(r, r));
+}
+
+// Neighborhood dye coverage moves with each plate and varies smoothly across
+// broad pockets. This is an appearance estimate for the gap profile, not a
+// pressure solution. A wide signed-distance transition keeps the quadrature
+// from reproducing displaced copies of sharp edges.
+vec2 broadCoverage(vec2 uv) {
+    vec2 s = vec2(0.0);
+    const vec2 stencil[6] = vec2[6](
+        vec2(64, 16), vec2(-64, -16), vec2(22, -87),
+        vec2(-22, 87), vec2(-86, 47), vec2(86, -47));
+    for (int i = 0; i < 6; ++i)
+        s += smoothstep(vec2(-45.0), vec2(45.0), distanceAt(uv + stencil[i] / slideUnits));
+    return s / 6.0;
+}
+
+vec2 unitOrZero(vec2 v) {
+    return v / max(length(v), 0.08);
+}
+
+vec2 gapDepth(vec2 uv, vec2 cover) {
+    float pinkThin = opticalPatch(uv - vec2(0.51, 0.47), vec2(0.160, 0.128));
+    float cyanThin = opticalPatch(uv - vec2(0.62, 0.415), vec2(0.135, 0.176));
+    float pinkDepth = 1.31 - 0.94 * pinkThin + 0.34 * (uv.y - uv.x) + 0.46 * (cover.r - 0.50);
+    float cyanDepth = 1.08 - 0.86 * cyanThin + 0.33 * (uv.x + uv.y - 1.0) + 0.36 * (cover.g - 0.50);
+    return max(vec2(pinkDepth,cyanDepth),vec2(0.24,0.14));
+}
+
+// The local fraction of each phase distinguishes a resolved interface from
+// a pinhole or a speck. Sample at fixed offsets rather than projecting onto
+// the nearest contour: contour ownership switches abruptly on a medial axis.
+vec2 resolvedRim(vec2 uv) {
+    const vec2 ring[8] = vec2[8](
+        vec2(7.5,0.0), vec2(5.303,5.303), vec2(0.0,7.5), vec2(-5.303,5.303),
+        vec2(-7.5,0.0), vec2(-5.303,-5.303), vec2(0.0,-7.5), vec2(5.303,-5.303));
+    vec2 fraction = vec2(0.0);
+    for (int i = 0; i < 8; ++i)
+        fraction += smoothstep(vec2(-3.0), vec2(3.0), distanceAt(uv + ring[i] / slideUnits));
+    fraction /= 8.0;
+    vec2 balance = 4.0 * fraction * (1.0 - fraction);
+    vec2 local = 1.0 - smoothstep(vec2(3.6), vec2(7.8), abs(distanceAt(uv)));
+    return local * smoothstep(vec2(0.39), vec2(0.88), balance);
+}
+
+// Unit-thickness color is controlled by the dye's linear-RGB absorption.
+// At its meniscus the apparent path shortens on the shoulder and thickens
+// along the narrow contact line. The grazing loss and opposing bright band
+// model the projected rim. Their widths are appearance parameters, in design px.
+vec3 transmit(float distance, float facing, vec3 absorption, float depth,
+              float meniscusWidth, float resolvedWidth, out float pathLength) {
+    float d = distance / meniscusWidth;
+    float coverage = smoothstep(-0.65, 0.65, d);
+    float shoulder = 0.095 * (1.0 - smoothstep(0.0, 11.0, d));
+    float thickness = 1.0 - shoulder - 0.18 * resolvedWidth * bell(d - 1.8, 2.45);
+    thickness += resolvedWidth * 0.40 * bell(d - 1.05, 1.70);
+    pathLength = depth * coverage * thickness;
+    vec3 transmission = exp(-absorption * depth * coverage * thickness);
+
+    float litSide = smoothstep(-0.35, 0.9, facing);
+    float shadow = (0.17 + 0.36 * (1.0 - litSide)) * bell(d + 0.20, 1.82);
+    float bright = (0.035 + 0.35 * litSide * litSide) * bell(d - 3.90, 2.18);
+    float outerLight = 0.065 * litSide * bell(d + 3.20, 1.55);
+    return transmission * (1.0 + resolvedWidth * (bright + outerLight - shadow));
+}
+
+// A thin curved front interface redirects the sample into the rear slide.
+// A common aperture ray is used for both slides, preserving their optical
+// overlap through focus as well as the thin displacement along a crossing.
+vec3 apertureRay(vec2 uv, vec2 aperture, vec2 frontNormal, vec2 rearNormal,
+                 float pinkDepth, float cyanDepth, float frontBlur, float rearBlur,
+                 vec2 rimSupport) {
+    vec2 frontUV = uv + aperture * frontBlur / slideUnits;
+    float nearD = distanceAt(frontUV).g;
+#ifdef TSS_LIVE_FOOTPRINT
+    // The meniscus is on the material plane. Sample its optical properties
+    // at the passing ray rather than carrying the focused rim across the pupil.
+    vec4 frontProperties = rayMaterial(frontUV,true);
+    frontNormal = frontProperties.xy;
+    rimSupport.g = frontProperties.z;
+    cyanDepth = frontProperties.w;
+#ifdef TSS_WHEEL_PROFILE
+    cyanDepth = mix(1.0,cyanDepth,depthVariation);
+#endif
+#endif
+    float bend = rimSupport.g * 5.8 * bell(nearD - 1.2, 3.6);
+    vec2 rearUV = uv + (aperture * rearBlur + frontNormal * bend) / slideUnits;
+    float farD = distanceAt(rearUV).r;
+#ifdef TSS_LIVE_FOOTPRINT
+    vec4 rearProperties = rayMaterial(rearUV,false);
+    rearNormal = rearProperties.xy;
+    rimSupport.r = rearProperties.z;
+    pinkDepth = rearProperties.w;
+#ifdef TSS_WHEEL_PROFILE
+    pinkDepth = mix(1.0,pinkDepth,depthVariation);
+#endif
+#endif
+    float frontPath, rearPath;
+    vec3 front = transmit(nearD, dot(frontNormal, lampDirection), cyanAbsorption, cyanDepth, 1.15, rimSupport.g, frontPath);
+    vec3 rear = transmit(farD, dot(rearNormal, lampDirection), pinkAbsorption, pinkDepth, 1.46, rimSupport.r, rearPath);
+#ifdef TSS_WHEEL_PROFILE
+    // The four photographic regions determine effective optical densities.
+    // Apply the paired density only to the common path. A solo slide has
+    // exactly zero common path. The remaining depth keeps its own absorption.
+    vec3 correction = pairedDensityCorrection * min(frontPath, rearPath);
+    // Some wheel photographs show a different hue at the rear phase boundary.
+    correction += rearRimDelta * rearPath * rimSupport.r * bell(farD - 2.9, 3.2);
+    return front * rear * exp(-correction);
+#else
+    return front * rear;
+#endif
+}
+
+vec3 linearToSRGB(vec3 radiance) {
+    vec3 v = clamp(radiance, 0.0, 1.0);
+    return mix(12.92 * v, 1.055 * pow(v, vec3(1.0 / 2.4)) - 0.055,
+               greaterThan(v, vec3(0.0031308)));
+}
+
+vec4 hook() {
+    vec2 uv = HOOKED_pos;
+    vec2 delta = 1.5 / slideUnits;
+    vec2 dx = distanceAt(uv + vec2(delta.x, 0.0)) - distanceAt(uv - vec2(delta.x, 0.0));
+    vec2 dy = distanceAt(uv + vec2(0.0, delta.y)) - distanceAt(uv - vec2(0.0, delta.y));
+    vec2 frontNormal = unitOrZero(vec2(dx.g, dy.g));
+    vec2 rearNormal = unitOrZero(vec2(dx.r, dy.r));
+
+    vec2 rimSupport = resolvedRim(uv);
+    // The two glass gaps have different broad variations. At the illuminated
+    // central saddle the path through either dye can shorten substantially.
+    // A slowly varying shape term couples the dye depth to each moving pool.
+    vec2 cover = broadCoverage(uv);
+    vec2 depth = gapDepth(uv,cover);
+    float pinkDepth = depth.r;
+    float cyanDepth = depth.g;
+#ifdef TSS_WHEEL_PROFILE
+    pinkDepth = mix(1.0, pinkDepth, depthVariation);
+    cyanDepth = mix(1.0, cyanDepth, depthVariation);
+#endif
+    float frontBlur = 0.75 + 2.05 * smoothstep(0.08, 0.90, 0.30 * uv.x + 0.70 * uv.y);
+    float rearBlur = 2.00 + 5.80 * smoothstep(0.12, 0.86, 0.65 * (1.0 - uv.x) + 0.35 * uv.y);
+#ifdef TSS_LIVE_FOCUS
+    // Paraxial thin lens, projected onto a fixed screen. The signed pupil
+    // footprint is R * v * (1/s - 1/sFocus) in screen mm. Opposite signs
+    // sample opposite sides of the same pupil between the two slide planes.
+    // This illustrative projector has an 8 mm pupil radius and a 1.6 m throw.
+    if (liveFocus >= 0.0) {
+        const float rearMm = 53.4;
+        const float frontMm = 51.8;
+        const float screenPixelsPerMm = 1.8; // design pixels at 1280 x 720
+        float focusMm = mix(rearMm, frontMm, clamp(liveFocus, 0.0, 1.0));
+        float scale = 8.0 * 1600.0 * screenPixelsPerMm;
+        rearBlur = scale * (1.0 / rearMm - 1.0 / focusMm);
+        frontBlur = scale * (1.0 / frontMm - 1.0 / focusMm);
+    }
+#endif
+
+    // Uniform-area radial strata, turned through the golden angle on the
+    // half-circle. Antipodal pairs exactly center the pupil's first moment.
+    // Fixed sample positions avoid temporal shimmer as the plates move.
+    const vec2 aperture[24] = vec2[24](
+        vec2(0.196729, 0.054446), vec2(-0.196729, -0.054446),
+        vec2(-0.211371, 0.283412), vec2(0.211371, -0.283412),
+        vec2(-0.242130, -0.386919), vec2(0.242130, 0.386919),
+        vec2(0.530510, -0.101121), vec2(-0.530510, 0.101121),
+        vec2(-0.111116, 0.602207), vec2(0.111116, -0.602207),
+        vec2(-0.575999, -0.355751), vec2(0.575999, 0.355751),
+        vec2(0.587367, -0.443472), vec2(-0.587367, 0.443472),
+        vec2(0.215354, 0.760673), vec2(-0.215354, -0.760673),
+        vec2(-0.837836, -0.079771), vec2(0.837836, 0.079771),
+        vec2(0.399575, -0.794988), vec2(-0.399575, 0.794988),
+        vec2(0.626751, 0.694394), vec2(-0.626751, -0.694394),
+        vec2(-0.915004, 0.347995), vec2(0.915004, -0.347995)
+    );
+    vec3 trans = vec3(0.0);
+#ifdef TSS_LIVE_FOOTPRINT
+    // Integrate display-pixel and condenser-pupil footprints together. Using
+    // the same screen sample for both slides retains per-ray optical overlap.
+    vec2 pixelStep = vec2(abs(dFdx(uv.x)), abs(dFdy(uv.y)));
+    float pixelSupport = footprintSupport(uv, max(abs(frontBlur), abs(rearBlur)), pixelStep);
+    for (int i = 0; i < 24; ++i)
+        trans += apertureRay(uv + pixelSupport * pixelStep * pixelStratum(i),
+                             aperture[i], frontNormal, rearNormal,
+                             pinkDepth, cyanDepth, frontBlur, rearBlur, rimSupport);
+#else
+    for (int i = 0; i < 24; ++i)
+        trans += apertureRay(uv, aperture[i], frontNormal, rearNormal,
+                             pinkDepth, cyanDepth, frontBlur, rearBlur, rimSupport);
+#endif
+    trans /= 24.0;
+
+    vec2 offset = (uv - vec2(0.56, 0.43)) * vec2(1.57, 1.35);
+    float radius2 = dot(offset, offset);
+    float irradiance = 0.80 / (1.0 + 0.75 * radius2);
+    irradiance += 0.19 * exp(-8.5 * radius2);
+    vec3 lampTone = mix(vec3(1.0, 0.949, 0.907), vec3(0.786, 0.761, 0.918),
+                        smoothstep(0.036, 0.58, radius2));
+    vec3 lamp = lampTone * irradiance;
+    // Soft veiling light from nearby clear carrier in the condenser hot zone
+    // changes with the plate geometry. The brightly lit clear passage spills
+    // a little color into neighbouring pockets.
+    float clearFraction = (1.0 - cover.r) * (1.0 - cover.g);
+    float flare = (0.0018 + 0.073 * clearFraction * opticalPatch(uv - vec2(0.54, 0.47), vec2(0.19, 0.21)));
+    vec3 radiance = lamp * trans + irradiance * flare * vec3(0.86, 0.95, 1.0);
+#ifdef TSS_WHEEL_PROFILE
+    radiance *= wheelCarrier;
+#endif
+#ifdef TSS_PROGRAM_LINEAR
+    if (TSS_PROGRAM_LINEAR) return vec4(radiance,1.0);
+#endif
+    return vec4(linearToSRGB(radiance), 1.0);
+}

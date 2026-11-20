@@ -1,0 +1,9 @@
+/src-tauri/target/
+target/
+/.claude/
+/src-tauri/gen/
+/node_modules/
+/.DS_Store
+*.log
+/experiments/optics-next/output/windows-two-vessel-input.f32le
+/experiments/optics-next/output/windows-screen-rays-*.f32le
