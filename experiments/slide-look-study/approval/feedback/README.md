@@ -37,4 +37,4 @@ ffmpeg -framerate 24 -i "$TSS_FEEDBACK_CLIP_DIR/source-%03d.ppm" \
   -movflags +faststart feedback-comparison.mp4
 ```
 
-The Windows WebView2 verification also opened the projector on the single attached monitor, presented 18 frames with transport paused, then closed it. Both audio routes were muted for this first hardware check. The run exposed device enumeration and sink selection APIs. Timing between independently driven physical output devices remains unmeasured. [Windows integration evidence](../windows-live/gesture-controls/export/README.md)
+The final Windows WebView2 verification opened the projector on the single attached monitor. It reported 19 prior presentations. When the operator window was minimized, the renderer submitted 15 offscreen wheel frames in 673.13 ms. When both windows were minimized it submitted zero frames in 668.66 ms. Both native windows restored and the projector closed. The sample used muted audio routes. Physical A/V latency between separate output devices remains unmeasured. [Windows integration evidence](../windows-live/gesture-controls/export/README.md)

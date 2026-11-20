@@ -65,3 +65,5 @@ For each receiver pixel, the ray from lamp centre crosses the estimated mid-heig
 Disabling the lamp's Shadow Caustics raises the mean to 98.44% of the empty-beam result through the curved geometry, while greatly increasing per-pixel variance. The MNEE estimates lose appreciable flux along the contours. The finite crop also allows energy to leave the frame. The study demonstrates geometrically registered redistribution and exposes an estimator limitation. Absolute rim brightness needs independent transport benchmarking before use as calibrated gain.
 
 Generate both inspectable Blender scenes from the same [scene assembly](cycles_scene.py) and [measured geometry](geometry/) using the commands above. [Color comparison method](color-method.md)
+
+The published curved and planar EXRs record the generating scene's basename in the OpenEXR `File` string. For a new render, use `exrstdattr -string File state-048-curved.blend input.exr output.exr` and the corresponding planar filename. FFmpeg SHA-256 over decoded planar 32-bit RGB samples matched before and after this metadata change for both receivers.
