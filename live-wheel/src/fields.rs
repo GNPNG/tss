@@ -74,16 +74,29 @@ fn parse(b: &[u8]) -> Result<Layout, String> {
     })
 }
 impl Fields {
+    pub fn coral_release() -> Result<Self, String> {
+        let mut bytes = unpack(include_bytes!("../assets/coral-release.rg8.gz"))?;
+        let layout = parse(&bytes)?;
+        bytes.drain(..layout.header);
+        Ok(Self::from_layout(layout, bytes))
+    }
+    pub fn same_glass_as(&self, other: &Self) -> bool {
+        self.size == other.size && self.view == other.view
+    }
     pub fn from_slice(bytes: &[u8]) -> Result<Self, String> {
         let layout = parse(bytes)?;
+        let data = bytes[layout.header..].to_vec();
+        Ok(Self::from_layout(layout, data))
+    }
+    fn from_layout(layout: Layout, data: Vec<u8>) -> Self {
         let [w, h, count, rate] = layout.dimensions;
-        Ok(Self {
+        Self {
             size: [w, h],
             count,
             rate,
-            data: bytes[layout.header..].to_vec(),
+            data,
             view: layout.view,
-        })
+        }
     }
     pub fn view_size(&self) -> [u32; 2] {
         [self.view[2], self.view[3]]
@@ -120,11 +133,43 @@ impl Fields {
         let a = x.floor() as u32;
         (a, (a + 1).min(self.count - 1), (x - a as f64) as f32)
     }
+    pub fn sample_motion(&self, motion: crate::MotionPreset, seconds: f64) -> (u32, u32, f32) {
+        match motion {
+            crate::MotionPreset::WheelFlow => self.sample(seconds),
+            crate::MotionPreset::CoralRelease => {
+                let end = self.count - 1;
+                let pos = (seconds * f64::from(self.rate)).clamp(0., f64::from(end));
+                let first = pos.floor() as u32;
+                (first, (first + 1).min(end), (pos - f64::from(first)) as f32)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod world_tests {
     use super::*;
+    #[test]
+    fn coral_advances_forward_and_holds_its_detached_geometry() {
+        let started = std::time::Instant::now();
+        let coral = Fields::coral_release().unwrap();
+        println!(
+            "First coral cache decode: {:.3} ms",
+            started.elapsed().as_secs_f64() * 1000.
+        );
+        let mut wheel = Fields::from_slice(&bundled_fields().unwrap()).unwrap();
+        assert!(coral.same_glass_as(&wheel));
+        assert!(coral.frame(0) != wheel.frame(0));
+        let end = coral.count - 1;
+        let hz = f64::from(coral.rate);
+        let sample = |s| coral.sample_motion(crate::MotionPreset::CoralRelease, s);
+        assert_eq!(sample(-2.), (0, 1, 0.));
+        assert_eq!(sample(1.5 / hz), (1, 2, 0.5));
+        assert_eq!(sample(f64::from(end) / hz), (end, end, 0.));
+        assert_eq!(sample(10000.), (end, end, 0.));
+        wheel.view[2] -= 1;
+        assert!(!coral.same_glass_as(&wheel));
+    }
     #[test]
     fn bundled_world_keeps_registered_gate_and_offscreen_phases() {
         let raw = bundled_fields().unwrap();

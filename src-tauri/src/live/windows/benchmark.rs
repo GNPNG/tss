@@ -25,6 +25,9 @@ pub(super) struct Benchmark {
     index: usize,
     count: usize,
     pressure: bool,
+    coral: bool,
+    initial_take: u64,
+    replay_requests: u64,
     pressing: bool,
     began: Option<Instant>,
     stroke_started: Instant,
@@ -47,8 +50,11 @@ impl Benchmark {
             footprint_sampling,
             index: 0,
             pressure: pressure_trial(),
+            coral: super::super::coral_trial(),
+            initial_take: 0,
+            replay_requests: 0,
             pressing: false,
-            count: if pressure_trial() {
+            count: if pressure_trial() || super::super::coral_trial() {
                 1
             } else if std::env::args_os().any(|arg| arg == "--gesture-pair") {
                 2
@@ -295,12 +301,18 @@ impl Benchmark {
         Ok(())
     }
     pub fn before(&mut self, r: &mut LiveWheel, hwnd: HWND, c: &Config) -> Result<(), String> {
-        let (wheel, slide, gesture) = if self.pressure {
+        let (wheel, slide, gesture) = if self.coral {
+            ("violet-blue", Slide::Front, Gesture::Tug)
+        } else if self.pressure {
             ("violet-blue", Slide::Rear, Gesture::Pressure)
         } else {
             RUNS[self.index]
         };
-        if c.wheel != wheel || c.slide != slide || c.gesture != gesture {
+        if c.wheel != wheel
+            || c.slide != slide
+            || c.gesture != gesture
+            || (self.coral && c.motion != tss_live_wheel::MotionPreset::CoralRelease)
+        {
             if Instant::now() > self.deadline {
                 return Err(format!(
                     "Editor did not select the requested controls for {wheel}"
@@ -310,13 +322,39 @@ impl Benchmark {
         }
         if self.began.is_none() {
             if self.index == 0 {
-                if self.pressure {
+                if self.coral {
+                    let frame = |r: &mut LiveWheel, time| -> Result<Vec<u8>, String> {
+                        r.render_offscreen(time)?;
+                        Ok(r.capture_rgba8()?.2)
+                    };
+                    let first = frame(r, 0.)?;
+                    let middle = frame(r, 1.9)?;
+                    let last = frame(r, 4.)?;
+                    let held = frame(r, 6.)?;
+                    let changed = |a: &[u8], b: &[u8]| {
+                        a.chunks_exact(4)
+                            .zip(b.chunks_exact(4))
+                            .filter(|(x, y)| (0..3).any(|i| x[i].abs_diff(y[i]) >= 3))
+                            .count()
+                    };
+                    let early = changed(&first, &middle);
+                    let late = changed(&middle, &last);
+                    if early == 0 || late == 0 || held != last {
+                        return Err(
+                            "Coral release failed to advance or hold its final state".into()
+                        );
+                    }
+                    self.proof = json!({"sampleTimes":[0.,1.9,4.,6.],
+                        "earlyChangedPixelsAtLeast3Codes":early, "lateChangedPixelsAtLeast3Codes":late,
+                        "heldByteIdentical":true});
+                    self.initial_take = c.motion_take;
+                } else if self.pressure {
                     self.pressure_proof(r, hwnd, c)?;
                 } else {
                     self.proof(r, hwnd, c)?;
                 }
             }
-            if self.index < 2 {
+            if self.index < 2 && !self.coral {
                 let suffix = if self.pressure {
                     "pressure.frames"
                 } else if self.index == 0 {
@@ -385,6 +423,15 @@ impl Benchmark {
         if elapsed < WARM {
             return Ok(false);
         }
+        if self.coral
+            && self.replay_requests < 3
+            && (elapsed - WARM).as_secs() >= self.replay_requests * 4
+            && c.motion_take == self.initial_take + self.replay_requests
+        {
+            app.emit("tss-benchmark-release", ())
+                .map_err(|e| e.to_string())?;
+            self.replay_requests += 1;
+        }
         if did_present {
             self.presents += 1;
             if let Some(prev) = self.last.replace(now) {
@@ -401,10 +448,13 @@ impl Benchmark {
         if self.intervals.is_empty() || self.drags == 0 {
             return Err("Insufficient interactive frame samples".into());
         }
+        if self.coral && (self.replay_requests != 3 || c.motion_take != self.initial_take + 3) {
+            return Err("The editor did not replay all three coral releases".into());
+        }
         scripted_mouse(hwnd, c.rect, WM_LBUTTONUP, [0.5, 0.5]);
         let n = self.intervals.len() as f64;
         let seconds = self.intervals.iter().sum::<f64>() / 1000.;
-        self.results.push(json!({"wheel":c.wheel,"slide":c.slide,"gesture":c.gesture,"tugResponse":c.tug_response,"presented":self.presents,
+        self.results.push(json!({"wheel":c.wheel,"motion":c.motion,"replayRequests":self.replay_requests,"slide":c.slide,"gesture":c.gesture,"tugResponse":c.tug_response,"presented":self.presents,
             "skipped":self.skips,"mouseMovesApplied":self.drags,"secondsBetweenPresents":seconds,
             "fps": n/seconds,"p50Ms":percentile(&mut self.intervals,0.5),
             "p95Ms":percentile(&mut self.intervals,0.95),"p99Ms":percentile(&mut self.intervals,0.99),

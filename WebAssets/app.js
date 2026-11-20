@@ -35,6 +35,7 @@ function liveSelection() {
   if (!windowsDesktop || !layer?.visible || !layer.nativeLive || state.exporting ||
       layer.customColors || !mathmosWheels.has(layer.palette)) return null;
   return { layerId: layer.id, wheel: layer.palette, slide: layer.slide, gesture: layer.gesture,
+    motion: layer.motion, motionTake: layer.motionTake,
     mousePressure: layer.mousePressure?.[layer.slide] ?? 0.5,
     tugResponse: layer.tugResponse[layer.slide], renderWidth: layer.renderWidth, focus: projectorFocus,
     ...feedbackDeck.config(projectorDeck?.enabled), keepPresenting:!!projectorDeck?.enabled };
@@ -306,6 +307,7 @@ async function loadWheelPresets() {
     if (windowsDesktop) {
       const benchmark = await window.__TAURI__.core.invoke('live_wheel_benchmark_config');
       if (benchmark) {
+        await window.__TAURI__.event.listen('tss-benchmark-release', () => byId('replay-release').click());
         await window.__TAURI__.event.listen('tss-benchmark-wheel', ({ payload }) => {
           for (const [id, value] of [['wheel-slide', payload.slide], ['wheel-gesture', payload.gesture]]) {
             const control = byId(id);
@@ -322,6 +324,11 @@ async function loadWheelPresets() {
         layer.gesture = benchmark?.gesture ?? 'tug';
         layer.renderWidth = benchmark?.renderWidth ?? 640;
         chooseWheel(benchmark?.wheel ?? 'violet-blue');
+        if (benchmark?.coralTrial) {
+          const control = byId('wheel-motion');
+          control.value = 'coral-release';
+          control.dispatchEvent(new Event('change'));
+        }
         if (benchmark?.verifyExport) {
           const { verifyWheelExport } = await import('./verify-wheel-export.js');
           await nativeSurface.sync();
@@ -350,6 +357,7 @@ function makeLayer() {
   canvas.height = preview.height;
   const id = state.nextId++;
   return { id, name: `Liquid ${id}`, visible: true, palette: 'orchid', colors: [...LIQUID_PALETTES.orchid], customColors: false, hue: 0, speed: 1, scale: 1, opacity: state.layers.length ? 0.7 : 1, canvas, renderer: null, nativeLive: windowsDesktop,
+    motion: 'wheel-flow', motionTake: 0,
     slide: 'rear', gesture: 'tug', tugResponse: { rear: 0.4, front: 0.4 }, mousePressure: { rear: 0.5, front: 0.5 }, renderWidth: 640 };
 }
 function selectLayer(id) {
@@ -437,6 +445,10 @@ function renderControls() {
   byId('native-performance').hidden = !live;
   byId('live-wheel').checked = !!live;
   byId('live-wheel').disabled = !wheel || !!layer?.customColors || !layer?.visible;
+  byId('wheel-motion').value = layer?.motion ?? 'wheel-flow';
+  byId('wheel-motion').disabled = !live;
+  byId('replay-release').hidden = layer?.motion !== 'coral-release';
+  byId('replay-release').disabled = !live;
   byId('wheel-slide').value = layer?.slide ?? 'rear';
   byId('wheel-width').value = String(layer?.renderWidth ?? 640);
   byId('wheel-gesture').value = layer?.gesture ?? 'tug';
@@ -647,6 +659,19 @@ byId('live-wheel').addEventListener('change', (event) => {
 byId('wheel-slide').addEventListener('change', (event) => {
   const layer = selectedLayer();
   if (layer) { layer.slide = event.target.value; renderControls(); }
+});
+byId('wheel-motion').addEventListener('change', (event) => {
+  const layer = selectedLayer();
+  if (!layer || layer.motion === event.target.value) return;
+  layer.motion = event.target.value;
+  if (layer.motion === 'coral-release') layer.motionTake++;
+  renderControls();
+});
+byId('replay-release').addEventListener('click', () => {
+  const layer = selectedLayer();
+  if (!layer || layer.motion !== 'coral-release') return;
+  layer.motionTake++;
+  nativeSurface?.sync();
 });
 byId('wheel-gesture').addEventListener('change', (event) => {
   const layer = selectedLayer();

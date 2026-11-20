@@ -1,4 +1,4 @@
-use super::{Config, Gesture, LiveWheel};
+use super::{Config, Gesture, LiveWheel, MotionPreset};
 use serde_json::json;
 use std::{fs, io::Write, path::PathBuf, time::Duration};
 
@@ -9,11 +9,22 @@ pub(super) struct Capture {
     path: PathBuf,
     duration: Duration,
     origin: Option<Duration>,
+    source_start: Option<f64>,
     sample: u64,
     last: Duration,
     manifest: Option<fs::File>,
     configurations: Vec<serde_json::Value>,
-    last_config: Option<(String, Option<f32>, u64, u32, Gesture, Option<f32>, u32)>,
+    last_config: Option<(
+        String,
+        MotionPreset,
+        u64,
+        Option<f32>,
+        u64,
+        u32,
+        Gesture,
+        Option<f32>,
+        u32,
+    )>,
 }
 
 impl Capture {
@@ -23,6 +34,7 @@ impl Capture {
             path,
             duration,
             origin: None,
+            source_start: None,
             sample: 0,
             last: Duration::ZERO,
             manifest: None,
@@ -40,9 +52,23 @@ impl Capture {
         frame_time: Duration,
         applied_strokes: u64,
     ) -> Result<bool, String> {
+        self.frame_at(r, c, frame_time, frame_time.as_secs_f64(), applied_strokes)
+    }
+
+    pub fn frame_at(
+        &mut self,
+        r: &LiveWheel,
+        c: &Config,
+        frame_time: Duration,
+        field_time: f64,
+        applied_strokes: u64,
+    ) -> Result<bool, String> {
         let elapsed = frame_time - *self.origin.get_or_insert(frame_time);
+        let source_start = *self.source_start.get_or_insert(field_time);
         let key = (
             c.wheel.clone(),
+            c.motion,
+            c.motion_take,
             c.focus,
             c.layer_id,
             c.slide as u32,
@@ -51,10 +77,12 @@ impl Capture {
             c.render_width,
         );
         if self.last_config.as_ref() != Some(&key) {
-            self.configurations
-                .push(json!({"t":elapsed.as_secs_f64(), "wheel":c.wheel,
+            self.configurations.push(
+                json!({"t":elapsed.as_secs_f64(), "wheel":c.wheel, "motion":c.motion,
+                "motionTake":c.motion_take, "fieldTime":field_time,
                 "focus":c.focus, "track":c.layer_id, "slide":c.slide, "gesture":c.gesture,
-                "tugResponse":c.tug_response, "renderWidth":c.render_width}));
+                "tugResponse":c.tug_response, "renderWidth":c.render_width}),
+            );
             self.last_config = Some(key);
         }
         if elapsed >= self.duration && self.sample > 1 {
@@ -72,11 +100,11 @@ impl Capture {
                 "frames": self.sample, "successfulPresentsInWindow":self.sample,
                 "gesture":c.gesture,"tugResponse":c.tug_response,
                 "retention":"every successful present before the requested endpoint",
-                "sourceStartSeconds":self.origin.unwrap().as_secs_f64(),
+                "sourceStartSeconds":source_start, "motion":c.motion, "motionTake":c.motion_take,
                 "elapsedSeconds": elapsed.as_secs_f64(), "configurations":self.configurations,
                 "appliedMouseStrokes":applied_strokes,
                 "source": "active editor optical target immediately following successful presentation",
-                "clock": "editor field sample time, actual seconds relative to first captured frame"});
+                "clock": "editor performance time, actual seconds relative to first captured frame"});
             fs::write(
                 self.path.join("capture.json"),
                 serde_json::to_vec_pretty(&data).unwrap(),

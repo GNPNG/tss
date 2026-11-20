@@ -3,9 +3,12 @@ export function wheelMovieRequest(selection, duration, events, baseline) {
   return {
     layerId: selection.layerId,
     wheel: selection.wheel,
+    ...(selection.motion ? {motion: selection.motion, motionTake: selection.motionTake} : {}),
     duration,
     events,
-    baseline: baseline === 'auto' ? (events.length ? 'neutral' : 'current') : baseline,
+    baseline: baseline === 'auto'
+      ? (events.length || selection.motion === 'coral-release' ? 'neutral' : 'current')
+      : baseline,
   };
 }
 
@@ -51,8 +54,10 @@ export class NativeWheelExport {
     try {
       const outputPath = await this.invoke('choose_export_path');
       if (!outputPath) return;
-      if (this.selection()?.layerId !== selection.layerId || this.selection()?.wheel !== selection.wheel ||
-          this.source().audioPath !== audioPath || this.source().proceduralBusy) throw Error('The selected wheel or song changed.');
+      const current = this.selection();
+      if (current?.layerId !== selection.layerId || current.wheel !== selection.wheel ||
+          current.motion !== selection.motion || current.motionTake !== selection.motionTake ||
+          this.source().audioPath !== audioPath || this.source().proceduralBusy) throw Error('The selected wheel, motion or song changed.');
       await this.finishRecording();
       this.pause();
       await this.prepare();

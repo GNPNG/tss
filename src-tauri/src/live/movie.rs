@@ -33,6 +33,10 @@ pub struct Event {
 pub struct Request {
     pub layer_id: u64,
     pub wheel: String,
+    #[serde(default)]
+    pub(super) motion: super::MotionPreset,
+    #[serde(default)]
+    pub(super) motion_take: u64,
     pub duration: f64,
     pub baseline: Baseline,
     pub events: Vec<Event>,
@@ -122,6 +126,22 @@ pub async fn cancel_native_wheel_export(control: State<'_, ExportControl>) -> Re
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn legacy_wheel_requests_and_explicit_coral_takes_decode_independently() {
+        let mut body = serde_json::json!({"layerId":2,"wheel":"violet-blue",
+            "duration":2.0,"baseline":"neutral","events":[]});
+        let parse = |value| serde_json::from_value::<Request>(value);
+        let legacy = parse(body.clone()).unwrap();
+        assert_eq!(legacy.motion, super::super::MotionPreset::WheelFlow);
+        assert_eq!(legacy.motion_take, 0);
+        body["motion"] = serde_json::json!("coral-release");
+        body["motionTake"] = serde_json::json!(4);
+        let coral = parse(body.clone()).unwrap();
+        assert_eq!(coral.motion, super::super::MotionPreset::CoralRelease);
+        assert_eq!(coral.motion_take, 4);
+        body["motion"] = serde_json::json!("unsupported");
+        assert!(parse(body).is_err());
+    }
     fn event(time: f64, slide: Slide, phase: Phase) -> Event {
         Event {
             time,
@@ -138,6 +158,8 @@ mod tests {
         Request {
             layer_id: 2,
             wheel: "violet-blue".into(),
+            motion: Default::default(),
+            motion_take: 0,
             duration: 0.75,
             baseline: Baseline::Neutral,
             events,

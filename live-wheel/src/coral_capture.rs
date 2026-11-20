@@ -1,0 +1,204 @@
+use super::*;
+use std::{
+    fs::{self, File},
+    io::{BufWriter, Write},
+    path::PathBuf,
+    time::Instant,
+};
+
+/// Capture the actual editor optics on one explicitly selected hardware GPU.
+/// Each readback finishes before the next optical frame is submitted.
+#[test]
+#[ignore = "requires a reserved hardware GPU and an unused capture directory"]
+fn capture_coral_release() -> Result<(), String> {
+    let path =
+        PathBuf::from(std::env::var_os("TSS_CORAL_CAPTURE_DIR").ok_or("Missing capture path")?);
+    let adapter_match =
+        std::env::var("TSS_LIVE_ADAPTER").map_err(|_| "Missing hardware adapter name")?;
+    if adapter_match.trim().is_empty() {
+        return Err("Empty hardware adapter name".into());
+    }
+    let backend = if cfg!(target_os = "macos") {
+        gpu::Backends::METAL
+    } else {
+        gpu::Backends::VULKAN
+    };
+    let instance = gpu::Instance::new(gpu::InstanceDescriptor {
+        backends: backend,
+        ..Default::default()
+    });
+    let adapter = instance
+        .enumerate_adapters(backend)
+        .into_iter()
+        .find(|candidate| {
+            let info = candidate.get_info();
+            info.device_type == gpu::DeviceType::DiscreteGpu
+                && info
+                    .name
+                    .to_lowercase()
+                    .contains(&adapter_match.to_lowercase())
+        })
+        .ok_or_else(|| format!("No matching discrete GPU for {adapter_match}"))?;
+    let info = adapter.get_info();
+    let (device, queue) = pollster::block_on(
+        adapter.request_device(
+            &gpu::DeviceDescriptor {
+                label: Some("Coral release review"),
+                required_features: gpu::Features::empty(),
+                required_limits: gpu::Limits::downlevel_defaults()
+                    .using_resolution(adapter.limits())
+                    .using_alignment(adapter.limits()),
+            },
+            None,
+        ),
+    )
+    .map_err(|e| e.to_string())?;
+    let size = [640, 360];
+    let cfg = gpu::SurfaceConfiguration {
+        usage: gpu::TextureUsages::RENDER_ATTACHMENT,
+        format: gpu::TextureFormat::Bgra8Unorm,
+        width: size[0],
+        height: size[1],
+        present_mode: gpu::PresentMode::Fifo,
+        desired_maximum_frame_latency: 2,
+        alpha_mode: gpu::CompositeAlphaMode::Opaque,
+        view_formats: vec![],
+    };
+    let fields = Fields::from_slice(&bundled_fields()?)?;
+    let mut renderer = pollster::block_on(LiveWheel::from_device(
+        device,
+        queue,
+        cfg,
+        fields,
+        info.name.clone(),
+        size,
+    ))?;
+    renderer.set_wheel("violet-blue")?;
+    renderer.set_focus(Some(1.0))?;
+    let capture = |r: &mut LiveWheel| -> Result<Vec<u8>, String> {
+        r.render_offscreen(0.0)?;
+        Ok(r.capture_rgba8()?.2)
+    };
+    let original = capture(&mut renderer)?;
+    renderer.set_motion(MotionPreset::CoralRelease)?;
+    let release = capture(&mut renderer)?;
+    let changed = original
+        .chunks_exact(4)
+        .zip(release.chunks_exact(4))
+        .filter(|(a, b)| (0..3).any(|c| a[c].abs_diff(b[c]) >= 3))
+        .count();
+    assert!(
+        changed > 0,
+        "Switching motion must change the projected geometry"
+    );
+    renderer.set_motion(MotionPreset::WheelFlow)?;
+    assert!(
+        capture(&mut renderer)? == original,
+        "Restoring wheel flow must restore its source geometry"
+    );
+    renderer.set_motion(MotionPreset::CoralRelease)?;
+    fs::create_dir(&path).map_err(|e| e.to_string())?;
+    if std::env::var_os("TSS_CORAL_TUG_COMPARISON").is_some() {
+        return tug_comparison(&mut renderer, &path);
+    }
+    let mut sink =
+        BufWriter::new(File::create_new(path.join("frames.rgba")).map_err(|e| e.to_string())?);
+    let mut timings_ms = Vec::new();
+    let rate = 24;
+    let frames = 7 * rate;
+    for index in 0..frames {
+        let t = f64::from(index) / f64::from(rate);
+        // Watch the complete release at front focus. Hold the final state to examine
+        // the same droplets and the rear plume while focus travels away and back.
+        let ramp = |s: f64| {
+            let u = s.clamp(0.0, 1.0);
+            u * u * (3.0 - 2.0 * u)
+        };
+        let focus = 1.0 - ramp((t - 4.0) / 0.85) + ramp((t - 5.5) / 1.0);
+        renderer.set_focus(Some(focus as f32))?;
+        let before = Instant::now();
+        renderer.render_program_offscreen(t, t)?;
+        let (w, h, pixels) = renderer.capture_rgba8()?;
+        timings_ms.push(before.elapsed().as_secs_f64() * 1000.0);
+        assert_eq!([w, h], size);
+        sink.write_all(&pixels).map_err(|e| e.to_string())?;
+    }
+    sink.flush().map_err(|e| e.to_string())?;
+    let metadata = serde_json::json!({
+        "gpu": info.name, "backend": format!("{:?}", info.backend),
+        "wheel": "violet-blue", "motion": "coral-release", "size": size,
+        "frames": frames, "fps": rate, "format": "rgba8-srgb",
+        "focus": "front 0–4 s; rear 4.85–5.5 s; front again at 6.5 s",
+        "motion_switch_changed_pixels_at_least_3": changed, "restored_wheel_flow_exactly": true,
+        "render_plus_readback_ms": timings_ms,
+    });
+    fs::write(
+        path.join("capture.json"),
+        serde_json::to_vec_pretty(&metadata).unwrap(),
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn tug_comparison(renderer: &mut LiveWheel, path: &std::path::Path) -> Result<(), String> {
+    // The unmatched instruction is one front-slide drag. Both tracks receive
+    // the same simulation sample, camera focus and shader configuration.
+    let mut left =
+        BufWriter::new(File::create_new(path.join("no-tug.rgba")).map_err(|e| e.to_string())?);
+    let mut right =
+        BufWriter::new(File::create_new(path.join("front-tug.rgba")).map_err(|e| e.to_string())?);
+    let point = |frame: usize| -> [f32; 2] {
+        let u = ((frame as f32 - 36.) / 24.).clamp(0., 1.);
+        let p = u * u * (3. - 2. * u);
+        [0.46 + 0.13 * p, 0.58 - 0.13 * p]
+    };
+    let mut counts = Vec::new();
+    for n in 0..132usize {
+        let seconds = n as f64 / 24.;
+        renderer.select_track(1);
+        renderer.render_offscreen(seconds)?;
+        let (_, _, a) = renderer.capture_rgba8()?;
+        renderer.select_track(2);
+        if n == 36 {
+            renderer.set_tug_response(1, 1.)?;
+        }
+        if (37..=60).contains(&n) {
+            renderer.gesture(1, SlideGesture::Tug, point(n - 1), point(n));
+        }
+        if n == 61 {
+            renderer.end_gesture(1);
+        }
+        renderer.render_offscreen(seconds)?;
+        let (_, _, b) = renderer.capture_rgba8()?;
+        if n <= 36 {
+            assert!(
+                a == b,
+                "Matched controls differ before contact at frame {n}"
+            );
+        }
+        counts.push(
+            a.chunks_exact(4)
+                .zip(b.chunks_exact(4))
+                .filter(|(aa, bb)| (0..3).any(|k| aa[k].abs_diff(bb[k]) >= 3))
+                .count(),
+        );
+        left.write_all(&a).map_err(|e| e.to_string())?;
+        right.write_all(&b).map_err(|e| e.to_string())?;
+    }
+    assert!(counts[60] > 0 && counts[131] > 0);
+    left.flush().map_err(|e| e.to_string())?;
+    right.flush().map_err(|e| e.to_string())?;
+    let meta = serde_json::json!({
+        "adapter":renderer.adapter_name(), "focus":"front", "wheel":"violet-blue",
+        "fps":24, "frames":132, "size":[640,360], "motion":"coral-release",
+        "tug":{"slide":"front", "response":1.0,"start_seconds":1.5,"end_seconds":2.5,
+               "from":point(36),"to":point(60),"path":"smoothstep"},
+        "pre_contact_identical":true, "changed_pixels_at_least_three_codes":counts
+    });
+    fs::write(
+        path.join("comparison.json"),
+        serde_json::to_vec_pretty(&meta).unwrap(),
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}

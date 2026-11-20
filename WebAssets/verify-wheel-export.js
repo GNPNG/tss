@@ -1,6 +1,7 @@
 // Bounded operator-invoked 4K integration proof. The actual encoder request,
 // selection grants, native renderer, and source-audio decoder are shared with
 // ordinary desktop exports. Commands bind paths from explicit process arguments.
+import { wheelMovieRequest } from './native-wheel-export.js';
 export async function verifyWheelExport(selection, duration, status, projector,performerDeck) {
   const invoke = window.__TAURI__.core.invoke;
   const facts = {};
@@ -15,6 +16,7 @@ export async function verifyWheelExport(selection, duration, status, projector,p
     facts.audioDuration=seconds;
     facts.wheelOptions=el('mathmos-wheel').options.length-1;
     facts.wheel=el('mathmos-wheel').value;
+    facts.motion=el('wheel-motion').value;
     facts.gesture=el('wheel-gesture').value;
     facts.macroDeckReady=!el('macro-deck').hidden;
     facts.feedbackReady=!el('video-feedback').hidden;
@@ -52,8 +54,8 @@ export async function verifyWheelExport(selection, duration, status, projector,p
     status('Exporting the two-cue 4K verification sequence…');
     await window.__TAURI__.event.listen('tss-wheel-export-progress', ({payload}) =>
       status(`4K verification · ${payload.completed} / ${payload.total} frames`));
-    await invoke('export_native_wheel',{audioPath,outputPath,request:{
-      layerId,wheel:selection.wheel,baseline:'neutral',duration:duration(),events}});
+    await invoke('export_native_wheel',{audioPath,outputPath,
+      request:wheelMovieRequest(selection, duration(), events, 'neutral')});
     el('audience-sink').value='mute';
     el('cue-sink').value='mute';
     el('projector').click();

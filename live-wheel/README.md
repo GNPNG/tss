@@ -19,11 +19,21 @@ Plate pressure acts independently on each sealed slide. A press reduces the cent
 
 The native viewport shows the two sealed slides on the selected track. Its fluid trajectory advances on a performance clock. The gesture deck can replay live inputs against the song.
 
+## Coral release
+
+**Slide motion → Coral release** selects a second pair of independently solved films. Use any of the seven color wheels. The foreground starts with buds attached to a bank of oil. The rear carries broad folds that remain visible through the intervening glass. Move **Projector focus** toward the front to follow a neck as it thins, then toward the rear to see the folds through the newly detached drops.
+
+The finite solve has 96 states at 24 Hz. Playback holds the last state at 95/24 seconds. **Replay release live** restarts the selected track in the editor and on the delayed projector, retaining its slide poses. Material tug, rotation and compression change the projection during playback. The timing and sites of pinch-off come from the stored solve. The native exporter starts **Automatic** coral exports at the beginning of the release with neutral slide poses. **Current pose and film position** starts the export at the displayed point in the take. Manual live restarts are outside the recorded gesture schedule.
+
+The first selection prepares the entire coral cache on the CPU. Five fresh processes on an Intel Core i7-9750H Mac took 232–284 ms (median 236 ms) to decode and register the cache using the release build of the production field reader. Filesystem pages were allowed to stay warm. This delay occurs before live frame timing. Audition the preset once before a performance to keep both 90.75 MiB field sequences resident in host memory. Subsequent switches reuse the same two GPU texture slots. To time the reader separately, run `cargo test --release --locked --manifest-path live-wheel/Cargo.toml coral_advances_forward_and_holds_its_detached_geometry -- --nocapture`.
+
+To measure this preset on a Windows GPU, use the existing editor benchmark with `--benchmark-live NEW-REPORT.json --coral-trial`. The trial requests three releases during a twelve-second front-slide tug and checks that the editor applied all three. Its frozen-frame check compares the start, middle, end and held state before collecting presentation timings.
+
 ## Export the selected wheel
 
 Open a local song, choose the live wheel, then select **Export selected wheel in 4K**. Choose a new MP4 filename. Export finishes an open gesture recording before reading the schedule. A take recorded while the song was paused can be assigned a trigger in the gesture deck. The current wheel material and focus apply throughout. Enabled gestures scheduled at a recording position, audio motif or lyric phrase replay in song order at 30 fps. **Export starting pose** offers three choices.
 
-- **Automatic** starts from neutral slides and the beginning of the fluid cache when the song contains scheduled events for this track. An unscheduled wheel starts from its current poses and visible film position.
+- **Automatic** starts from neutral slides and the beginning of the fluid cache for Coral release or when the song contains scheduled events for this track. Unscheduled Wheel flow starts from its current poses and visible film position.
 - **Current pose and film position** copies the two live slides, then applies the scheduled events to that copy.
 - **Neutral pose and film start** starts at cache time zero with both slide rotations and tugs cleared.
 

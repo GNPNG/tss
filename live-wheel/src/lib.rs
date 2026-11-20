@@ -9,7 +9,9 @@ pub use movie::WheelMovie;
 mod material;
 mod motion;
 mod pressure;
+mod preset;
 pub use fields::bundled_fields;
+pub use preset::MotionPreset;
 pub use motion::SlideGesture;
 use motion::SlidePose;
 pub use wgpu;
@@ -227,6 +229,8 @@ pub struct LiveWheel {
     surface_adapter: Option<gpu::Adapter>,
     cfg: gpu::SurfaceConfiguration,
     fields: Fields,
+    motion: MotionPreset,
+    inactive_fields: Option<Fields>,
     cache: gpu::Texture,
     cache_view: gpu::TextureView,
     slots: [Option<u32>; 2],
@@ -504,6 +508,8 @@ impl LiveWheel {
             surface_adapter: None,
             cfg,
             fields,
+            motion: MotionPreset::WheelFlow,
+            inactive_fields: None,
             cache,
             cache_view,
             slots: [None, None],
@@ -596,6 +602,24 @@ impl LiveWheel {
         }
         self.wheel = id.into();
         self.upload_material();
+        Ok(())
+    }
+    /// Switch film geometry while retaining the optics, poses and GPU allocation.
+    pub fn set_motion(&mut self, preset: MotionPreset) -> Result<(), String> {
+        if self.motion == preset {
+            return Ok(());
+        }
+        if self.inactive_fields.is_none() {
+            let coral = Fields::coral_release()?;
+            if !coral.same_glass_as(&self.fields) {
+                return Err("Coral release requires the registered full-slide geometry".into());
+            }
+            self.inactive_fields = Some(coral);
+        }
+        std::mem::swap(&mut self.fields, self.inactive_fields.as_mut().unwrap());
+        self.motion = preset;
+        self.slots = [None, None];
+        self.reset_feedback_history();
         Ok(())
     }
     fn upload_material(&self) {
@@ -851,7 +875,7 @@ impl LiveWheel {
         if let Some(f) = &mut self.feedback {
             f.prepare(&self.device, size);
         }
-        let (a, b, fraction) = self.fields.sample(time_seconds);
+        let (a, b, fraction) = self.fields.sample_motion(self.motion, time_seconds);
         let [first, second] = self.cache_pair(a, b);
         let poses = self
             .tracks
@@ -1021,6 +1045,8 @@ impl LiveWheel {
     }
 }
 
+#[cfg(test)]
+mod coral_capture;
 #[cfg(test)]
 mod feedback_test;
 #[cfg(test)]

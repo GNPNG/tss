@@ -1,5 +1,14 @@
 use serde::{Deserialize, Serialize};
 use tauri::{State, WebviewWindow};
+#[cfg(windows)]
+use tss_live_wheel::MotionPreset;
+#[cfg(not(windows))]
+#[path = "../../live-wheel/src/preset.rs"]
+mod preset;
+#[cfg(not(windows))]
+use preset::MotionPreset;
+#[cfg(any(windows, test))]
+mod release_clock;
 #[cfg(any(windows, test))]
 mod mouse_pressure;
 pub mod movie;
@@ -197,6 +206,10 @@ pub struct FeedbackAnchor {
 pub struct Config {
     layer_id: u64,
     wheel: String,
+    #[serde(default)]
+    motion: MotionPreset,
+    #[serde(default)]
+    motion_take: u64,
     slide: Slide,
     #[serde(default)]
     gesture: Gesture,
@@ -328,6 +341,12 @@ pub struct BenchmarkConfig {
     gesture: Gesture,
     render_width: u32,
     verify_export: bool,
+    coral_trial: bool,
+}
+
+#[cfg(windows)]
+fn coral_trial() -> bool {
+    std::env::args_os().any(|arg| arg == "--coral-trial")
 }
 
 #[tauri::command]
@@ -336,7 +355,7 @@ pub fn live_wheel_benchmark_config() -> Option<BenchmarkConfig> {
     if windows::benchmark_output().is_some() || crate::export_smoke::enabled() {
         return Some(BenchmarkConfig {
             wheel: "violet-blue",
-            slide: Slide::Rear,
+            slide: if coral_trial() { Slide::Front } else { Slide::Rear },
             gesture: if windows::pressure_trial() {
                 Gesture::Pressure
             } else {
@@ -344,6 +363,7 @@ pub fn live_wheel_benchmark_config() -> Option<BenchmarkConfig> {
             },
             render_width: 640,
             verify_export: crate::export_smoke::enabled(),
+            coral_trial: coral_trial(),
         });
     }
     None
