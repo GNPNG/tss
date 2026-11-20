@@ -1,0 +1,12 @@
+receiver=640x360
+curved min=0 p01=0 p05=0.00588589348 p50=0.58071959 p95=0.620235443 p99=0.627913594 max=0.99103713
+flat min=0.00319957407 p01=0.146508738 p05=0.451817334 p50=0.586225748 p95=0.619830251 p99=0.622915685 max=0.638836741
+flat_zero_pixels=0 flat_below_quarter_p95=2452 total=230400
+integrated_curved_over_flat=0.903122472
+curved_over_flat min=0 p01=0 p05=0.01068033 p50=1.0000093 p95=1.00876045 p99=1.13636279 max=8.88015938
+curved_zero_pixels=3827 curved_zero_near=2625 curved_zero_interior=0
+interior_below_quarter_p95=59 interior_total=122096
+registered near_n=42194 near_mean_abs_change=0.47502499 far_n=129116 far_mean_abs_change=0.0016911655
+mirror_x near_n=42194 near_mean_abs_change=0.125469152 far_n=129116 far_mean_abs_change=0.106491905
+mirror_y near_n=42194 near_mean_abs_change=0.109992547 far_n=129116 far_mean_abs_change=0.108217909
+output=3840x2160 display_clipped_pixels=2496 changed_pixels=4037375
