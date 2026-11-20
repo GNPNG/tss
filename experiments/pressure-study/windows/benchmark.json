@@ -1,0 +1,994 @@
+{
+  "adapter": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design (Vulkan)",
+  "clock": "std::time::Instant after successful FIFO surface present returns",
+  "field": [
+    512,
+    288
+  ],
+  "footprintSampling": true,
+  "frozenGesture": {
+    "pressure": 0.5,
+    "size": [
+      640,
+      360
+    ],
+    "slideResults": [
+      {
+        "afterCoarseWaitAmount": 0.5,
+        "case": "rear",
+        "coarseWaitVsSettledBytes": 0,
+        "holdMismatchedBytes": 0,
+        "positiveControl": true,
+        "pressedPixelsAtLeast3Codes": 11198,
+        "recordedSamples": [
+          {
+            "amount": 0.0,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 0.0,
+            "phase": "down"
+          },
+          {
+            "amount": 0.005615234375,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 8.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.021484375,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 16.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.046142578125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 24.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.078125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 32.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.115966796875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 40.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.158203125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 48.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.203369140625,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 56.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.25,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 64.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.296630859375,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 72.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.341796875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 80.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.384033203125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 88.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.421875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 96.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.453857421875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 104.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.478515625,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 112.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.494384765625,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 120.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.5,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 128.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.494384765625,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 165.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.478515625,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 173.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.453857421875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 181.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.421875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 189.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.384033203125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 197.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.341796875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 205.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.296630859375,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 213.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.25,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 221.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.203369140625,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 229.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.158203125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 237.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.115966796875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 245.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.078125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 253.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.046142578125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 261.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.021484375,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 269.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.005615234375,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 277.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.0,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 285.0,
+            "phase": "up"
+          }
+        ],
+        "releaseMismatchedBytes": 0,
+        "replayByteIdentical": true,
+        "replayPeakChecked": true,
+        "requestedCenter": [
+          0.48,
+          0.52
+        ],
+        "slide": "rear",
+        "untouchedTrackMismatchedBytes": 0
+      },
+      {
+        "afterCoarseWaitAmount": 0.5,
+        "case": "front-original",
+        "coarseWaitVsSettledBytes": 0,
+        "holdMismatchedBytes": 0,
+        "positiveControl": true,
+        "pressedPixelsAtLeast3Codes": 17301,
+        "recordedSamples": [
+          {
+            "amount": 0.0,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 0.0,
+            "phase": "down"
+          },
+          {
+            "amount": 0.005615234375,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 8.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.021484375,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 16.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.046142578125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 24.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.078125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 32.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.115966796875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 40.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.158203125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 48.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.203369140625,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 56.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.25,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 64.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.296630859375,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 72.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.341796875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 80.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.384033203125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 88.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.421875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 96.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.453857421875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 104.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.478515625,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 112.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.494384765625,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 120.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.5,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 128.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.494384765625,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 164.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.478515625,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 172.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.453857421875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 180.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.421875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 188.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.384033203125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 196.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.341796875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 204.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.296630859375,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 212.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.25,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 220.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.203369140625,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 228.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.158203125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 236.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.115966796875,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 244.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.078125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 252.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.046142578125,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 260.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.021484375,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 268.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.005615234375,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 276.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.0,
+            "center": [
+              0.4799688756465912,
+              0.5193905830383301
+            ],
+            "elapsedMs": 284.0,
+            "phase": "up"
+          }
+        ],
+        "releaseMismatchedBytes": 0,
+        "replayByteIdentical": true,
+        "replayPeakChecked": true,
+        "requestedCenter": [
+          0.48,
+          0.52
+        ],
+        "slide": "front",
+        "untouchedTrackMismatchedBytes": 0
+      },
+      {
+        "afterCoarseWaitAmount": 0.494384765625,
+        "case": "front",
+        "coarseWaitVsSettledBytes": 5229,
+        "holdMismatchedBytes": 0,
+        "positiveControl": true,
+        "pressedPixelsAtLeast3Codes": 21334,
+        "recordedSamples": [
+          {
+            "amount": 0.0,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 0.0,
+            "phase": "down"
+          },
+          {
+            "amount": 0.005615234375,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 8.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.021484375,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 16.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.046142578125,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 24.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.078125,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 32.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.115966796875,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 40.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.158203125,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 48.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.203369140625,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 56.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.25,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 64.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.296630859375,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 72.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.341796875,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 80.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.384033203125,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 88.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.421875,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 96.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.453857421875,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 104.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.478515625,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 112.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.494384765625,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 120.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.5,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 128.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.494384765625,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 149.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.478515625,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 157.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.453857421875,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 165.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.421875,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 173.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.384033203125,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 181.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.341796875,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 189.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.296630859375,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 197.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.25,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 205.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.203369140625,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 213.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.158203125,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 221.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.115966796875,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 229.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.078125,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 237.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.046142578125,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 245.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.021484375,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 253.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.005615234375,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 261.0,
+            "phase": "move"
+          },
+          {
+            "amount": 0.0,
+            "center": [
+              0.5799300074577332,
+              0.40997231006622314
+            ],
+            "elapsedMs": 269.0,
+            "phase": "up"
+          }
+        ],
+        "releaseMismatchedBytes": 0,
+        "replayByteIdentical": true,
+        "replayPeakChecked": true,
+        "requestedCenter": [
+          0.58,
+          0.41
+        ],
+        "slide": "front",
+        "untouchedTrackMismatchedBytes": 0
+      }
+    ],
+    "timeSeconds": 0.65
+  },
+  "input": "window-local scripted WM_LBUTTONDOWN/WM_MOUSEMOVE/WM_LBUTTONUP",
+  "maxFrameLatency": 2,
+  "wheels": [
+    {
+      "focus": null,
+      "fps": 40.000371336780546,
+      "gesture": "pressure",
+      "mouseMovesApplied": 283,
+      "p50Ms": 25.0061,
+      "p95Ms": 25.3552,
+      "p99Ms": 25.6255,
+      "presented": 481,
+      "preview": [
+        640,
+        360
+      ],
+      "secondsBetweenPresents": 11.99988860000001,
+      "skipped": 0,
+      "slide": "rear",
+      "surface": [
+        2571,
+        1444
+      ],
+      "tugResponse": 0.4000000059604645,
+      "wheel": "violet-blue"
+    }
+  ]
+}
