@@ -18,3 +18,5 @@ experiments/coral-release/small-drops/reproduce.sh /path/to/original-coral /path
 ```
 
 The generated `coral-small-front.r8.gz` decompresses to 96 consecutive 704 × 704 byte planes in row-major order. Byte zero is the front field's first texel. Codes of 128 and above fall on the oil side of the reconstructed contour. The file SHA-256 is `f45365cc3fb8808fb172d535cf15e31f237f9a661a57bf100df3b2b8524394e1`. [Bundled front field](../../../live-wheel/assets/coral-small-front.r8.gz)
+
+A clean regeneration on the Intel Mac reproduced the compressed front field byte for byte. The reproduction script also follows each of the ten daughters in both recordings. Six frames after the later detected release, the source and optical silhouettes have intersection over union between 0.930 and 0.969. [Silhouette comparison](check-matches.cpp)

@@ -2,6 +2,7 @@
 # First build the original coral experiment with ../reproduce.sh.
 set -eu
 export LC_ALL=C OMP_NUM_THREADS=1
+: "${CIMG_INCLUDE:?Set CIMG_INCLUDE to the directory containing CImg.h}"
 if [ "$#" -ne 2 ]; then
     echo "Usage: reproduce.sh ORIGINAL_CORAL_REPRODUCTION_DIR NEW_OUTPUT_DIR" >&2
     exit 2
@@ -22,3 +23,5 @@ awk -f "$src/../check-phase.awk" front.log
 "$original/pack" . small.rg8.gz
 "$original/verify" --cache small.rg8.gz > optical-events.csv
 ruby "$src/extract-front.rb" small.rg8.gz coral-small-front.r8.gz
+"${CXX:-c++}" -std=c++17 -O2 -I"$CIMG_INCLUDE" "$src/check-matches.cpp" -lz -o check-matches
+./check-matches "$src/matched-sites.csv" cyan coral-small-front.r8.gz
