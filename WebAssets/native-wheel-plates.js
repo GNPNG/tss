@@ -1,3 +1,5 @@
+import { materialMotionFields } from './material-motion.js';
+
 export class NativeWheelPlates {
   constructor({button, format, invoke, listen, selection, busy, prepare, pause, status, refresh}) {
     Object.assign(this, {button, format, invoke, listen, selection, otherExportBusy: busy, prepare, pause, status, refreshExports: refresh});
@@ -18,7 +20,8 @@ export class NativeWheelPlates {
     let unlisten;
     try {
       await this.prepare();
-      const {layerId, wheel, motion, motionTake, visibleFilms, focus} = this.selection();
+      const selected = this.selection();
+      const {layerId, wheel, motion, motionTake, visibleFilms, focus} = selected;
       const format = this.format?.();
       let started = false;
       unlisten = await this.listen('tss-wheel-plate-progress', ({payload}) => {
@@ -26,7 +29,7 @@ export class NativeWheelPlates {
         this.status('Production stills · ' + payload);
       });
       const folder = await this.invoke('export_native_wheel_plates', {
-        selection: {layerId, wheel, motion, motionTake, visibleFilms, focus, ...(format?.print ? {print:format.print} : format ? {format} : {})},
+        selection: {layerId, wheel, motion, motionTake, visibleFilms, focus, ...materialMotionFields(selected), ...(format?.print ? {print:format.print} : format ? {format} : {})},
       });
       this.status(folder ? 'Wheel stills saved to ' + folder : 'Plate export cancelled');
       return folder;

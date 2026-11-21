@@ -1,3 +1,4 @@
+import { materialMotionFields } from './material-motion.js';
 import { hasRelease } from './native-wheel.js';
 
 // Capture the selected track and its scheduled performance once. Frames stay native.
@@ -5,6 +6,7 @@ export function wheelMovieRequest(selection, duration, events, baseline) {
   return {
     layerId: selection.layerId,
     wheel: selection.wheel,
+    ...materialMotionFields(selection),
     ...(selection.visibleFilms ? {visibleFilms: selection.visibleFilms} : {}),
     ...(selection.motion ? {motion: selection.motion, motionTake: selection.motionTake} : {}),
     ...(selection.stack ? {stack: selection.stack} : {}),
@@ -63,6 +65,7 @@ export class NativeWheelExport {
       const current = this.selection();
       if (current?.layerId !== selection.layerId || current.wheel !== selection.wheel ||
           current.motion !== selection.motion || current.motionTake !== selection.motionTake ||
+          current.materialMotion?.rear !== selection.materialMotion?.rear || current.materialMotion?.front !== selection.materialMotion?.front ||
           current.visibleFilms !== selection.visibleFilms || JSON.stringify(current.stack) !== JSON.stringify(selection.stack) ||
           this.source().audioPath !== audioPath || this.source().proceduralBusy) throw Error('The selected wheel, films, motion or song changed.');
       await this.finishRecording();

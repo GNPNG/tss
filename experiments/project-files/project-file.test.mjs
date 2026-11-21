@@ -31,6 +31,20 @@ test('portable native and procedural layer state, acoustic and lyric triggers ro
   assert.deepEqual(events(reopened),events(p));
   assert.deepEqual(events(reopened).map(e => e.time), [5,5.5,6]);
 });
+test('independent film oil grades survive project snapshots and default missing sides to the original wheel', () => {
+  const doc=fixture(), layer=doc.layers[1];
+  assert.ok(!Object.hasOwn(layerSettings(layer),'materialMotion'));
+  layer.materialMotion={rear:'pdms-20'};
+  assert.deepEqual(layerSettings(validateProject(doc,palettes).layers[1]).materialMotion,{rear:'pdms-20',front:'wheel'});
+  layer.materialMotion.front='pdms-1000';
+  const restored=validateProject(JSON.parse(JSON.stringify(doc)),palettes);
+  assert.deepEqual(restored.layers[1].materialMotion,{rear:'pdms-20',front:'pdms-1000'});
+  for(const invalid of [null,[],{front:'20'},{back:'pdms-20'},{rear:1000}]) {
+    layer.materialMotion=invalid;
+    assert.throws(()=>validateProject(doc,palettes),/layers/);
+  }
+});
+
 test('malformed nested fields, duplicate IDs and unknown versions fail before installation', () => {
   for (const corrupt of [
     p=>p.version=2,p=>p.audio.name='../song.m4a',p=>p.audio.sha256=null,p=>p.selected=99,p=>p.layers[1].id=7,

@@ -18,6 +18,12 @@ cargo +1.88.0 run --locked --manifest-path src-tauri/Cargo.toml --features tauri
 
 The host prefers a discrete presenting adapter. To select the Radeon on a dual-GPU Mac, launch with `TSS_LIVE_ADAPTER='Radeon'`. For a bounded inspection, append `-- --verify-mac-preview /path/to/new-directory` to the command above. The editor records five presentations, dispatches a local AppKit drag into the preview, writes the wheel image and measurements, and exits. It also requests an image of its own window using macOS screen capture.
 
+## Physical oil selection
+
+With **Wheel flow** selected, choose **Rear film oil** and **Front film oil** independently. Each film offers **Original wheel**, **20 cSt PDMS** and **1,000 cSt PDMS**. The PDMS grades refer to silicone oil in water. The wheel preset supplies the dyes, track opacity sets the contribution to the composite, and **Material response** sets the response to a manual tug.
+
+**Wheel with coral beads** uses the selected rear oil and the prescribed front bead release. **Coral release** supplies both trajectories. Returning to **Wheel flow** restores the saved selections. Projects created before these controls use **Original wheel** on both films.
+
 ## Performance controls
 
 1. Select a visible liquid track and choose a preset under **Mathmos oil wheels**. **Live selected wheel** opens that track in the native preview. Windows and macOS start with Violet / Blue.

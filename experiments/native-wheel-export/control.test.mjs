@@ -10,6 +10,20 @@ test('scheduled takes use the neutral baseline and preserve explicit overrides',
   assert.equal(wheelMovieRequest(layer,2,[],'neutral').baseline,'neutral');
 });
 
+import { newMedia, programLayers } from '../../WebAssets/visual-media.js';
+test('a mixed movie carries the two oil choices on the correct wheel through the scene order', () => {
+  const a={id:1,visible:true,opacity:1,palette:'violet-blue',motion:'wheel-flow',motionTake:0,materialMotion:{rear:'pdms-20',front:'pdms-1000'}};
+  const b={...a,id:2,palette:'yellow-red',materialMotion:{front:'pdms-20'}};
+  const art={id:3,visible:true,opacity:.8,media:newMedia({id:10,name:'Picture.png',sha256:'a'.repeat(64),width:2,height:2,durationUs:1,still:true})};
+  const stack=programLayers([a,art,b],l=>!l.media);
+  const request=wheelMovieRequest({layerId:1,wheel:a.palette,materialMotion:a.materialMotion,stack},6,[],'neutral');
+  assert.deepEqual(request.materialMotion,a.materialMotion);
+  assert.deepEqual(request.stack.map(l=>l.layerId),[2,3,1]);
+  assert.deepEqual(request.stack[0].materialMotion,{rear:'wheel',front:'pdms-20'});
+  assert.ok(!Object.hasOwn(request.stack[1],'materialMotion'));
+  assert.deepEqual(request.stack[2].materialMotion,a.materialMotion);
+});
+
 import { NativeWheelExport } from '../../WebAssets/native-wheel-export.js';
 test('native export retains the selected optical films with either pose baseline', () => {
   for (const visibleFilms of ['both', 'rear', 'front', 'clear']) {
@@ -94,6 +108,7 @@ test('still plates need no song and preserve focus and film selection through th
 
 test('the selected-wheel export sends print stock and finishing options to the native editor', async () => {
   const selection={layerId:3,wheel:'violet-blue',motion:'wheel',motionTake:1,visibleFilms:{rear:true,front:true},focus:1};
+  selection.materialMotion={rear:'pdms-1000',front:'pdms-20'};
   const print={layout:'label7',stock:'uncoated',gilding:'foil',richBlack:true,catalog:6};
   const {NativeWheelPlates}=await import('../../WebAssets/native-wheel-plates.js');
   const button={textContent:'Export',addEventListener(){}};

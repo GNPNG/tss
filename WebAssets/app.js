@@ -2,6 +2,7 @@ import { LiquidRenderer, LIQUID_PALETTES } from './liquid-renderer.js';
 import { installVisualAdvisor } from './visual-advisor.js';
 import { installLocalLyrics } from './local-lyrics.js';
 import { analyzeAudio, featuresAt } from './audio-features.js';
+import { materialMotionFields } from './material-motion.js';
 import { NativeWheelSurface, hasRelease } from './native-wheel.js';
 import { PlateFormatControls } from './plate-format.js';
 import { NativeWheelPlates } from './native-wheel-plates.js';
@@ -59,7 +60,7 @@ function liveSelection() {
   const timed = stack.some(l=>l.envelope!=null || l.media);
   const needsStack = timed || stack.length > 1 || stack[0].opacity !== 1 || stack[0].layerId !== layer.id;
   return { ...(needsStack ? {stack} : {}), layerId: layer.id, wheel: layer.media?'violet-blue':layer.palette, slide: layer.slide, gesture: layer.gesture,
-    motion: layer.motion, motionTake: layer.motionTake, visibleFilms: layer.visibleFilms ?? 'both',
+    motion: layer.motion, motionTake: layer.motionTake, ...materialMotionFields(layer.media ? null : layer), visibleFilms: layer.visibleFilms ?? 'both',
     mousePressure: layer.mousePressure?.[layer.slide] ?? 0.5,
     tugResponse: layer.tugResponse[layer.slide], renderWidth: layer.renderWidth, focus: projectorFocus,
     ...feedbackDeck.config(projectorDeck?.enabled || timed), keepPresenting:!!projectorDeck?.enabled };
@@ -567,6 +568,16 @@ function renderControls() {
   byId('live-wheel').disabled = !wheel || !!layer?.customColors || !layer?.visible;
   byId('wheel-motion').value = layer?.motion ?? 'wheel-flow';
   byId('wheel-motion').disabled = !live;
+  const coral = layer?.motion === 'coral-release', beads = layer?.motion === 'wheel-with-coral-beads';
+  for (const slide of ['rear','front']) {
+    const control = byId(slide+'-film-oil');
+    control.value = layer?.materialMotion?.[slide] ?? 'wheel';
+    control.disabled = !live || coral || (beads && slide==='front');
+  }
+  const oilNote = byId('film-oil-note');
+  oilNote.hidden = !(coral || beads);
+  oilNote.textContent = coral ? 'Coral release supplies both films. Wheel flow restores their oil selections.'
+    : beads ? 'The front film uses the coral bead release. Wheel flow restores its oil selection.' : '';
   byId('wheel-films').value = layer?.visibleFilms ?? 'both';
   byId('wheel-films').disabled = !live;
   byId('replay-release').hidden = !hasRelease(layer?.motion);
@@ -805,6 +816,15 @@ byId('wheel-slide').addEventListener('change', (event) => {
   const layer = selectedLayer();
   if (layer) { layer.slide = event.target.value; renderControls(); }
 });
+for (const slide of ['rear','front']) {
+  byId(slide+'-film-oil').addEventListener('change', event => {
+    const layer = selectedLayer();
+    if (!layer || layer.media || event.target.disabled) return;
+    layer.materialMotion = {...layer.materialMotion, [slide]:event.target.value};
+    nativeSurface?.sync();
+    checkpoint('Set '+slide+' film oil');
+  });
+}
 byId('wheel-films').addEventListener('change', (event) => {
   const layer = selectedLayer();
   if (layer) { layer.visibleFilms = event.target.value; nativeSurface?.sync(); }
@@ -1067,7 +1087,7 @@ function restoreEdits(doc, newProject) {
   state.layers = doc.layers.map(config => {
     const existing = newProject ? null : old.get(config.id);
     if (existing) old.delete(existing.id);
-    const layer=Object.assign(existing || {canvas:layerCanvas(), renderer:null}, {envelope:null,media:undefined}, layerSettings(config));
+    const layer=Object.assign(existing || {canvas:layerCanvas(), renderer:null}, {envelope:null,media:undefined,materialMotion:undefined}, layerSettings(config));
     const grant=layer.media&&visualGrants.get(layer.media.sha256);
     if(grant)bindProjectMedia(layer,grant);
     return layer;

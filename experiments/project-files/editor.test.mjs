@@ -8,6 +8,7 @@ import { join } from 'node:path';
 
 async function exerciseControls(platform) {
   const coral = platform === 'Windows coral project';
+  const oils = platform === 'Windows film oils';
   const windows = platform === 'Windows';
   Object.defineProperty(navigator,'userAgent',{value:platform+' project controls'});
   const $ = id => document.getElementById(id);
@@ -24,7 +25,7 @@ async function exerciseControls(platform) {
   const set = (id,value) => {
     const input=$(id);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
   };
-  const audio = coral ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
+  const audio = coral || oils ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
   let documentText, incoming, linked=null, lastSelection=1;
   const advisorRequests=[],reviewedLyrics=[],previewRequests=[];
   let finishInference;
@@ -57,7 +58,7 @@ async function exerciseControls(platform) {
       advisorRequests.push(args);
       return new Promise(resolve=>{finishInference=()=>resolve({visual:'video',signal:'onset',fit:'repeat'});});
     case 'resolve_visual_media': return args.name==='Plate.gif'?{id:42,name:args.name,sha256:args.sha256,width:400,height:240,durationUs:800000,still:false}:null;
-    case 'open_project': return [coral ? 'coral-wheel.tss' : 'Headliner.tss',incoming,linked];
+    case 'open_project': return [coral || oils ? 'coral-wheel.tss' : 'Headliner.tss',incoming,linked];
     default: throw Error('Unexpected command '+command);
     }
   }}};
@@ -65,7 +66,7 @@ async function exerciseControls(platform) {
   window.requestAnimationFrame=()=>0;
   await import('/app.js');
   await until(()=>$('edit-history').options.length>0);
-  if (coral) {
+  if (coral || oils) {
     incoming=await (await fetch('/coral-wheel.tss')).text();
     click('open-project');await idle();
     check($('app-status').textContent==='Opened coral-wheel.tss.' && $('track-title').textContent==='coral-wheel.tss','normal project open');
@@ -83,6 +84,38 @@ async function exerciseControls(platform) {
     check(!$('replay-release').disabled && $('replay-release').textContent==='Replay front beads','available front replay');
     click('replay-release');await until(()=>previewRequests.at(-1)?.motionTake===first.motionTake+1);
     check(previewRequests.at(-1).visibleFilms==='both' && $('play').disabled,'silent replay preserves both films');
+    if(oils) {
+      const rear=$('rear-film-oil'), front=$('front-film-oil');
+      check(!rear.disabled && front.disabled && rear.value==='wheel' && front.value==='wheel','legacy coral sources');
+      set('wheel-motion','wheel-flow');
+      check(!rear.disabled && !front.disabled,'both wheel oils editable');
+      set('rear-film-oil','pdms-20');
+      await until(()=>previewRequests.at(-1)?.materialMotion?.rear==='pdms-20');
+      click('undo-edit');await until(()=>rear.value==='wheel' && !!previewRequests.at(-1) && !previewRequests.at(-1).materialMotion);
+      click('redo-edit');await until(()=>rear.value==='pdms-20');
+      set('front-film-oil','pdms-1000');
+      await until(()=>previewRequests.at(-1)?.materialMotion?.front==='pdms-1000');
+      set('wheel-motion','coral-release');
+      check(rear.disabled && front.disabled && !$('film-oil-note').hidden,'prescribed coral source overrides both');
+      set('wheel-motion','wheel-with-coral-beads');
+      check(!rear.disabled && front.disabled && front.value==='pdms-1000','front release retains its authored choice');
+      click('save-project');await idle();
+      const saved=JSON.parse(documentText),original=JSON.parse(incoming).layers[0];
+      check(saved.layers[0].materialMotion.rear==='pdms-20' && saved.layers[0].materialMotion.front==='pdms-1000','saved independent oil choices');
+      for(const field of ['palette','colors','opacity','tugResponse','mousePressure'])
+        check(JSON.stringify(saved.layers[0][field])===JSON.stringify(original[field]),'oil preserves '+field);
+      incoming=documentText;set('rear-film-oil','wheel');
+      click('open-project');await until(()=>$('replace-project').open);$('replace-project').querySelector('[value=replace]').click();await idle();
+      check(rear.value==='pdms-20' && front.value==='pdms-1000' && front.disabled,'normal reopen restores both oils and source override');
+      set('wheel-motion','wheel-flow');click('add-layer');set('mathmos-wheel','yellow-red');
+      await until(()=>previewRequests.at(-1)?.stack?.length===2);
+      check(rear.value==='wheel' && front.value==='wheel','new wheel starts with original motion');
+      set('front-film-oil','pdms-20');
+      await until(()=>previewRequests.at(-1)?.stack?.some(l=>l.wheel==='yellow-red' && l.materialMotion?.front==='pdms-20'));
+      const layers=previewRequests.at(-1).stack;
+      check(layers.some(l=>l.wheel==='violet-blue' && l.materialMotion.rear==='pdms-20' && l.materialMotion.front==='pdms-1000'),
+        'stack keeps the first wheel independent of selected wheel');
+    }
     return;
   }
   if (platform==='Macintosh') {
@@ -182,7 +215,15 @@ async function exerciseControls(platform) {
     !restored.layers.some(l=>l.media?.assetId!==undefined),'portable media link, offline metadata and refreshed grant');
 }
 const chrome=process.env.CHROME_BIN;
-for (const platform of ['Linux','Windows','Macintosh','Windows coral project']) test(platform==='Windows coral project'?'Open and replay the standalone coral capture project without audio':platform==='Macintosh'?'Mac desktop native wheel selection, optics and modal visibility':platform+' editor project and region controls, reviewed advisor cues, lyric consent and undo',
+const projectControls='editor project and region controls, reviewed advisor cues, lyric consent and undo';
+const editorCases=[
+  ['Linux','Linux '+projectControls],
+  ['Windows','Windows '+projectControls],
+  ['Macintosh','Mac desktop native wheel selection, optics and modal visibility'],
+  ['Windows coral project','Open and replay the standalone coral capture project without audio'],
+  ['Windows film oils','Independent slide oil selection, release overrides, undo, save, reopen and stack'],
+];
+for (const [platform,title] of editorCases) test(title,
   {skip:!chrome && 'Set CHROME_BIN to a Chrome executable', timeout:30000}, async()=>{
     const web=new URL('../../WebAssets/',import.meta.url);
     const media=new URL('../slide-look-study/approval/windows-live/gesture-controls/export/two-slide-cues.m4a',import.meta.url);
