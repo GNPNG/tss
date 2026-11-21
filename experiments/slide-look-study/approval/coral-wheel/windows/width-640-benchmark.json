@@ -1,0 +1,81 @@
+{
+  "adapter": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design (Vulkan)",
+  "clock": "std::time::Instant after successful FIFO surface present returns",
+  "field": [
+    512,
+    288
+  ],
+  "footprintSampling": true,
+  "frozenGesture": {
+    "earlyChangedPixelsAtLeast3Codes": 52437,
+    "fixedRearSeconds": 2.0,
+    "frontReplayByteIdenticalToStart": true,
+    "heldByteIdentical": true,
+    "lateChangedPixelsAtLeast3Codes": 36098,
+    "rearChangedPixelsAtLeast3Codes": 62255,
+    "rearTimesWithFrontHeldAt6Seconds": [
+      2.0,
+      3.5
+    ],
+    "sampleTimes": [
+      0.0,
+      1.9,
+      4.0,
+      6.0
+    ]
+  },
+  "input": "window-local scripted WM_LBUTTONDOWN/WM_MOUSEMOVE/WM_LBUTTONUP",
+  "maxFrameLatency": 2,
+  "wheels": [
+    {
+      "focus": 0.8999999761581421,
+      "fps": 39.9996983356084,
+      "gesture": "tug",
+      "measuredFromUnixMs": 1795232057900,
+      "measuredThroughUnixMs": 1795232069906,
+      "motion": "wheel-with-coral-beads",
+      "mouseMovesApplied": 475,
+      "p50Ms": 25.0044,
+      "p95Ms": 25.2183,
+      "p99Ms": 25.497,
+      "presented": 481,
+      "preview": [
+        640,
+        360
+      ],
+      "replayRequests": 3,
+      "replays": [
+        {
+          "firstPresentedMs": 56.7307,
+          "motionTake": 2,
+          "mouseMovesApplied": 158,
+          "requestedMs": 6.8096,
+          "strokeStarts": 1
+        },
+        {
+          "firstPresentedMs": 4056.8071000000004,
+          "motionTake": 3,
+          "mouseMovesApplied": 158,
+          "requestedMs": 4006.8867,
+          "strokeStarts": 1
+        },
+        {
+          "firstPresentedMs": 8056.801699999999,
+          "motionTake": 4,
+          "mouseMovesApplied": 158,
+          "requestedMs": 8006.875499999999,
+          "strokeStarts": 1
+        }
+      ],
+      "secondsBetweenPresents": 12.000090499999995,
+      "skipped": 0,
+      "slide": "front",
+      "surface": [
+        2571,
+        1444
+      ],
+      "tugResponse": 0.4000000059604645,
+      "wheel": "violet-blue"
+    }
+  ]
+}

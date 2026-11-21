@@ -12,6 +12,8 @@ In the source build, choose **Violet / Blue → Slide motion → Wheel with cora
 
 **Projected films** lets you inspect either film in isolation and return to the moving overlap. [Watch the rear film, front film and combined projection side by side](experiments/slide-look-study/approval/coral-solo/coral-solo.mp4)
 
+The coral wheel sustained 40.00 FPS on the Windows GTX 1650 Ti Max-Q at both 640 × 360 and 960 × 540. Each 12-second trial recorded 481 successful presentations, three front-slide replays, 475 applied mouse movements and zero skipped acquisitions. [Windows presentation timings and GPU telemetry](experiments/slide-look-study/approval/coral-wheel/windows/README.md)
+
 The source build adds **Slide motion → Coral release**. Watch the front film shed two drops, then pull focus through them onto the violet film behind. [Radeon capture](experiments/slide-look-study/approval/coral-release/coral-release.mp4) · [Full-size frame](experiments/slide-look-study/approval/coral-release/coral-release.png) · [How the films were solved and measured](experiments/coral-release/README.md)
 
 - Open MP3 or M4A audio and preview a waveform with synchronized liquid-light motion.

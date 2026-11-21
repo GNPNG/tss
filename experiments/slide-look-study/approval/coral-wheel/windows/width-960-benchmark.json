@@ -1,0 +1,81 @@
+{
+  "adapter": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design (Vulkan)",
+  "clock": "std::time::Instant after successful FIFO surface present returns",
+  "field": [
+    512,
+    288
+  ],
+  "footprintSampling": true,
+  "frozenGesture": {
+    "earlyChangedPixelsAtLeast3Codes": 118030,
+    "fixedRearSeconds": 2.0,
+    "frontReplayByteIdenticalToStart": true,
+    "heldByteIdentical": true,
+    "lateChangedPixelsAtLeast3Codes": 81365,
+    "rearChangedPixelsAtLeast3Codes": 139997,
+    "rearTimesWithFrontHeldAt6Seconds": [
+      2.0,
+      3.5
+    ],
+    "sampleTimes": [
+      0.0,
+      1.9,
+      4.0,
+      6.0
+    ]
+  },
+  "input": "window-local scripted WM_LBUTTONDOWN/WM_MOUSEMOVE/WM_LBUTTONUP",
+  "maxFrameLatency": 2,
+  "wheels": [
+    {
+      "focus": 0.8999999761581421,
+      "fps": 40.00020666773443,
+      "gesture": "tug",
+      "measuredFromUnixMs": 1795232093669,
+      "measuredThroughUnixMs": 1795232105688,
+      "motion": "wheel-with-coral-beads",
+      "mouseMovesApplied": 475,
+      "p50Ms": 24.9914,
+      "p95Ms": 25.2581,
+      "p99Ms": 25.546599999999998,
+      "presented": 481,
+      "preview": [
+        960,
+        540
+      ],
+      "replayRequests": 3,
+      "replays": [
+        {
+          "firstPresentedMs": 69.4424,
+          "motionTake": 2,
+          "mouseMovesApplied": 158,
+          "requestedMs": 19.4546,
+          "strokeStarts": 1
+        },
+        {
+          "firstPresentedMs": 4069.8352,
+          "motionTake": 3,
+          "mouseMovesApplied": 158,
+          "requestedMs": 4019.4272,
+          "strokeStarts": 1
+        },
+        {
+          "firstPresentedMs": 8069.5414,
+          "motionTake": 4,
+          "mouseMovesApplied": 158,
+          "requestedMs": 8019.4917,
+          "strokeStarts": 1
+        }
+      ],
+      "secondsBetweenPresents": 11.999938000000006,
+      "skipped": 0,
+      "slide": "front",
+      "surface": [
+        2571,
+        1444
+      ],
+      "tugResponse": 0.4000000059604645,
+      "wheel": "violet-blue"
+    }
+  ]
+}
