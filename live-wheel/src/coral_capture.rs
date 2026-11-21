@@ -337,3 +337,67 @@ fn capture_production_formats() -> Result<(), String> {
     }
     Ok(())
 }
+
+#[test]
+#[ignore = "requires a guarded discrete GPU, TSS_PLATE_CAPTURE_DIR and TSS_ECI_PROFILE_DIR"]
+fn capture_print_mechanicals() -> Result<(), String> {
+    use crate::production::{PrintFormat, PrintLayout, Stock};
+    let dir =
+        PathBuf::from(std::env::var_os("TSS_PLATE_CAPTURE_DIR").ok_or("Missing output directory")?);
+    let iccs =
+        PathBuf::from(std::env::var_os("TSS_ECI_PROFILE_DIR").ok_or("Missing ECI profiles")?);
+    let (mut r, info) = discrete_renderer([320, 180])?;
+    r.select_track(1);
+    r.set_motion(MotionPreset::WheelWithCoralBeads)?;
+    r.set_focus(Some(0.9))?;
+    r.set_footprint_sampling(true);
+    let times = [2.635, 0.75];
+    r.render_film_times_offscreen(times[0], times[1], times[0])?;
+    println!("Native optical source: {}", info.name);
+    for (layout, stock) in [
+        (PrintLayout::LpGatefold, Stock::Coated),
+        (PrintLayout::Label7, Stock::Uncoated),
+    ] {
+        let bytes = std::fs::read(iccs.join(stock.profile_name())).map_err(|e| e.to_string())?;
+        let mut profile = crate::PrintProfile::new(stock, bytes)?;
+        let format = PrintFormat {
+            layout,
+            stock,
+            catalog: Some(6),
+            gilding: Some(if stock == Stock::Coated {
+                crate::production::Gilding::Metallic
+            } else {
+                crate::production::Gilding::Foil
+            }),
+            rich_black: true,
+        };
+        let [w, h] = layout.mechanical().pixels;
+        // Known independent registration marks exercise exact process and spot output.
+        let mask = |right: bool| -> Result<Vec<u8>, String> {
+            let stride = w.div_ceil(8) as usize;
+            let mut bits = vec![255; stride * h as usize];
+            let x0 = if right { w * 3 / 5 } else { w / 5 };
+            for y in h / 3..h / 3 + 24 {
+                for x in x0..x0 + 32 {
+                    bits[y as usize * stride + x as usize / 8] &= !(0x80 >> (x % 8));
+                }
+            }
+            let mut data = Vec::new();
+            let mut e = png::Encoder::new(&mut data, w, h);
+            e.set_color(png::ColorType::Grayscale);
+            e.set_depth(png::BitDepth::One);
+            let mut writer = e.write_header().map_err(|e| e.to_string())?;
+            writer.write_image_data(&bits).map_err(|e| e.to_string())?;
+            writer.finish().map_err(|e| e.to_string())?;
+            Ok(data)
+        };
+        profile.set_masks(format, Some(mask(true)?), Some(mask(false)?))?;
+
+        let dir =
+            pollster::block_on(
+                r.export_print_mechanical(&dir, times, format, &profile, |_| Ok(())),
+            )?;
+        println!("{layout:?}: {}", dir.display());
+    }
+    Ok(())
+}

@@ -49,3 +49,16 @@ When converting generated `sRGB` masters locally via ImageMagick 7 (`magick`):
   `magick input_master.png -profile sRGB.icc -profile ISOcoated_v2_300_eci.icc -density 300 -units PixelsPerInch -compress LZW output_cmyk_300dpi.tif`
 * **4K Square DSP Master**:
   `magick input_master.png -colorspace sRGB -filter Lanczos -resize 4000x4000 -depth 16 output_dsp_4000.png`
+
+### Native print mechanicals
+
+In the Windows editor, select a visible wheel and open **Selected wheel · production stills**. Choose any PRINT_CMYK format and its stock. **Preview current framing** shows the current optical projection beneath the registered die, spindle, fold and safety guides. The export captures the wheel at full density in its presented pose, crops its optical gate without stretching it, and renders to the full-bleed 300 ppi dimensions above. Choose the matching original destination ICC from the [ECI Offset 2009 archive](https://eci.org/lib/exe/eci_offset_2009.zip).
+
+The bundle contains these files.
+
+- `artwork.tif` carries the 16-bit-per-channel CMYK process artwork, stock profile and optional C60 M40 Y40 K100 solids. Its full canvas includes bleed and the material later removed by each circular die.
+- `press.pdf` contains that same 16-bit process image, the stock output intent, physical TrimBox and BleedBox, plus any selected colophon and spot finishing. The optional EPNI colophon uses positive 6.5 pt Source Sans 3 outlines in K100 overprint on an uninked panel. Source Sans 3 is distributed under the SIL Open Font License. [Typeface source](https://github.com/adobe-fonts/source-sans/tree/3.052R)
+- `dieline.svg` is a separate, registered non-printing finishing guide in millimetres. The PDF TrimBox is rectangular. Use the SVG outer and spindle dies for circular labels.
+- `mechanical.json` records the physical dimensions, film times, stock, black-generation rule, TAC ceiling and measured maximum across all process pixels.
+
+To add gilding to the title or sigil, select **PANTONE 871 C** or **FOIL_GOLD** and supply the artwork as a registered, full-canvas, one-bit grayscale PNG. Marked black pixels print on the named separation and white remains clear. The screen alternate approximates the spot. The rich-black solids option accepts a separate mask in the same format. Put the desired large solid areas on that plate. Both stencils use the exact raster dimensions in the print specification. Keep finishing marks and the optional colophon clear of each other.

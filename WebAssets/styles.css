@@ -913,3 +913,6 @@ input[type=range].hue-slider {
 .plate-formats figcaption { margin-top: 5px; font-size: .8rem; }
 #plate-horizon-controls label { margin-right: 1em; }
 #plate-horizon-y { width: 5em; }
+
+#print-finishing { display: grid; gap: .5rem; margin: .75rem 0; }
+.plate-formats [hidden] { display: none !important; }

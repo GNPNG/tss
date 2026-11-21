@@ -31,11 +31,25 @@
           <button class="button quiet" type="button" id="export-native-wheel" disabled>Export selected wheel in 4K</button>
         </div>
         <details class="plate-formats" id="plate-formats" hidden><summary>Selected wheel · production stills</summary>
-          <div class="native-choices"><label>Digital format<select id="plate-layout">
+          <div class="native-choices"><label>Format<select id="plate-layout"><optgroup label="DIGITAL_4K">
             <option value="visualizer">4K visualizer · layered</option><option value="dsp-cover">DSP master cover</option>
             <option value="vertical">Vertical reel / promo story</option><option value="panorama">Five-gatefold cycle panorama</option>
-          </select></label><label>Color space<select id="plate-color"></select></label></div>
-          <div id="plate-horizon-controls"><label><input type="checkbox" id="plate-horizon"> Horizon guide</label>
+          </optgroup><optgroup label="PRINT_CMYK">
+            <option value="lp-jacket">12″ LP single jacket</option><option value="lp-gatefold">12″ LP gatefold spread</option>
+            <option value="picture-sleeve">7″ picture sleeve</option><option value="label7">7″ center label</option>
+            <option value="label12">12″ center label</option><option value="cd-gatefold">Mini-LP CD gatefold</option><option value="obi">12″ archival obi strip</option>
+          </optgroup></select></label><label id="plate-color-label">Color space<select id="plate-color"></select></label>
+          <label id="plate-stock-label" hidden>Stock<select id="plate-stock"><option value="coated">Gloss / satin · ISO Coated v2 300%</option><option value="uncoated">Archival / matte · PSO Uncoated 280%</option></select></label></div>
+
+          <div id="print-finishing" hidden>
+            <label>Sigil / title plate<select id="print-spot"><option value="">No gilding</option><option value="metallic">PANTONE 871 C</option><option value="foil">FOIL_GOLD</option></select></label>
+            <label><input type="checkbox" id="print-rich"> Rich-black solids mask</label>
+            <label>Colophon on uninked panel<select id="print-catalog"><option value="">Omit</option>
+              <option value="6">EPNI-006</option><option value="7">EPNI-007</option><option value="8">EPNI-008</option><option value="9">EPNI-009</option><option value="10">EPNI-010</option></select></label>
+            <small>Finishing masks use full-canvas, 1-bit grayscale PNGs. Black marks receive ink or foil.</small>
+          </div>
+          <div id="plate-horizon-controls">
+<label><input type="checkbox" id="plate-horizon"> Horizon guide</label>
             <label>Pixel row from top <input type="number" id="plate-horizon-y" min="0" max="2159" value="1339" step="1"></label></div>
           <figure><svg role="img" aria-label="Selected output framing and composition guides"></svg><figcaption></figcaption></figure>
           <button class="button quiet" type="button" id="plate-frame">Preview current framing</button>

@@ -26,7 +26,7 @@ export class NativeWheelPlates {
         this.status('Production stills · ' + payload);
       });
       const folder = await this.invoke('export_native_wheel_plates', {
-        selection: {layerId, wheel, motion, motionTake, visibleFilms, focus, ...(format ? {format} : {})},
+        selection: {layerId, wheel, motion, motionTake, visibleFilms, focus, ...(format?.print ? {print:format.print} : format ? {format} : {})},
       });
       this.status(folder ? 'Wheel stills saved to ' + folder : 'Plate export cancelled');
       return folder;

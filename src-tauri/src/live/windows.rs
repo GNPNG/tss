@@ -64,7 +64,12 @@ pub(super) fn plate_verification() -> Option<PathBuf> {
 
 enum Command {
     PlatePreview(super::plates::Selection, macros::Reply<Vec<u8>>),
-    Plates(super::plates::Selection, PathBuf, macros::Reply<PathBuf>),
+    Plates(
+        super::plates::Selection,
+        PathBuf,
+        Option<tss_live_wheel::PrintProfile>,
+        macros::Reply<PathBuf>,
+    ),
     VerifyVisibility(macros::Reply<VisibilityProof>),
     Projector(bool, u32, macros::Reply<()>),
     Set(Option<Config>),
@@ -93,8 +98,9 @@ impl Host {
         &self,
         selected: super::plates::Selection,
         parent: PathBuf,
+        profile: Option<tss_live_wheel::PrintProfile>,
     ) -> Result<PathBuf, String> {
-        self.request(|reply| Command::Plates(selected, parent, reply))
+        self.request(|reply| Command::Plates(selected, parent, profile, reply))
             .await
     }
 
@@ -591,7 +597,7 @@ fn run(
                     };
                     let _ = reply.try_send(result);
                 }
-                Command::Plates(selected, folder, reply) => {
+                Command::Plates(selected, folder, profile, reply) => {
                     let result = match (engine.as_mut(), config.as_ref()) {
                         (Some(r), Some(c)) if selected.matches(c) => {
                             consume_mouse(r, c.slide, c.gesture, c.mouse_pressure)?;
@@ -609,25 +615,33 @@ fn run(
                                 ShowWindow(child.0, SW_HIDE);
                             }
                             let mut stage = String::new();
-                            let result = pollster::block_on(r.export_digital_plates(
-                                &folder,
-                                times,
-                                selected.format,
-                                |name| {
-                                    pump();
-                                    if unsafe { IsWindow(parent) == 0 } {
-                                        return Err(
-                                            "Plate export interrupted when the editor closed"
-                                                .into(),
-                                        );
-                                    }
-                                    if name != stage {
-                                        let _ = app.emit("tss-wheel-plate-progress", name);
-                                        stage = name.to_owned();
-                                    }
-                                    Ok(())
-                                },
-                            ));
+                            let progress = |name: &str| {
+                                pump();
+                                if unsafe { IsWindow(parent) == 0 } {
+                                    return Err(
+                                        "Plate export interrupted when the editor closed".into()
+                                    );
+                                }
+                                if name != stage {
+                                    let _ = app.emit("tss-wheel-plate-progress", name);
+                                    stage = name.to_owned();
+                                }
+                                Ok(())
+                            };
+                            let result = match (selected.print, profile) {
+                                (Some(format), Some(profile)) => {
+                                    pollster::block_on(r.export_print_mechanical(
+                                        &folder, times, format, &profile, progress,
+                                    ))
+                                }
+                                (None, None) => pollster::block_on(r.export_digital_plates(
+                                    &folder,
+                                    times,
+                                    selected.format,
+                                    progress,
+                                )),
+                                _ => Err("Print stock requires its destination ICC profile".into()),
+                            };
                             if !c.preview_hidden && unsafe { IsWindow(parent) != 0 } {
                                 child.place(c.rect)?;
                             }

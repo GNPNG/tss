@@ -1,0 +1,16 @@
+{
+  "coated": {
+    "rampSamples": 1025,
+    "blackL": 12.942388,
+    "whiteL": 100,
+    "largestReversalL": 0,
+    "reversalsAbove0_05L": 0
+  },
+  "uncoated": {
+    "rampSamples": 1025,
+    "blackL": 29.807376,
+    "whiteL": 100,
+    "largestReversalL": 0,
+    "reversalsAbove0_05L": 0
+  }
+}

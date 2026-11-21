@@ -6,6 +6,7 @@ mod fields;
 pub use feedback::FeedbackSettings;
 mod movie;
 mod plates;
+pub use plates::PrintProfile;
 pub mod production;
 pub use movie::WheelMovie;
 mod material;

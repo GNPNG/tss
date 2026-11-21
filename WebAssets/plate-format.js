@@ -9,8 +9,11 @@ const colorNames = {rec709:'Rec.709',srgb:'sRGB IEC 61966-2-1','display-p3':'Dis
 const ns = 'http://www.w3.org/2000/svg';
 
 export class PlateFormatControls {
-  constructor(root, capture, status) {
+  constructor(root, capture, status, geometry) {
     this.root=root;
+    this.geometry=geometry;
+    this.status=status;
+    this.stock=root.querySelector('#plate-stock');
     this.layout=root.querySelector('#plate-layout');
     this.color=root.querySelector('#plate-color');
     this.horizon=root.querySelector('#plate-horizon');
@@ -33,6 +36,12 @@ export class PlateFormatControls {
   }
 
   options() {
+    if(!plateFormats[this.layout.value]){
+      const catalog=this.root.querySelector('#print-catalog').value;
+      return {print:{layout:this.layout.value,stock:this.stock.value,catalog:catalog?Number(catalog):null,
+        gilding:this.root.querySelector('#print-spot').value||null,richBlack:this.root.querySelector('#print-rich').checked}};
+    }
+
     const y=this.y.valueAsNumber;
     if(this.layout.value==='visualizer' && this.horizon.checked &&
        (!Number.isInteger(y)||y<0||y>2159)) throw Error('Horizon must be a pixel row from 0 to 2159.');
@@ -40,9 +49,35 @@ export class PlateFormatControls {
       horizonY:this.layout.value==='visualizer' && this.horizon.checked ? y : null};
   }
 
+  async renderPrint(kind) {
+    const {spec,canvasMm:[w,h],guide}=await this.geometry(kind);
+    if(this.layout.value!==kind) return;
+    this.guide.replaceChildren();
+    this.guide.setAttribute('viewBox',[0,0,w,h].join(' '));
+    this.guide.style.aspectRatio=w+'/'+h;
+    const image=(href,preserve)=>{
+      const node=document.createElementNS(ns,'image');
+      for(const [key,value] of Object.entries({href,width:w,height:h,preserveAspectRatio:preserve})) node.setAttribute(key,value);
+      this.guide.append(node);
+    };
+    if(this.source) image(this.source,'xMidYMid slice');
+    image('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(guide),'none');
+    this.root.querySelector('figcaption').textContent=spec.pixels.join(' × ')+' px at 300 ppi · '+w+' × '+h+' mm with '+spec.bleedMm+' mm bleed · '+spec.safeMm+' mm type safety. Red die, green safe, purple fold. Choose the original ECI stock profile when exporting.';
+  }
+
   render(resetColor=false) {
     const kind=this.layout.value;
-    const {size:[w,h],colors}=plateFormats[kind];
+    const digital=plateFormats[kind];
+    this.root.querySelector('#plate-color-label').hidden=!digital;
+    this.root.querySelector('#plate-stock-label').hidden=!!digital;
+    this.root.querySelector('#print-finishing').hidden=!!digital;
+    if(!digital){
+      this.root.querySelector('#plate-horizon-controls').hidden=true;
+      this.renderPrint(kind).catch(e=>this.status('Could not load the mechanical: '+String(e)));
+      return;
+    }
+    const {size:[w,h],colors}=digital;
+
     if(resetColor) this.color.replaceChildren(...colors.map(id=>new Option(colorNames[id],id)));
     this.root.querySelector('#plate-horizon-controls').hidden=kind!=='visualizer';
     this.y.disabled=!this.horizon.checked;

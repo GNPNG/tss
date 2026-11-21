@@ -11,6 +11,8 @@ mod color;
 mod guides;
 mod layout;
 mod rec709;
+mod print;
+pub use print::PrintProfile;
 use crate::production::{DigitalFormat, Encoding, Layout};
 
 #[repr(C)]

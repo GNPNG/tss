@@ -2,13 +2,13 @@ use super::{Host, MotionPreset, VisibleFilms};
 use serde::Deserialize;
 use tauri::State;
 #[cfg(windows)]
-use tss_live_wheel::production::DigitalFormat;
+use tss_live_wheel::production::{DigitalFormat, PrintFormat, PrintLayout};
 #[cfg(not(windows))]
 #[path = "../../../live-wheel/src/production.rs"]
 #[allow(dead_code)]
 mod production;
 #[cfg(not(windows))]
-use production::DigitalFormat;
+use production::{DigitalFormat, PrintFormat, PrintLayout};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +22,13 @@ pub struct Selection {
     pub(super) focus: Option<f32>,
     #[serde(default)]
     pub(super) format: DigitalFormat,
+    pub(super) print: Option<PrintFormat>,
+}
+
+#[tauri::command]
+pub fn print_geometry(layout: PrintLayout) -> serde_json::Value {
+    let mechanical = layout.mechanical();
+    serde_json::json!({"spec":mechanical, "canvasMm":mechanical.canvas_mm(), "guide":mechanical.guide_svg()})
 }
 
 #[tauri::command]
@@ -64,7 +71,68 @@ pub async fn export_native_wheel_plates(
     {
         use tauri_plugin_dialog::DialogExt;
         selection.format.validate()?;
+        let profile = if let Some(format) = selection.print {
+            let Some(profile) = app
+                .dialog()
+                .file()
+                .set_title(format!("Choose {}", format.stock.profile_name()))
+                .add_filter("ECI print ICC profile", &["icc", "icm"])
+                .blocking_pick_file()
+            else {
+                return Ok(None);
+            };
+            let path = profile.into_path().map_err(|e| e.to_string())?;
+            if std::fs::metadata(&path).map_err(|e| e.to_string())?.len() > 8_000_000 {
+                return Err("Selected file exceeds the ECI profile size".into());
+            }
+            let mut icc = tss_live_wheel::PrintProfile::new(
+                format.stock,
+                std::fs::read(path).map_err(|e| e.to_string())?,
+            )?;
+            let choose_mask = |title: &str| -> Result<Option<Vec<u8>>, String> {
+                let Some(path) = app
+                    .dialog()
+                    .file()
+                    .set_title(title)
+                    .add_filter("Full-canvas 1-bit grayscale stencil", &["png"])
+                    .blocking_pick_file()
+                else {
+                    return Ok(None);
+                };
+                let path = path.into_path().map_err(|e| e.to_string())?;
+                if std::fs::metadata(&path).map_err(|e| e.to_string())?.len() > 8_000_000 {
+                    return Err("Stencil exceeds 8 MB".into());
+                }
+                std::fs::read(path).map(Some).map_err(|e| e.to_string())
+            };
+            let spot = if let Some(g) = format.gilding {
+                let Some(data) = choose_mask(&format!(
+                    "Choose the registered sigil/title stencil for {}",
+                    g.plate()
+                ))?
+                else {
+                    return Ok(None);
+                };
+                Some(data)
+            } else {
+                None
+            };
+            let rich = if format.rich_black {
+                let Some(data) = choose_mask("Choose the registered rich-black solids stencil")?
+                else {
+                    return Ok(None);
+                };
+                Some(data)
+            } else {
+                None
+            };
+            icc.set_masks(format, spot, rich)?;
+            Some(icc)
+        } else {
+            None
+        };
         let fixture = super::windows::plate_verification();
+
         let folder = if let Some(dir) = &fixture {
             if !dir.is_absolute() || !dir.is_dir() {
                 app.exit(1);
@@ -77,14 +145,14 @@ pub async fn export_native_wheel_plates(
             let Some(folder) = app
                 .dialog()
                 .file()
-                .set_title("Choose a folder for the 4K wheel plates")
+                .set_title("Choose a folder for the production artwork")
                 .blocking_pick_folder()
             else {
                 return Ok(None);
             };
             folder.into_path().map_err(|e| e.to_string())?
         };
-        let result = host.plates(selection, folder).await;
+        let result = host.plates(selection, folder, profile).await;
         if fixture.is_some() {
             if let Err(e) = &result {
                 eprintln!("Plate verification failed: {e}");

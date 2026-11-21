@@ -129,7 +129,7 @@ const wheelExporter = windowsDesktop ? new NativeWheelExport({
 const plateFormat = windowsDesktop ? new PlateFormatControls(byId('plate-formats'), async () => {
   await prepareWheel();
   return window.__TAURI__.core.invoke('preview_wheel_plates',{selection:liveSelection()});
-},status) : null;
+},status,layout => window.__TAURI__.core.invoke("print_geometry",{layout})) : null;
 const plateExporter = windowsDesktop ? new NativeWheelPlates({
   button: byId('export-wheel-plates'), format: () => plateFormat.options(), invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: wheelGestureSelection,
   busy: () => state.exporting || !!wheelExporter?.busy, prepare: prepareWheel, pause, status,

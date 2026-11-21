@@ -91,3 +91,14 @@ test('still plates need no song and preserve focus and film selection through th
   assert.equal(await ui.start(), null);
   assert.deepEqual(calls, ['prepare','pause','unlisten','prepare','unlisten']);
 });
+
+test('the selected-wheel export sends print stock and finishing options to the native editor', async () => {
+  const selection={layerId:3,wheel:'violet-blue',motion:'wheel',motionTake:1,visibleFilms:{rear:true,front:true},focus:1};
+  const print={layout:'label7',stock:'uncoated',gilding:'foil',richBlack:true,catalog:6};
+  const {NativeWheelPlates}=await import('../../WebAssets/native-wheel-plates.js');
+  const button={textContent:'Export',addEventListener(){}};
+  const ui=new NativeWheelPlates({button,selection:()=>selection,format:()=>({print}),busy:()=>false,
+    prepare:async()=>{},pause(){},status(){},refresh(){},listen:async()=>()=>{},
+    invoke:async(name,request)=>{ assert.equal(name,'export_native_wheel_plates');assert.deepEqual(request,{selection:{...selection,print}});return 'mechanical'; }});
+  assert.equal(await ui.start(),'mechanical');
+});

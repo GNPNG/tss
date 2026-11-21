@@ -1,0 +1,44 @@
+{
+  "lp-gatefold": {
+    "stock": "coated",
+    "size": [
+      7559,
+      3780
+    ],
+    "coveragePixels": 28573020,
+    "tacPercent": 300,
+    "observedMaxTacPercent": 256.9573510337987,
+    "distinctCMYK": [
+      65536,
+      65275,
+      20208,
+      28480
+    ],
+    "iccSha256": "c6b4b62f0726243742eced8b9669476a6be89e581f50a7600ed8b6fcbb9cdab8",
+    "processSha256": "990779bfb70a036b7cbff0b88f7f2dd4ad94b191fa3711b4bbf0bd8a1ff3378e",
+    "richBlackMarkPixels": 768,
+    "registeredSpotPixels": 768,
+    "ripPlate": "PANTONE 871 C"
+  },
+  "label7": {
+    "stock": "uncoated",
+    "size": [
+      1134,
+      1134
+    ],
+    "coveragePixels": 1285956,
+    "tacPercent": 280,
+    "observedMaxTacPercent": 246.63157091630427,
+    "distinctCMYK": [
+      59661,
+      65127,
+      14325,
+      27422
+    ],
+    "iccSha256": "e170a59fbf26e7845c62b07e95901b1ef3335a664c03e7ef48ddb84fa08337be",
+    "processSha256": "0ddcbed239933bc4510f327c25ae623fe9719922658ffe72d47774e097658875",
+    "richBlackMarkPixels": 768,
+    "registeredSpotPixels": 768,
+    "ripPlate": "FOIL_GOLD"
+  }
+}
