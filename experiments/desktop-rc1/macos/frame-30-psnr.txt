@@ -1,0 +1,1 @@
+n:1 mse_avg:0.23 mse_y:0.22 mse_u:0.19 mse_v:0.31 psnr_avg:54.54 psnr_y:54.76 psnr_u:55.30 psnr_v:53.24

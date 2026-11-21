@@ -2,7 +2,7 @@
 
 ![The Sacred Swirls project logo](WebAssets/assets/tss-project-logo.jpeg)
 
-The Sacred Swirls (TSS), EPNI-018, is a desktop liquid-light instrument. Two independently simulated films sit between parallel glass plates. Each has its own dye, carrier, in-plane motion and optical depth. The Windows editor projects light through both films with a shared adjustable focus.
+The Sacred Swirls (TSS), EPNI-018, is a desktop liquid-light instrument. Two independently simulated films sit between parallel glass plates. Each has its own dye, carrier, in-plane motion and optical depth. The Windows and Intel Mac editors project light through both films with a shared adjustable focus.
 
 ## Current development build
 
@@ -21,7 +21,7 @@ The source build adds **Slide motion → Coral release**. Watch the front film s
 - Open MP3 or M4A audio and preview a waveform with synchronized liquid-light motion.
 - Add, select, hide, reorder and remove liquid layers. Adjust each layer's palette, hue, flow speed, scale and opacity.
 - Export an 8-bit development preview of the current liquid composition and audio as 3840×2160 H.264/AAC MP4 at 30 fps. Rendering runs frame by frame and can be cancelled.
-- On Windows, export the selected Mathmos wheel and scheduled slide gestures in 4K on the same GPU used for live preview. [Starting poses and native MP4 output](live-wheel/README.md#export-the-selected-wheel)
+- On Windows and Intel Mac, export the selected Mathmos wheel and scheduled slide gestures in 4K on the same GPU used for live preview. [Starting poses and native MP4 output](live-wheel/README.md#export-the-selected-wheel) · [Packaged Intel Mac movie and mouse test](experiments/desktop-rc1/macos/README.md)
 
 Windows opens on the Violet / Blue wheel. Choose a wheel and select **Rear slide** or **Front slide**. **Material tug** draws the liquid toward a drag, **Rotate slide** turns the glass and **Press slide** squeezes the selected film at the contact point. The glass extends beyond the visible gate. Move **Projector focus** to bring either film into focus. [Live controls](live-wheel/README.md) · [Seven wheel studies](experiments/slide-look-study/approval/wheels/README.md) · [Focus pull](experiments/slide-look-study/approval/focus/violet-blue-rack-focus.mp4) · [Press and release, rear then front](experiments/slide-look-study/approval/pressure/slide-compression.mp4)
 

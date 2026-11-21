@@ -1,0 +1,15 @@
+{
+  "sampleRate": 48000,
+  "segments": [
+    {
+      "start": 0.25,
+      "end": 0.75,
+      "correlation": 0.994127349698341
+    },
+    {
+      "start": 1.1,
+      "end": 1.6,
+      "correlation": 0.9999999636367598
+    }
+  ]
+}
