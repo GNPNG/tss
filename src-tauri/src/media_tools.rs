@@ -99,11 +99,28 @@ fn find(dirs: &[PathBuf], name: &str) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     for dir in dirs.iter().filter(|d| d.is_absolute()) {
         let path = dir.join(&exe);
+        // WinGet's Links folder can enumerate a valid NTFS link that CreateProcess
+        // cannot launch. Start the installed codec executable at the link target.
+        #[cfg(windows)]
+        if matches!(name, "ffmpeg" | "ffprobe") {
+            if let Some(target) = linked_executable(&path) {
+                if !paths.contains(&target) {
+                    paths.push(target);
+                }
+            }
+        }
         if !paths.contains(&path) && (path.is_file() || cfg!(windows) && path.is_symlink()) {
             paths.push(path);
         }
     }
     paths
+}
+
+#[cfg(any(windows, all(test, unix)))]
+fn linked_executable(entry: &Path) -> Option<PathBuf> {
+    let target = std::fs::read_link(entry).ok()?;
+    let target = entry.parent()?.join(target);
+    target.is_file().then_some(target)
 }
 
 fn run(path: &Path, args: &[&str], timeout: Duration) -> Result<String, String> {
@@ -408,6 +425,33 @@ mod tests {
     use super::*;
     use std::{cell::Cell, fs};
 
+    #[cfg(unix)]
+    #[test]
+    fn installed_codec_link_resolves_absolute_and_relative_package_targets() {
+        use std::os::unix::fs::symlink;
+        let root = tempfile::tempdir().unwrap();
+        let links = root.path().join("Links");
+        let package = root.path().join("Packages");
+        std::fs::create_dir(&links).unwrap();
+        std::fs::create_dir(&package).unwrap();
+        let ffmpeg = package.join("ffmpeg.exe");
+        std::fs::write(&ffmpeg, b"fixture").unwrap();
+        let absolute = links.join("ffmpeg.exe");
+        let relative = links.join("ffprobe.exe");
+        symlink(&ffmpeg, &absolute).unwrap();
+        symlink("../Packages/ffmpeg.exe", &relative).unwrap();
+        assert_eq!(linked_executable(&absolute).unwrap(), ffmpeg);
+        assert_eq!(
+            linked_executable(&relative)
+                .unwrap()
+                .canonicalize()
+                .unwrap(),
+            ffmpeg.canonicalize().unwrap()
+        );
+        std::fs::remove_file(&ffmpeg).unwrap();
+        assert!(linked_executable(&absolute).is_none());
+    }
+
     fn entries(dir: &Path, names: &[&str]) {
         for name in names {
             fs::write(
@@ -557,6 +601,12 @@ mod tests {
             );
             run(p, args, d)
         };
+        let before = probe(&dirs, package, &read_only);
+        assert!(
+            before.ready,
+            "{}",
+            serde_json::to_string_pretty(&before).unwrap()
+        );
         let report = install(&dirs, package, &read_only).unwrap();
         assert!(report.ready);
         for binary in [Binary::Ffmpeg, Binary::Ffprobe] {
