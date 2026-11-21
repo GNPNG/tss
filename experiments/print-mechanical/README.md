@@ -9,3 +9,14 @@ node experiments/print-mechanical/verify.mjs "$TSS_PLATE_CAPTURE_DIR" "$TSS_ECI_
 The raster comparison uses a Q16 or higher ImageMagick build. The independent inspections use ExifTool, qpdf and Ghostscript.
 
 Argyll emitted a gamut-mapper non-monotonicity warning while calculating the uncoated perceptual link. The independent 1,025-step neutral-axis lookup found zero reversals in output L* for both stocks. That measurement covers the neutral axis. The files remain digital separations, and the target press, stock and foil require physical proof for final appearance. Run `node experiments/print-mechanical/verify-neutral.mjs /path/to/xicclu "$TSS_ECI_PROFILE_DIR"` to repeat the measurement.
+
+The [Windows release verification](windows-6db61de.json) records the staged editor hash, PE imports and six CPU test results for commit `6db61de`. Reproduce it from that revision in an x64 Visual Studio developer shell with Rust 1.88.0 and the Vulkan SDK shader compiler on PATH.
+
+```cmd
+cargo build --release --locked --manifest-path src-tauri\Cargo.toml --features tauri/custom-protocol
+cargo test --release --locked --manifest-path live-wheel\Cargo.toml --lib plates:: -- --test-threads=1
+cargo test --release --locked --manifest-path live-wheel\Cargo.toml --lib production::print_tests:: -- --test-threads=1
+dumpbin /DEPENDENTS src-tauri\target\release\the-sacred-swirls.exe
+```
+
+With a shared `CARGO_TARGET_DIR`, pass that directory's release executable to `dumpbin`. To reproduce the source archive hash, run `git archive --format=zip -o source.zip 6db61de rust-toolchain.toml WebAssets live-wheel src-tauri experiments/rec709-plate/plate.rs experiments/slide-look-study/optics.hook experiments/visual-advisor/holdout.json performer`.

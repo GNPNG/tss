@@ -1,0 +1,62 @@
+{
+  "checkedUtc": "2026-11-21T05:04:13.3703608Z",
+  "machine": "FLIP",
+  "sourceCommit": "6db61de1ae5e25417d7db4d0ffb7f96a04f2dbad",
+  "sourceArchiveSha256": "f01d8e55a7cb0d193a32f74b6284310812ce37008741c47698eabc37d159f4c1",
+  "target": "x86_64-pc-windows-msvc",
+  "rust": "1.88.0",
+  "configuration": "release, tauri/custom-protocol",
+  "elapsedEditorBuild": "4m 04s",
+  "editor": {
+    "file": "the-sacred-swirls.exe",
+    "bytes": 64489472,
+    "sha256": "bdfa6c7dea69cc6eeae349eef218dfe588904be340be21fd2c299c0f1ed868bd"
+  },
+  "littleCms": {
+    "linkage": "Static",
+    "importedDlls": [
+      "bcryptprimitives.dll",
+      "kernel32.dll",
+      "api-ms-win-core-synch-l1-2-0.dll",
+      "oleaut32.dll",
+      "combase.dll",
+      "ntdll.dll",
+      "advapi32.dll",
+      "user32.dll",
+      "ole32.dll",
+      "comctl32.dll",
+      "shlwapi.dll",
+      "gdi32.dll",
+      "dwmapi.dll",
+      "shell32.dll",
+      "ws2_32.dll",
+      "OPENGL32.dll",
+      "d3dcompiler_47.dll",
+      "VCRUNTIME140.dll",
+      "VCRUNTIME140_1.dll",
+      "api-ms-win-crt-math-l1-1-0.dll",
+      "api-ms-win-crt-string-l1-1-0.dll",
+      "api-ms-win-crt-stdio-l1-1-0.dll",
+      "api-ms-win-crt-filesystem-l1-1-0.dll",
+      "api-ms-win-crt-time-l1-1-0.dll",
+      "api-ms-win-crt-heap-l1-1-0.dll",
+      "api-ms-win-crt-convert-l1-1-0.dll",
+      "api-ms-win-crt-runtime-l1-1-0.dll",
+      "api-ms-win-crt-locale-l1-1-0.dll"
+    ]
+  },
+  "gpuUsed": false,
+  "passedCpuTests": [
+    "plates::layout::tests::square_and_vertical_preserve_the_optical_aspect",
+    "plates::print::finishing::tests::outlined_colophon_fits_each_mechanical_including_the_annular_labels",
+    "plates::print::tests::enforce_tac_without_replacing_k_or_altering_sub_limit_samples",
+    "plates::print::tests::lzw_tiff_decodes_all_cmyk16_codes_across_the_last_partial_strip",
+    "plates::tests::straight_over_reconstructs_darkening_brightening_and_saturated_channels",
+    "production::print_tests::physical_dimensions_agree_with_the_300_ppi_raster_and_finishing_guides"
+  ],
+  "originalLogSha256": {
+    "editor-build.log": "d2835fc36b6bc07655692897395ca285e794f649a18dcd894640b81ae234fd3d",
+    "cpu-tests.log": "4fbd8f1ad7494209cf5f0d0499723f0c3ad5c73336a45ee862ad5837be26ff6b",
+    "dependencies.log": "98457ba0dbba40f40b443130a0fc47fd702a059485b3246a582c6b748a9a15ee"
+  }
+}
