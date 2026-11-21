@@ -3,7 +3,7 @@
 param(
     [Parameter(Mandatory)] [ValidatePattern('^v[0-9][A-Za-z0-9.-]*$')] [string] $Tag,
     [Parameter(Mandatory)] [string] $OutputDirectory,
-    [string] $BinaryDirectory = (Join-Path $PSScriptRoot '../src-tauri/target/release'),
+    [string] $BinaryDirectory,
     [ValidatePattern('^[a-fA-F0-9]{7,40}$')] [string] $DocumentationCommit,
     # Root of the curated example tree. Paths inside it are preserved under examples/.
     [string] $ExampleDirectory,
@@ -12,7 +12,8 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$bin = (Resolve-Path $BinaryDirectory).Path
+if (!$BinaryDirectory) { $BinaryDirectory = Join-Path $repo 'src-tauri/target/release' }
+$bin = (Resolve-Path -LiteralPath $BinaryDirectory).Path
 $out = [IO.Directory]::CreateDirectory($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputDirectory)).FullName
 $name = "The-Sacred-Swirls-$Tag-Windows-x64.zip"
 $target = Join-Path $out $name
@@ -24,8 +25,8 @@ try {
     }
     if ($LiveSolverDirectory) {
         $solver = (Resolve-Path -LiteralPath $LiveSolverDirectory).Path
-        foreach ($name in 'tss-slide-solver.exe','cygwin1.dll','BASILISK-COPYING','CYGWIN-COPYING','CYGWIN-LICENSE') {
-            Copy-Item -LiteralPath (Join-Path $solver $name) -Destination $scratch
+        foreach ($member in 'tss-slide-solver.exe','cygwin1.dll','BASILISK-COPYING','CYGWIN-COPYING','CYGWIN-LICENSE') {
+            Copy-Item -LiteralPath (Join-Path $solver $member) -Destination $scratch
         }
     }
     $quickstart = Get-Content (Join-Path $repo 'docs/windows-preview.md') -Raw -Encoding UTF8

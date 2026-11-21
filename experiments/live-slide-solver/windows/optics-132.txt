@@ -1,0 +1,4 @@
+level=5 physics_side=32 atlas_side=132 view=[18, 39, 96, 54] measured_ticks=24 seed=83724
+two_cells_serial_p50_ms=15.071 p95_ms=28.057 max_ms=63.634
+two_channel_distance_p50_ms=5.553 p95_ms=7.907 max_ms=8.657
+two_cells_plus_distance_p50_ms=21.288 p95_ms=33.286 max_ms=69.303
