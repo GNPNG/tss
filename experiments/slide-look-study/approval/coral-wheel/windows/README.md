@@ -18,6 +18,12 @@ Before timing, the editor held the rear phase at 2 s and captured the front at 0
 
 Each peak is the highest reading within the timed window. The guard sampled the NVIDIA driver at approximately one-second intervals. The CSVs retain the raw timestamps and measured values and identify the device by its run-local ordinal. Windows 11 Pro for Workstations Insider Preview build 28120 used NVIDIA driver 617.14. [640 telemetry](width-640-gpu.csv) · [960 telemetry](width-960-gpu.csv)
 
+## Projected films in the Windows editor
+
+The [8-second viewing copy](projected-films.mp4) follows the real **Slide motion** and **Projected films** controls through the ordinary Windows editor. At 0.95 s Windows UI Automation selects **Wheel with coral beads**. Both films are visible until 1.83 s, followed by **Front only**, **Rear only** at 2.63 s, **Clear glass** at 3.42 s and **Both films** again at 4.21 s. The caption under the projection follows the first native frame recorded for each configuration. Each UI Automation selection was read back from the editor control and independently recorded by the native renderer on a successful presentation. [Control readbacks](films-ui.json) · [Native frame and configuration manifest](films-capture.json)
+
+The assembled editor was built from `36eb767`, with SHA-256 `0aa5ce8fc590214a6f62f0f075aea9dbc41b95a55e7411f8cf311f79d4a4af41`. Live readback captured 312 successful 640 × 360 projections spanning 8.013851 seconds on the GTX. Reading each frame back affects frame rate. The H.264 viewing copy retains the capture timing, with the repeated endpoint frame from the native presentation timing file. It runs 8.015 seconds, uses 8-bit limited-range Rec.709 and adds a 40-pixel caption band below the original image.
+
 ## Repeat the measurements
 
 Build the native Windows editor from commit `ad58c6a` using the pinned Rust 1.88.0 toolchain and `cargo build --locked --release --manifest-path src-tauri/Cargo.toml --features tauri/custom-protocol`. The timed executable SHA-256 was `25ac6fa36ea4f39b9363f169d994d75b376b7e957441f6927399f8bdb5455c98`. The earlier diagnostic executable rejected its 640-pixel attempt with “Insufficient interactive frame samples.” The successful version starts a fresh drag after each replay and checks the consumed points per take.

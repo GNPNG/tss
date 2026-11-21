@@ -1,0 +1,40 @@
+{
+    "editorSha256":  "0AA5CE8FC590214A6F62F0F075AEA9DBC41B95A55E7411F8CF311F79D4A4AF41",
+    "slideMotion":  "Wheel with coral beads",
+    "ui":  [
+               {
+                   "uiValue":  "Both films",
+                   "elapsedMs":  5749
+               },
+               {
+                   "uiValue":  "Front only",
+                   "elapsedMs":  6632
+               },
+               {
+                   "uiValue":  "Rear only",
+                   "elapsedMs":  7428
+               },
+               {
+                   "uiValue":  "Clear glass",
+                   "elapsedMs":  8238
+               },
+               {
+                   "uiValue":  "Both films",
+                   "elapsedMs":  9021
+               }
+           ],
+    "nativeFilmSequence":  [
+                               "both",
+                               "front",
+                               "rear",
+                               "clear",
+                               "both"
+                           ],
+    "nativeFrames":  312,
+    "elapsedSeconds":  8.013851,
+    "nativeAdapter":  "NVIDIA GeForce GTX 1650 Ti with Max-Q Design (Vulkan)",
+    "nativePreview":  [
+                          640,
+                          360
+                      ]
+}
