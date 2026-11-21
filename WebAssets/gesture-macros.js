@@ -103,19 +103,21 @@ export function songGestureEvents(macros,groups,layerId,songDuration) {
   return output.sort((a,b)=>a.time-b.time);
 }
 
-export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=async()=>{} }) {
+export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=async()=>{}, onEdit=()=>{} }) {
   const el = id => document.getElementById('macro-' + id);
   const note = message => { el('status').textContent = message; };
   const all = new Map();
   let key = 'unsaved-session', groups = [], lyricGroups = [], recording = null;
+  let projectOwned = false, documentEpoch = 0;
   let selected = null, sequence = Promise.resolve(), previousSongTime = null;
   let captureTask=Promise.resolve();
   let schedule = null, includePreviousStart = true;
   const current = () => all.get(selected);
   const candidates = () => [...groups, ...lyricGroups];
-  const save = () => {
+  const save = (checkpoint = true) => {
     schedule = null;
-    if (!key) return;
+    if (checkpoint) onEdit('Edit gesture macros');
+    if (!key || projectOwned) return;
     try { localStorage.setItem('tss.gestures.v1.' + key, JSON.stringify({ macros: [...all.values()], lyricGroups })); }
     catch { note('Storage is full or unavailable. This session still contains the recording.'); }
   };
@@ -368,7 +370,8 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
   el('name').addEventListener('change',()=>{const m=current();if(m){m.name=el('name').value.trim()||m.name;render();save();}});
   for (const [id,key] of [['amount','amount'],['step','step'],['cap','cap']]) {
     el(id).addEventListener('input',()=>{const m=current();if(!m)return; const v=el(id).valueAsNumber;if(!Number.isFinite(v))return;
-      m[key]=Math.min(Number(el(id).max),Math.max(0,v));el('amount-value').textContent=Number(m.amount).toFixed(2)+'×';save();});
+      m[key]=Math.min(Number(el(id).max),Math.max(0,v));el('amount-value').textContent=Number(m.amount).toFixed(2)+'×';save(false);});
+    el(id).addEventListener('change',()=>onEdit('Set gesture '+id));
   }
   el('on').addEventListener('change',()=>{
     const m=current();
@@ -381,8 +384,8 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
   el('cue').addEventListener('change',()=>{if(current()){current().cue=el('cue').value;current().muted=[];save();render();}});
   el('lyrics').addEventListener('change',async e=>{
     const file=e.target.files[0]; if(!file)return;
-    const atKey=key;
-    try { const parsed=lyricCueGroups(await file.text(),file.name); if(key!==atKey)return;lyricGroups=parsed;render();save();note(`${parsed.length} recurring lyric cues.`); }
+    const epoch=documentEpoch;
+    try { const parsed=lyricCueGroups(await file.text(),file.name); if(documentEpoch!==epoch)return;lyricGroups=parsed;render();save();note(`${parsed.length} recurring lyric cues.`); }
     catch(err){note(String(err));}finally{e.target.value='';}
   });
   restore(); render(); el('deck').hidden=false;
@@ -401,7 +404,18 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
       }
       if(!stillCurrent()) return;
       previousSongTime=null;includePreviousStart=true;
-      key=id;groups=audioCueGroups(analysis);restore();render();
+      ++documentEpoch;projectOwned=false;key=id;groups=audioCueGroups(analysis);restore();render();
+    },
+    projectState(){return {macros:[...all.values()], audioGroups:groups, lyricGroups, selected};},
+    async stopForEdit(){await captureTask;await finishPendingRecording();stop();await sequence;},
+    restoreProject(data, fromFile=false){
+      ++documentEpoch;
+      if(fromFile) projectOwned=true;
+      schedule=null;previousSongTime=null;includePreviousStart=true;
+      all.clear();
+      for(const m of data.macros) all.set(m.id,m);
+      groups=data.audioGroups;lyricGroups=data.lyricGroups;selected=data.selected;
+      render();save(false);
     },
     applyLyricGroups(reviewed) {
       lyricGroups = reviewed;

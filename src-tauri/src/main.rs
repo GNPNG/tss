@@ -5,6 +5,7 @@ mod export_smoke;
 mod lyrics;
 mod live;
 mod performer;
+mod project;
 
 use export::ExportManager;
 use std::path::PathBuf;
@@ -293,6 +294,11 @@ fn main() {
             lyrics::transcribe_song,
             lyrics::cancel_transcription,
             lyrics::save_reviewed_lyrics,
+            project::open_project,
+            project::save_project,
+            project::remember_project_audio,
+            project::clear_project_audio,
+            project::project_audio_digest,
             choose_export_path,
             start_export,
             append_export_frame,

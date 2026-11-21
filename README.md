@@ -27,6 +27,10 @@ Open a song, expand **Gesture macros** and select **Record gesture**. You can re
 
 Generate and review timed lyrics from the open recording with **Local lyric transcription**. [Transcription and trigger controls](docs/local-lyrics.md)
 
+**Save project** writes a `.tss` file. **Open project** restores the playhead, ordered layers, palettes and swatches, native wheel and film controls, shared focus, feedback settings, export starting pose, gesture recordings and cue timings. Keep the song beside the project when transferring it to another machine. The desktop editor also remembers audio locations chosen on this machine. If the recording moves, **Relink audio** verifies the chosen file against the saved SHA-256. You can continue editing the visuals with the audio offline. Live gestures that you want to replay should be recorded in **Gesture macros**.
+
+Choose **Undo**, **Redo**, or a named edit in the timeline’s **History** menu to revisit layer, focus, feedback and gesture edits. Opening a project or another song starts a new history. The editor retains up to 128 steps within its in-memory snapshot budget.
+
 The native wheel supports recursive video feedback and a separate audience window with adjustable A/V delay. The selected-wheel exporter renders 3840 × 2160 H.264/AAC from the native optics, song and scheduled gestures. [Projector and cue audio](experiments/projector-output/README.md) · [Feedback comparison](experiments/slide-look-study/approval/feedback/feedback-comparison.mp4)
 
 The GTX 1650 Ti Max-Q delivered 39.95–40.00 FPS across all seven wheels at 640 × 360 with finite-pixel optical sampling. Both Violet / Blue gesture tests ran at 40.00 FPS. All 3,843 measured presentations succeeded. The frozen-frame capture/replay test reproduced both 38-event gestures byte for byte. [Windows measurements and recordings](experiments/slide-look-study/approval/windows-live/gesture-controls/README.md)

@@ -8,6 +8,8 @@ import { VideoFeedbackControls } from './video-feedback.js';
 import { installPerformerDeck } from './performer-host.js';
 import { ProjectorDeck } from './projector-output.js';
 import { initMacroDeck, songFingerprint } from './gesture-macros.js';
+import { PROJECT_FORMAT, layerSettings, validateProject, emptyGestures, EditHistory } from './project-file.js';
+import { audioCueGroups } from './phrase-cues.js';
 
 const byId = (id) => document.getElementById(id);
 const preview = byId('preview');
@@ -26,9 +28,14 @@ let startingNative = windowsDesktop;
 let projectorFocus = null;
 let projectorDeck = null;
 let wheelMediaRequest;
+let projectName = '', detachedGestures = emptyGestures(), savedEdits = '', projectBusy = false;
+const editHistory = new EditHistory();
+const retainedNativeLayers = new Set();
+let highestId = 0;
 const state = {
   audioContext: null, analyser: null, audioBuffer: null, source: null,
   playing: false, startedAt: 0, position: 0, audioName: '', audioPath: null, analysis: null, fileToken: 0, playToken: 0,
+  audioRef: null, audioSelectionId: null,
   layers: [], selected: null, nextId: 1, renderError: null, exporting: false, exportFinalizing: false, cancelExport: false,
 };
 
@@ -88,7 +95,7 @@ const macroDeck = windowsDesktop ? initMacroDeck({
   clock: () => ({position:currentPosition(),playing:state.playing}),
   selection: liveSelection,
   prepare:prepareWheel,
-  seek,
+  seek, onEdit: checkpoint,
 }) : null;
 
 const localLyrics = window.__TAURI__?.core ? installLocalLyrics({
@@ -215,45 +222,63 @@ async function seek(position) {
   updateTransport();
   if (wasPlaying && state.position < state.audioBuffer.duration) await play();
 }
-async function loadAudio(file, beforeCommit = async () => {}) {
-  if (!file) return;
+async function prepareAudio(file, token, expected, selectionId = null) {
+  const audio = ensureAudio();
+  const bytes = await file.arrayBuffer();
+  let sha256 = await songFingerprint(bytes).catch(() => null);
+  if (!sha256 && selectionId != null) sha256 = await desktopInvoke('project_audio_digest', {selectionId});
+  if (expected && sha256 !== expected.sha256) throw Error('This file does not match the audio saved with the project.');
+  const decoded = await audio.decodeAudioData(bytes);
+  if (token !== state.fileToken) return null;
+  const analysis = await analyzeAudio(decoded, progress => status('Analyzing audio ' + Math.round(progress * 100) + '%'), () => token === state.fileToken);
+  if (!analysis || token !== state.fileToken) return null;
+  return {decoded, analysis, ref:{name:file.name, sha256}};
+}
+function installAudio(data, ref, path = null, selectionId = null, position = 0) {
+  pause();
+  state.audioBuffer = data?.decoded ?? null;
+  state.analysis = data?.analysis ?? null;
+  state.audioRef = ref;
+  state.audioName = ref?.name ?? '';
+  state.audioPath = path;
+  state.audioSelectionId = selectionId;
+  state.position = data ? Math.min(position, data.decoded.duration) : position;
+  anchorFeedback(true);
+  byId('track-title').textContent = projectName || ref?.name || 'Untitled session';
+  byId('source-name').textContent = ref?.name || 'No audio selected';
+  byId('source-meta').textContent = data
+    ? formatTime(data.decoded.duration) + ' · ' + Math.round(data.decoded.sampleRate / 1000) + ' kHz · ' + (data.decoded.numberOfChannels === 1 ? 'Mono' : 'Stereo')
+    : ref ? 'Audio offline · select the matching recording' : 'Open an MP3 or M4A to begin';
+  byId('empty-wave').hidden = !!data;
+  byId('relink-audio').hidden = !ref || !!data;
+  drawWaveform();
+  renderTimeline(); updateTransport();
+}
+async function loadAudio(file, beforeCommit = async () => {}, path = null, selectionId = null, relinking = false) {
+  if (!file) return false;
   const token = ++state.fileToken;
   status('Reading audio…');
   try {
-    const audio = ensureAudio();
-    const bytes = await file.arrayBuffer();
-    const fingerprint = macroDeck ? songFingerprint(bytes).catch(() => null) : null;
-    const decoded = await audio.decodeAudioData(bytes);
-    if (token !== state.fileToken) return;
-    status('Analyzing audio…');
-    const analysis = await analyzeAudio(decoded, (progress) => status(`Analyzing audio ${Math.round(progress * 100)}%`), () => token === state.fileToken);
-    const songId = await fingerprint;
-    if (!analysis || token !== state.fileToken) return false;
+    const data = await prepareAudio(file, token, relinking ? state.audioRef : null, selectionId);
+    if (!data || token !== state.fileToken) return false;
+    await macroDeck?.stopForEdit();
+    if (token !== state.fileToken) return false;
     await beforeCommit();
     if (token !== state.fileToken) return false;
-    pause();
-    state.audioBuffer = decoded;
-    state.analysis = analysis;
-    state.audioName = file.name;
-    state.position = 0;
-    anchorFeedback(true);
-    if (macroDeck) {
-      try { await macroDeck.songLoaded(songId,analysis,() => token === state.fileToken); }
-      catch(error) { macroDeck.reportError(error); }
+    installAudio(data, data.ref, path, selectionId, relinking ? state.position : 0);
+    if (!relinking) {
+      detachedGestures = emptyGestures();
+      if (macroDeck) {
+        try { await macroDeck.songLoaded(data.ref.sha256, data.analysis, () => token === state.fileToken); }
+        catch(error) { macroDeck.reportError(error); }
+      } else detachedGestures.audioGroups = audioCueGroups(data.analysis);
       if (token !== state.fileToken) return false;
+      resetHistory('Open audio');
     }
-    byId('track-title').textContent = file.name;
-    byId('source-name').textContent = file.name;
-    byId('source-meta').textContent = `${formatTime(decoded.duration)} · ${Math.round(decoded.sampleRate / 1000)} kHz · ${decoded.numberOfChannels === 1 ? 'Mono' : 'Stereo'}`;
-    byId('empty-wave').hidden = true;
-    updateTransport();
-    drawWaveform();
-    renderTimeline();
-    status('Audio loaded');
+    status(relinking ? 'Project audio relinked' : 'Audio loaded');
     return true;
   } catch (error) {
-    if (token !== state.fileToken) return;
-    status(`Could not open audio: ${error.message}`);
+    if (token === state.fileToken) status('Could not open audio: ' + (error.message || error));
     return false;
   }
 }
@@ -383,11 +408,17 @@ function chooseWheel(id) {
   wheelSelect.dispatchEvent(new Event('change'));
 }
 
-function makeLayer() {
+function layerCanvas() {
   const canvas = document.createElement('canvas');
   canvas.width = preview.width;
   canvas.height = preview.height;
-  const id = state.nextId++;
+  return canvas;
+}
+function makeLayer() {
+  const canvas = layerCanvas();
+  const id = Math.max(state.nextId, highestId + 1);
+  highestId = id;
+  state.nextId = id + 1;
   return { id, name: `Liquid ${id}`, visible: true, palette: 'orchid', colors: [...LIQUID_PALETTES.orchid], customColors: false, hue: 0, speed: 1, scale: 1, opacity: state.layers.length ? 0.7 : 1, canvas, renderer: null, nativeLive: windowsDesktop,
     motion: 'wheel-flow', motionTake: 0, visibleFilms: 'both',
     slide: 'rear', gesture: 'tug', tugResponse: { rear: 0.4, front: 0.4 }, mousePressure: { rear: 0.5, front: 0.5 }, renderWidth: 640 };
@@ -415,7 +446,7 @@ function layerButton(text, label, action, disabled = false) {
   const button = document.createElement('button');
   button.type = 'button'; button.className = 'layer-control'; button.textContent = text;
   button.title = label; button.setAttribute('aria-label', label); button.disabled = disabled;
-  button.addEventListener('click', (event) => { event.stopPropagation(); action(); });
+  button.addEventListener('click', (event) => { event.stopPropagation(); action(); checkpoint(label); });
   return button;
 }
 function renderTimeline() {
@@ -441,9 +472,7 @@ function renderTimeline() {
       byId('render-error').hidden = true;
       if (state.selected === layer.id) state.selected = state.layers[0]?.id ?? null;
       renderTimeline(); renderControls(); status(`${layer.name} removed`);
-      if (nativeSurface) nativeSurface.sync().then(() =>
-        window.__TAURI__.core.invoke('forget_live_wheel_layer', { layerId: layer.id })
-      ).catch((e) => status(`Could not release layer: ${e}`));
+      if (nativeSurface) retainedNativeLayers.add(layer.id);
     });
     row.append(icon, info, toggle, up, down, remove); list.append(row);
     const lane = document.createElement('div'); lane.className = 'visual-lane';
@@ -562,30 +591,39 @@ function renderFrame(timestamp) {
   if (state.playing) updateTransport();
   requestAnimationFrame(renderFrame);
 }
-window.tssLoadAudioBytes = (name, bytes, beforeCommit) => loadAudio(new File([bytes instanceof ArrayBuffer || ArrayBuffer.isView(bytes) ? bytes : new Uint8Array(bytes)], name), beforeCommit);
-if (window.__TAURI__?.core) {
-  window.tssImportAudio = async (grantedSelection) => {
-    const invoke = window.__TAURI__.core.invoke;
-    byId('open-audio').disabled = true;
+const desktopInvoke = window.__TAURI__?.core?.invoke;
+function byteFile(name, bytes) {
+  return new File([bytes instanceof ArrayBuffer || ArrayBuffer.isView(bytes) ? bytes : new Uint8Array(bytes)], name);
+}
+window.tssLoadAudioBytes = (name, bytes, beforeCommit) => loadAudio(byteFile(name, bytes), beforeCommit);
+let audioBusy = false;
+if (desktopInvoke) {
+  window.tssImportAudio = async (grantedSelection, relinking = false) => {
+    if (audioBusy || projectBusy) return;
+    audioBusy = true;
+    byId('open-audio').disabled = byId('relink-audio').disabled = true;
     try {
-      const selection = Array.isArray(grantedSelection) ? grantedSelection : await invoke('choose_audio');
+      const selection = Array.isArray(grantedSelection) ? grantedSelection : await desktopInvoke('choose_audio');
       if (!selection) return;
       const [selectionId, path] = selection;
-      const bytes = await invoke('read_pending_audio', { selectionId });
+      const bytes = await desktopInvoke('read_pending_audio', {selectionId});
       const name = path.split(/[\\/]/).pop();
-      if (await window.tssLoadAudioBytes(name, bytes, () => invoke('confirm_audio', { selectionId }))) {
-        state.audioPath = path;
-        updateTransport();
-        if (macroDeck) {
-          const token = state.fileToken;
+      if (await loadAudio(byteFile(name, bytes), () => desktopInvoke('confirm_audio', {selectionId}), path, selectionId, relinking)) {
+        const token = state.fileToken;
+        if (state.audioRef.sha256) {
+          try { await desktopInvoke('remember_project_audio', {selectionId, sha256:state.audioRef.sha256}); }
+          catch(error) { status('Audio loaded. Could not remember its location: ' + error); }
+        }
+        if (macroDeck && !relinking && token === state.fileToken) {
           try {
-            const sidecar = await invoke('read_timed_lyrics',{selectionId});
+            const sidecar = await desktopInvoke('read_timed_lyrics',{selectionId});
             if (token === state.fileToken) macroDeck.importSidecar(sidecar);
           } catch(error) { if(token === state.fileToken) macroDeck.reportError(error); }
         }
       }
     } finally {
-      byId('open-audio').disabled = false;
+      byId('open-audio').disabled = byId('relink-audio').disabled = false;
+      audioBusy = false;
     }
   };
 }
@@ -683,10 +721,21 @@ byId('open-audio').addEventListener('click', () => {
   if (typeof window.tssImportAudio === 'function') {
     Promise.resolve(window.tssImportAudio()).catch((error) => status(`Could not open audio: ${error.message || error}`));
   } else {
-    byId('audio-file').click();
+    byId('audio-file').dataset.relink = ''; byId('audio-file').click();
   }
 });
-byId('audio-file').addEventListener('change', (event) => { state.audioPath = null; loadAudio(event.target.files?.[0]); event.target.value = ''; });
+byId('relink-audio').addEventListener('click', () => {
+  if (desktopInvoke) window.tssImportAudio(undefined, true).catch(error => status('Could not relink audio: ' + error));
+  else { byId('audio-file').dataset.relink = 'true'; byId('audio-file').click(); }
+});
+byId('audio-file').addEventListener('change', async (event) => {
+  const file = event.target.files?.[0], relink = event.target.dataset.relink === 'true';
+  event.target.value = '';
+  if (audioBusy || projectBusy) return;
+  audioBusy = true;
+  try { await loadAudio(file, undefined, null, null, relink); }
+  finally { audioBusy = false; }
+});
 byId('export').addEventListener('click', () => exportVideo().catch((error) => status(`Export failed: ${error.message || error}`)));
 byId('show-logo').addEventListener('click', () => { byId('logo-dialog').showModal(); nativeSurface?.sync(); });
 byId('close-logo').addEventListener('click', () => byId('logo-dialog').close());
@@ -804,9 +853,166 @@ byId('seek-area').addEventListener('click', (event) => { const rect = event.curr
 for (const id of ['hue', 'speed', 'scale', 'opacity']) {
   byId(id).addEventListener('input', (event) => { const layer = selectedLayer(); if (!layer) return; layer[id] = Number(event.target.value); renderControls(); });
 }
+function authoredState() {
+  return {layers:state.layers.map(layerSettings), selected:state.selected, nextId:state.nextId,
+    focus:projectorFocus, feedback:feedbackDeck.projectState(), exportBaseline:byId('native-export-baseline').value,
+    gestures:macroDeck?.projectState() ?? detachedGestures};
+}
+function editSignature() { return JSON.stringify([state.audioRef, authoredState()]); }
+function projectDocument() {
+  return {format:PROJECT_FORMAT, version:1, audio:state.audioRef,
+    position:state.audioBuffer ? currentPosition() : state.position, ...authoredState()};
+}
+function refreshHistory() {
+  const menu = byId('edit-history');
+  menu.replaceChildren(...editHistory.entries.map(({label}, i) => new Option(label, String(i))));
+  menu.value = String(editHistory.cursor);
+  byId('undo-edit').disabled = editHistory.cursor <= 0;
+  byId('redo-edit').disabled = editHistory.cursor >= editHistory.entries.length - 1;
+}
+function checkpoint(label) {
+  if (!editHistory.entries.length) return;
+  editHistory.record(authoredState(), label);
+  refreshHistory();
+}
+function resetHistory(label) { editHistory.reset(authoredState(), label); refreshHistory(); }
+function restoreEdits(doc, newProject) {
+  const old = new Map(state.layers.map(layer => [layer.id, layer]));
+  state.layers = doc.layers.map(config => {
+    const existing = newProject ? null : old.get(config.id);
+    if (existing) old.delete(existing.id);
+    return Object.assign(existing || {canvas:layerCanvas(), renderer:null}, layerSettings(config));
+  });
+  for (const layer of old.values()) {
+    layer.renderer?.dispose();
+    if (!newProject && nativeSurface) retainedNativeLayers.add(layer.id);
+  }
+  state.nextId = doc.nextId;
+  state.selected = doc.selected;
+  if (newProject) highestId = doc.nextId - 1;
+  projectorFocus = doc.focus;
+  feedbackDeck.restoreProject(doc.feedback);
+  byId('native-export-baseline').value = doc.exportBaseline;
+  if (macroDeck) macroDeck.restoreProject(doc.gestures, newProject);
+  else detachedGestures = doc.gestures;
+  state.renderError = null;
+  byId('render-error').hidden = true;
+  renderTimeline(); renderControls();
+}
+async function projectOperation(message, task) {
+  if (projectBusy || audioBusy || state.exporting || wheelExporter?.busy) { status('Finish the current operation first.'); return; }
+  projectBusy = true;
+  const dialog = byId('project-operation');
+  byId('project-message').textContent = message; dialog.showModal();
+  nativeSurface?.sync();
+  try { await presetsReady; await task(); }
+  catch (error) { status(message + ' failed: ' + (error.message || error)); }
+  finally { dialog.close(); projectBusy = false; nativeSurface?.sync(); }
+}
+function restoreHistory(cursor) {
+  const doc = editHistory.stateAt(cursor);
+  if (!doc || cursor === editHistory.cursor) return;
+  return projectOperation('Restore edit', async () => {
+    await macroDeck?.stopForEdit();
+    restoreEdits(doc, false);
+    editHistory.cursor = cursor; refreshHistory();
+    status(editHistory.entries[cursor].label);
+  });
+}
+function chooseReplacement() {
+  if (editSignature() === savedEdits) return true;
+  const dialog = byId('replace-project');
+  return new Promise(resolve => {
+    dialog.returnValue = '';
+    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'replace'), {once:true});
+    dialog.showModal();
+  });
+}
+const palettes = () => new Set([...Object.keys(LIQUID_PALETTES), ...mathmosWheels.keys()]);
+async function openProject(file) {
+  if (file && file.size > 64 * 1024 * 1024) throw Error('Project exceeds 64 MiB.');
+  const choice = file ? [file.name, await file.text(), null] : await desktopInvoke('open_project');
+  if (!choice) return;
+  const [name, text, selection] = choice;
+  const doc = validateProject(JSON.parse(text), palettes());
+  await macroDeck?.stopForEdit();
+  if (!await chooseReplacement()) return;
+  const token = ++state.fileToken;
+  let audio = null;
+  if (selection) {
+    const bytes = await desktopInvoke('read_pending_audio', {selectionId:selection[0]});
+    audio = await prepareAudio(byteFile(doc.audio.name, bytes), token, doc.audio, selection[0]);
+    if (!audio || token !== state.fileToken) throw Error('Audio selection changed.');
+  }
+  // Identical numeric IDs in two projects must never share a live slide pose.
+  if (nativeSurface) {
+    const selected = state.selected;
+    try {
+      state.selected = null;
+      await nativeSurface.sync();
+      for (const layer of state.layers) retainedNativeLayers.add(layer.id);
+      for (const layerId of retainedNativeLayers) await desktopInvoke('forget_live_wheel_layer', {layerId});
+      retainedNativeLayers.clear();
+    } finally { state.selected = selected; }
+  }
+  if (selection) await desktopInvoke('confirm_audio', {selectionId:selection[0]});
+  else if (desktopInvoke) await desktopInvoke('clear_project_audio');
+  pause();
+  projectName = name;
+  restoreEdits(doc, true);
+  installAudio(audio, doc.audio, selection?.[1], selection?.[0], doc.position);
+  resetHistory('Open project'); savedEdits = editSignature();
+  status(doc.audio && !audio ? 'Project opened. Relink ' + doc.audio.name + ' to play.' : 'Opened ' + name);
+}
+async function saveProject() {
+  await macroDeck?.finishPendingRecording();
+  if (state.audioRef && !state.audioRef.sha256) throw Error('This browser could not fingerprint the song. Open the project in the desktop editor or over HTTPS to link audio.');
+  const data = validateProject(projectDocument(), palettes());
+  const documentText = JSON.stringify(data);
+  const suggested = projectName || (state.audioName.replace(/\.[^.]+$/, '') || 'session') + '.tss';
+  let name;
+  if (desktopInvoke) name = await desktopInvoke('save_project', {document:documentText, suggestedName:suggested});
+  else {
+    const blob = new Blob([documentText], {type:'application/json'});
+    if (blob.size > 64 * 1024 * 1024) throw Error('Project exceeds 64 MiB.');
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = suggested; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    name = suggested;
+  }
+  if (!name) return;
+  projectName = name; byId('track-title').textContent = name;
+  savedEdits = editSignature(); status('Saved ' + name);
+}
+byId('project-operation').addEventListener('cancel', event => event.preventDefault());
+byId('open-project').addEventListener('click', () => {
+  if (desktopInvoke) projectOperation('Open project', () => openProject());
+  else byId('project-file').click();
+});
+byId('project-file').addEventListener('change', event => {
+  const file = event.target.files[0]; event.target.value = '';
+  if (file) projectOperation('Open project', () => openProject(file));
+});
+byId('save-project').addEventListener('click', () => projectOperation('Save project', saveProject));
+byId('undo-edit').addEventListener('click', () => restoreHistory(editHistory.cursor - 1));
+byId('redo-edit').addEventListener('click', () => restoreHistory(editHistory.cursor + 1));
+byId('edit-history').addEventListener('change', event => restoreHistory(Number(event.target.value)));
+byId('add-layer').addEventListener('click', () => checkpoint('Add visual layer'));
+byId('replay-release').addEventListener('click', () => checkpoint('Replay release'));
+byId('native-export-baseline').addEventListener('change', () => checkpoint('Set export starting pose'));
+byId('wheel-focus-reset').addEventListener('click', () => checkpoint('Restore wheel focus'));
+byId('palette-grid').addEventListener('click', () => checkpoint('Set palette'));
+byId('layer-list').addEventListener('click', () => checkpoint('Select layer'));
+byId('layer-list').addEventListener('keydown', event => {
+  if (event.key === 'Enter' || event.key === ' ') checkpoint('Select layer');
+});
+document.querySelector('.control-body').addEventListener('change', event => {
+  if (!event.target.closest('#performer-deck')) checkpoint(event.target.getAttribute('aria-label') || event.target.labels?.[0]?.textContent.trim().split('\n')[0] || 'Edit layer');
+});
 window.addEventListener('resize', drawWaveform);
 window.addEventListener('beforeunload', () => { state.layers.forEach((layer) => layer.renderer?.dispose()); });
 if (!context) showRenderError(new Error('Canvas 2D is not available'));
 else addLayer();
 renderTimeline(); renderControls(); updateTransport(); requestAnimationFrame(renderFrame);
-loadWheelPresets();
+const presetsReady = loadWheelPresets();
+presetsReady.then(() => { if (!editHistory.entries.length) { resetHistory('New session'); savedEdits = editSignature(); } });

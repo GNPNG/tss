@@ -26,6 +26,16 @@ export class VideoFeedbackControls {
       output.textContent = input.value + input.dataset.unit;
     }
   }
+  projectState() {
+    const values = Object.fromEntries(Object.entries(this.inputs).map(([name, input]) => [name, Number(input.value)]));
+    return {enabled:this.enabled.checked, ...values};
+  }
+  restoreProject(settings) {
+    this.enabled.checked = settings.enabled;
+    this.params.disabled = !settings.enabled;
+    for (const [name, input] of Object.entries(this.inputs)) input.value = settings[name];
+    this.readouts();
+  }
   clock({ loaded, playing, position, ended }, discontinuity = false) {
     if (discontinuity) this.epoch++;
     this.anchor = loaded ? { epoch: this.epoch, playing, position, ended:!!ended, atUnixMs: Date.now() } : null;

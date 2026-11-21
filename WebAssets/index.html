@@ -10,7 +10,7 @@
   <header class="topbar">
     <div class="brand"><button class="brand-logo" id="show-logo" aria-label="View The Sacred Swirls project logo"><img src="assets/tss-project-logo.jpeg" alt=""></button><div><strong>THE SACRED SWIRLS</strong><small>LIQUID LIGHT STUDIO</small></div></div>
     <div class="project-name"><span class="project-label">CURRENT SESSION</span><span id="track-title">Untitled session</span></div>
-    <div class="top-actions"><button class="button quiet" id="projector" disabled title="Projector output is not available yet">Projector <span>↗</span></button><button class="button quiet" id="export" disabled title="8-bit development preview; production masters are under development">Export 4K preview</button><button class="button primary" id="open-audio">＋ &nbsp;Open audio</button><input type="file" id="audio-file" accept="audio/mpeg,audio/mp4,.mp3,.m4a" hidden></div>
+    <div class="top-actions"><button class="button quiet" type="button" id="open-project">Open project</button><button class="button quiet" type="button" id="save-project">Save project</button><input type="file" id="project-file" accept=".tss" hidden><button class="button quiet" id="projector" disabled title="Projector output is not available yet">Projector <span>↗</span></button><button class="button quiet" id="export" disabled title="8-bit development preview; production masters are under development">Export 4K preview</button><button class="button primary" id="open-audio">＋ &nbsp;Open audio</button><input type="file" id="audio-file" accept="audio/mpeg,audio/mp4,.mp3,.m4a" hidden></div>
   </header>
 
   <main>
@@ -31,7 +31,7 @@
           <button class="button quiet" type="button" id="export-native-wheel" disabled>Export selected wheel in 4K</button>
           <button class="button quiet" type="button" id="export-wheel-plates" title="Save the selected wheel alone at full density before stack projection and video feedback" disabled>Export selected wheel · 4K 16-bit still plates</button>
         </div>
-        <div class="stage-footer"><div class="source-info"><span class="disc">♫</span><div><strong id="source-name">No audio selected</strong><small id="source-meta">Open an MP3 or M4A to begin</small></div></div><div class="transport"><button class="icon-button" id="restart" title="Return to start" aria-label="Return to start" disabled>↤</button><button class="play-button" id="play" title="Play" aria-label="Play" disabled>▶</button><button class="icon-button" id="stop" title="Stop" aria-label="Stop" disabled>■</button></div><div class="clock"><span id="current-time">00:00</span><span class="clock-separator"> / </span><span id="total-time">00:00</span></div></div>
+        <div class="stage-footer"><div class="source-info"><span class="disc">♫</span><div><strong id="source-name">No audio selected</strong><small id="source-meta">Open an MP3 or M4A to begin</small></div></div><button class="button quiet" type="button" id="relink-audio" hidden>Relink audio</button><div class="transport"><button class="icon-button" id="restart" title="Return to start" aria-label="Return to start" disabled>↤</button><button class="play-button" id="play" title="Play" aria-label="Play" disabled>▶</button><button class="icon-button" id="stop" title="Stop" aria-label="Stop" disabled>■</button></div><div class="clock"><span id="current-time">00:00</span><span class="clock-separator"> / </span><span id="total-time">00:00</span></div></div>
       </section>
 
       <aside class="controls card" aria-label="Selected layer controls">
@@ -117,7 +117,7 @@
     </div>
 
     <section class="timeline card" aria-label="Timeline">
-      <div class="timeline-header"><div><span class="eyebrow">ARRANGEMENT</span><h2>Timeline</h2></div><div class="timeline-actions"><span id="layer-count">1 visual layer</span><button id="add-layer" class="button add-layer">＋ &nbsp;Add visual layer</button></div></div>
+      <div class="timeline-header"><div><span class="eyebrow">ARRANGEMENT</span><h2>Timeline</h2></div><div class="timeline-actions"><label>History <select id="edit-history" aria-label="Edit history"></select></label><button class="button quiet" type="button" id="undo-edit" disabled>Undo</button><button class="button quiet" type="button" id="redo-edit" disabled>Redo</button><span id="layer-count">1 visual layer</span><button id="add-layer" class="button add-layer">＋ &nbsp;Add visual layer</button></div></div>
       <div class="timeline-content">
         <div class="track-labels"><div class="ruler-label">TRACKS</div><div class="audio-label"><span class="track-symbol">♫</span><div><strong>AUDIO</strong><small>Master track</small></div></div><div id="layer-list"></div></div>
         <div class="timeline-scroll"><div class="timeline-lanes"><div id="ruler" class="ruler" aria-hidden="true"></div><div class="wave-lane" id="seek-area" title="Click to seek"><canvas id="waveform"></canvas><div class="empty-wave" id="empty-wave">YOUR AUDIO WAVEFORM WILL APPEAR HERE</div></div><div id="visual-lanes"></div><div id="playhead" class="playhead" aria-hidden="true"></div></div></div>
@@ -174,6 +174,8 @@
       </div>
     </details>
   </main>
+  <dialog id="project-operation" aria-labelledby="project-message"><p id="project-message" role="status"></p></dialog>
+  <dialog id="replace-project" aria-labelledby="replace-prompt"><form method="dialog"><p id="replace-prompt">Open this project and discard unsaved edits to the current session?</p><button value="keep" autofocus>Keep editing</button> <button value="replace">Open project</button></form></dialog>
   <dialog id="logo-dialog" class="logo-dialog" aria-label="The Sacred Swirls project logo"><button class="button quiet" id="close-logo">Close</button><img src="assets/tss-project-logo.jpeg" alt="The Sacred Swirls project logo with a golden emblem over liquid light and illustrated landmarks"></dialog>
   <dialog id="wheel-study" class="wheel-study" aria-labelledby="wheel-study-name" aria-describedby="wheel-study-description">
     <header><h2 id="wheel-study-name"></h2><button type="button" class="button quiet" id="close-wheel-study">Close</button></header>

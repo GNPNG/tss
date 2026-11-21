@@ -189,6 +189,7 @@ button:focus-visible,input:focus-visible,select:focus-visible {
 
 .project-name {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 5px;
   color: #eee9d8;
@@ -205,6 +206,16 @@ button:focus-visible,input:focus-visible,select:focus-visible {
 .top-actions {
   display: flex;
   gap: 10px
+}
+
+#track-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+#edit-history {
+  max-width: 150px
 }
 
 .button {
@@ -830,6 +841,9 @@ input[type=range].hue-slider {
     padding: 0 20px;
     gap: 15px
   }
+
+  .top-actions {gap: 5px}
+  .top-actions .button {padding: 8px}
 
   .control-body {
     padding: 15px

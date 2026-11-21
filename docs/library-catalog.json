@@ -256,11 +256,13 @@
     "stack": "JavaScript application state over a Tauri host",
     "application": "Select, add, hide, reorder and delete layers. Mouse target and focus apply to the selected native preview.",
     "platform": "Windows and macOS for shared controls, native wheel on Windows",
-    "scope": "WebAssets/app.js 30,424 B shared. Serialized complete project size unmeasured.",
-    "decision": "Basic layer operations implemented. Boolean mask tracks, lossless history/undo, durable project merge and saved track templates require implementation.",
-    "evidence": "The register distinguishes current operations from requested saved projects and master timeline.",
+    "scope": "Version 1 project documents support up to 64 MiB. The editor retains up to 128 history steps within its snapshot budget.",
+    "decision": "The editor saves and opens ordered layers, wheel settings, gestures, cues and linked audio. Undo, redo and named history navigation operate within the current session. Boolean masks, project merge and saved track templates remain open.",
+    "evidence": "Headless editor controls with a real M4A and a mocked native bridge reproduced the project JSON after reopening it. Rust tests checked atomic replacement, matching local audio and relinking a moved song.",
     "sources": [
       "[Editor actions](../WebAssets/app.js)",
+      "[Project format](../WebAssets/project-file.js)",
+      "[Project tests](../experiments/project-files)",
       "[Computation specification](slide-computation-spec.md)",
       "[TSS dependency register](dependency-register.md)"
     ]
