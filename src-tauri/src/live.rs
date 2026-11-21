@@ -10,6 +10,7 @@ use preset::MotionPreset;
 #[cfg(any(windows, test))]
 mod mouse_pressure;
 pub mod movie;
+pub mod plates;
 #[cfg(any(windows, test))]
 mod release_clock;
 
@@ -379,6 +380,7 @@ pub struct BenchmarkConfig {
     render_width: u32,
     verify_export: bool,
     wheel_stack: bool,
+    verify_plates: bool,
     coral_trial: bool,
     motion: MotionPreset,
     focus: Option<f32>,
@@ -415,6 +417,7 @@ impl BenchmarkConfig {
             render_width: if preview_960 { 960 } else { 640 },
             verify_export,
             wheel_stack: false,
+            verify_plates: false,
             coral_trial: motion == MotionPreset::CoralRelease,
             motion,
             focus: beads.then_some(0.90),
@@ -432,6 +435,7 @@ impl BenchmarkConfig {
             crate::export_smoke::enabled(),
         );
         config.wheel_stack = flag("--wheel-stack-trial");
+        config.verify_plates = windows::plate_verification().is_some();
         config
     }
 
@@ -450,7 +454,10 @@ impl BenchmarkConfig {
 #[tauri::command]
 pub fn live_wheel_benchmark_config() -> Option<BenchmarkConfig> {
     #[cfg(windows)]
-    if windows::benchmark_output().is_some() || crate::export_smoke::enabled() {
+    if windows::benchmark_output().is_some()
+        || crate::export_smoke::enabled()
+        || windows::plate_verification().is_some()
+    {
         return Some(BenchmarkConfig::current());
     }
     None

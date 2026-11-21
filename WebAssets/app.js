@@ -2,6 +2,7 @@ import { LiquidRenderer, LIQUID_PALETTES } from './liquid-renderer.js';
 import { installLocalLyrics } from './local-lyrics.js';
 import { analyzeAudio, featuresAt } from './audio-features.js';
 import { NativeWheelSurface, hasRelease } from './native-wheel.js';
+import { NativeWheelPlates } from './native-wheel-plates.js';
 import { NativeWheelExport } from './native-wheel-export.js';
 import { VideoFeedbackControls } from './video-feedback.js';
 import { installPerformerDeck } from './performer-host.js';
@@ -97,10 +98,16 @@ const localLyrics = window.__TAURI__?.core ? installLocalLyrics({
 
 const wheelExporter = windowsDesktop ? new NativeWheelExport({
   invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: liveSelection,
-  source: () => ({audioPath: state.audioPath, duration: state.audioBuffer?.duration, proceduralBusy: state.exporting}),
+  source: () => ({audioPath: state.audioPath, duration: state.audioBuffer?.duration, proceduralBusy: state.exporting || !!plateExporter?.busy}),
   getEvents: (id, duration) => macroDeck?.exportEvents(id, duration) ?? [],
   finishRecording: async () => { await macroDeck?.finishPendingRecording(); },
   pause, prepare: prepareWheel, sync: () => nativeSurface.sync(), status,
+}) : null;
+
+const plateExporter = windowsDesktop ? new NativeWheelPlates({
+  button: byId('export-wheel-plates'), invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: liveSelection,
+  busy: () => state.exporting || !!wheelExporter?.busy, prepare: prepareWheel, pause, status,
+  refresh: updateTransport,
 }) : null;
 
 const performerDeck = windowsDesktop ? installPerformerDeck({
@@ -125,8 +132,9 @@ function updateTransport() {
   byId('play').disabled = !ready;
   byId('restart').disabled = !ready;
   byId('stop').disabled = !ready;
-  byId('export').disabled = !state.exporting && (!ready || !state.audioPath || !window.__TAURI__?.core);
+  byId('export').disabled = !state.exporting && (!ready || !state.audioPath || !window.__TAURI__?.core || !!plateExporter?.busy);
   wheelExporter?.refresh();
+  plateExporter?.refresh();
   byId('play').textContent = state.playing ? '❚❚' : '▶';
   byId('play').setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
   byId('play').title = state.playing ? 'Pause' : 'Play';
@@ -352,6 +360,7 @@ async function loadWheelPresets() {
           chooseWheel('yellow-red');
           selectLayer(layer.id);
         }
+        if (benchmark?.verifyPlates) await plateExporter.start();
         if (benchmark?.verifyExport) {
           const { verifyWheelExport } = await import('./verify-wheel-export.js');
           await nativeSurface.sync();
@@ -464,6 +473,7 @@ function renderControls() {
   const wheel = layer && mathmosWheels.get(layer.palette);
   const live = liveSelection();
   wheelExporter?.refresh();
+  plateExporter?.refresh();
   byId('video-feedback').hidden = !live;
   byId('native-wheel-controls').hidden = !windowsDesktop || !wheel;
   byId('native-performance').hidden = !live;
@@ -587,7 +597,7 @@ async function exportVideo() {
     if (state.exportFinalizing) await window.__TAURI__.core.invoke('cancel_export');
     return;
   }
-  if (!state.audioPath || !state.audioBuffer || !window.__TAURI__?.core) return;
+  if (!state.audioPath || !state.audioBuffer || !window.__TAURI__?.core || plateExporter?.busy) return;
   const invoke = window.__TAURI__.core.invoke;
   const outputPath = await invoke('choose_export_path');
   if (!outputPath) return;

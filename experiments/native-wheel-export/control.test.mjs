@@ -64,3 +64,30 @@ test('export flushes recorded points before capturing the schedule or presenting
     assert.equal(node('native-wheel-export-progress').open,false);
   } finally { globalThis.document = old; }
 });
+
+import { NativeWheelPlates } from '../../WebAssets/native-wheel-plates.js';
+test('still plates need no song and preserve focus and film selection through the real UI request', async () => {
+  const selection = {layerId: 4, wheel: 'violet-blue', motion: 'wheel-with-coral-beads', motionTake: 6, visibleFilms: 'rear', focus: 0.2};
+  const button = {textContent: 'Export', addEventListener() {}};
+  const calls = [];
+  let progress;
+  const ui = new NativeWheelPlates({
+    button, selection: () => selection, busy: () => false,
+    prepare: async () => calls.push('prepare'), pause: () => calls.push('pause'),
+    status() {}, refresh() {},
+    listen: async (name, fn) => { assert.equal(name, 'tss-wheel-plate-progress'); progress = fn; return () => calls.push('unlisten'); },
+    invoke: async (name, request) => {
+      assert.equal(name, 'export_native_wheel_plates');
+      assert.deepEqual(request, {selection});
+      progress({payload: 'BG.png'});
+      progress({payload: 'MID.png'});
+      return 'plates';
+    },
+  });
+  assert.equal(await ui.start(), 'plates');
+  assert.deepEqual(calls, ['prepare','pause','unlisten']);
+  assert.equal(button.textContent, 'Export');
+  ui.invoke = async () => null;
+  assert.equal(await ui.start(), null);
+  assert.deepEqual(calls, ['prepare','pause','unlisten','prepare','unlisten']);
+});

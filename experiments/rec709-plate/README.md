@@ -1,14 +1,32 @@
-# Rec.709 plate conversion experiment
+# Native 16-bit Rec.709 wheel plates
 
-`plate.rs` is an isolated, unused sample-conversion component. It is not connected to the application and does not implement PNG export. Its input contract is linear-light Rec.709-primary straight-alpha RGBA as finite `f32` samples in an explicitly specified row order. The conversion clips to the unit interval, applies the Rec.709 OETF to RGB only, quantizes once to 16-bit, and writes top-down, little-endian RGBA samples. It does not transform the source gamut, unassociate premultiplied alpha, apply tone mapping, or create metadata.
+![Violet and cyan native wheel projection with coral beads](projection-preview.jpg)
 
-Run the component tests with the pinned toolchain:
+The Windows editor's **Export selected wheel · 4K 16-bit still plates** control samples the selected wheel's optical shader into an RGBA32F framebuffer. The renderer evaluates the illumination, both film geometries, common pupil rays, refraction and flare at 3840 × 2160. The source simulation caches store quantized signed-distance fields. Interpolation and material work use half-float textures. Optical color stays in floating point until PNG encoding. The tagged PNGs use full-range BT.709 RGB and straight alpha, with cICP bytes 1, 1, 0, 1. The preview above is a reduced sRGB rendering for web display. [Control and compositing instructions](../../live-wheel/README.md#export-still-plates) · [PNG cICP field definitions](https://www.w3.org/TR/png-3/#cICP-chunk)
+
+The captured projection and two solo exposures each include their own lamp and clear carrier. The compositing set uses the lamp as its background. At each pixel the middle layer takes the background to the selected rear exposure. The foreground takes that result to the selected projection. For base RGB value B and target T in clipped linear light, the common alpha is the largest change required by any channel. A darkening channel requires (B−T)/B and a brightening channel requires (T−B)/(1−B). If every channel is unchanged the layer is transparent. Otherwise its straight RGB is B+(T−B)/alpha. This accounts for the ray interactions at the captured alignment. The alpha represents the required compositing change. The separate solo exposures show each physical film in isolation.
+
+## Radeon verification
+
+The guarded AMD Radeon Pro 5300M Metal run used Violet / Blue, **Wheel with coral beads**, front focus 0.9, rear time 2.635 s and front time 0.75 s. A 320 × 180 comparison against the native preview at identical sample positions and film times found a maximum difference of one sRGB code across all RGB channels. The native preview reproduced the same bytes after export.
+
+FFprobe identified all six 4K images as full-range rgba64be with BT.709 primaries and transfer. FFmpeg decoded 65,269 distinct red codes, 63,126 green and 46,711 blue in the projection. MID used 61,690 distinct alpha codes and FG used 65,017. Across 24,883,200 RGB samples the linear-light BG/MID/FG reconstruction differed from the encoded projection by at most 0.00004275 on a 0–1 scale. RMS error was 0.00000781. [All channel counts and measured errors](radeon-4k-verification.json)
+
+To independently check a finished bundle with Node, FFmpeg and FFprobe on PATH, run:
+
+```sh
+node experiments/rec709-plate/verify-plates.mjs "/path/to/TSS-violet-blue-…"
+```
+
+For a bounded Windows editor verification, pass `--verify-wheel-plates` followed by an existing absolute destination directory and optionally `--coral-beads-trial` to the normal editor under the existing hardware reservation procedure. This runs the same frontend controller and native export as the interactive button. The verification argument supplies the containing folder. The editor exits with the export result. Each successful export writes its own new bundle. The verifier checks all six PNGs including their metadata and computes per-channel precision and reconstruction error.
+
+The Radeon test uses `coral_capture::capture_digital_4k_plates` from the live-wheel test binary with `--ignored --exact`, an explicitly selected `TSS_LIVE_ADAPTER` and an existing `TSS_PLATE_CAPTURE_DIR`. Its unoptimized run took 156 s including six PNG encodes. PNG metadata uses cICP. ICC profile embedding, Display P3, print conversion, and downstream compositor import tests remain open under issue #8.
+
+## Sample conversion reference
+
+The original raw reference and the application use the same finite-sample quantizer. It clips to the unit interval, applies the BT.709 OETF to RGB, leaves alpha linear and rounds once to 16 bits. The raw reference writes top-down, little-endian interleaved samples. PNG serialization uses big-endian samples. The original independent 4K fixture matched the raw reference byte for byte before and after an FFmpeg PNG round trip.
 
 ```sh
 rustup run 1.88.0 rustc --test --edition 2021 experiments/rec709-plate/plate.rs -o /tmp/tss-rec709-plate-tests
 /tmp/tss-rec709-plate-tests
 ```
-
-On the development Mac, the converter's complete 3840 × 2160 output for the independent `/private/tmp/tss-plate-work/fixture-4k.rgba32fle` fixture matched the previously verified 16-bit raw output byte for byte. That raw output was encoded to PNG by FFmpeg, decoded back, and compared byte for byte. FFprobe reported `rgba64be`, full range, `gbr`, BT.709 primaries and transfer. These are isolated fixture checks, not application, Windows, display, or print-pipeline validation.
-
-Integration requires a renderer capable of producing linear-light, straight-alpha float plates, verified framebuffer readback on each target, a transfer strategy that preserves float precision, and an encoder that writes and validates 16-bit PNG color metadata. The intended optical transmission of separate liquid colors must also be represented in the plate compositing contract; ordinary alpha-over cannot be assumed to reproduce it. Capability failures must be reported rather than converting an 8-bit canvas into nominally 16-bit output. Performance, ICC embedding, P3, and target-application interpretation remain unverified.

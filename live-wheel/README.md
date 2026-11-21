@@ -39,6 +39,16 @@ On Windows, select a Mathmos wheel, add a visual layer and choose another wheel 
 
 Each wheel samples its own pair of film clocks and poses. Its existing optical shader attenuates the incident linear RGB image and adds that wheel’s fitted veiling light. A single lamp illuminates the stack. With manual focus, the ordered film planes span the existing focus travel. Each wheel integrates its own pupil footprint before transmitting the result to the next wheel. This screen-space approximation does not trace refracted rays across wheels. A single opaque wheel keeps its original optical path. The native stack accepts Mathmos wheel tracks.
 
+## Export still plates
+
+Select a live wheel in the Windows editor, click **Export selected wheel · 4K 16-bit still plates** and choose the containing folder. The editor captures the selected track's current rear and front positions, focus, gesture deformation and film visibility after the chooser closes. With multiple wheels visible, this control projects the selected wheel alone under its own lamp at full optical density. The stack movie uses the shared optical path and layer opacities. Audio is optional. Each export creates a new folder. The wheel clocks pause during rendering and encoding.
+
+Open **projection.png** for the 3840 × 2160 optical still. For compositing, stack **BG.png**, **MID.png** and **FG.png** in that order from back to front. Use Normal/Over blending in linear light with straight alpha. Interpret the PNGs as full-range Rec.709 with the BT.709 transfer function. Each carries a PNG cICP tag. The still captures the optics before electronic feedback.
+
+BG contains the lamp and clear carrier. MID introduces the visible rear film. FG adds the visible front film, including its refraction through the rear film, joint optical density and veiling light. These registered layers reconstruct the captured projection to file quantization precision. Changing their relative positions in a compositor creates a new image. Reposition the physical films in the editor to render the interaction at a new alignment.
+
+**rear-solo.png** and **front-solo.png** each show one film projected under the lamp. Both are opaque. Combining the two solo exposures omits the common pupil rays, refraction and flare. **plates.json** identifies the wheel, clocks, focus, visibility, pixel encoding and composition order. [Rec.709 verification](../experiments/rec709-plate/README.md)
+
 ## Export the selected wheel
 
 Open a local song, choose the live wheel, then select **Export selected wheel in 4K**. Choose a new MP4 filename. Export finishes an open gesture recording before reading the schedule. A take recorded while the song was paused can be assigned a trigger in the gesture deck. The current wheel material and focus apply throughout. Enabled gestures scheduled at a recording position, audio motif or lyric phrase replay in song order at 30 fps. **Export starting pose** offers three choices.

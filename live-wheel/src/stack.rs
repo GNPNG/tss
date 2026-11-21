@@ -193,11 +193,11 @@ impl LiveWheel {
                 times[0],
                 times[1],
                 program_time,
-                Some(Exposure {
+                Some(OpticalExposure::Stack(Exposure {
                     gpu: &gpu,
                     incident: &gpu.images[1 - index % 2].view,
                     output: &gpu.images[index % 2].view,
-                }),
+                })),
             );
         }
         self.active = selected;

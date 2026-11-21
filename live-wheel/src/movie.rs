@@ -15,7 +15,7 @@ pub struct WheelMovie<'a> {
 
 // wgpu-core 0.19's Vulkan Maintain::Wait uses a 5 s cleanup wait. Offline
 // frames can exceed it. Poll the actual completion callback at both boundaries.
-fn wait_for_callback<T>(
+pub(super) fn wait_for_callback<T>(
     device: &gpu::Device,
     recv: std::sync::mpsc::Receiver<T>,
 ) -> Result<T, String> {

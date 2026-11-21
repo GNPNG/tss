@@ -5,6 +5,9 @@
 //! framebuffer capabilities, or obtain pixels from the renderer.
 
 use std::io::{self, Write};
+#[path = "../../live-wheel/src/plates/rec709.rs"]
+mod rec709;
+use rec709::quantize;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RowOrigin {
@@ -53,15 +56,7 @@ pub fn write_rec709_rgba16le<W: Write>(
         row.clear();
         let start = source_y * row_samples;
         for (channel, sample) in input[start..start + row_samples].iter().enumerate() {
-            let value = sample.clamp(0.0, 1.0) as f64;
-            let encoded = if channel % 4 == 3 {
-                value
-            } else if value < 0.018 {
-                4.5 * value
-            } else {
-                1.099 * value.powf(0.45) - 0.099
-            };
-            let quantized = (encoded.clamp(0.0, 1.0) * 65535.0).round() as u16;
+            let quantized = quantize(*sample, channel % 4 == 3);
             row.extend_from_slice(&quantized.to_le_bytes());
         }
         output.write_all(&row)?;

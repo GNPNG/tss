@@ -49,7 +49,12 @@ fn output_arg(option: &str) -> Option<PathBuf> {
     None
 }
 
+pub(super) fn plate_verification() -> Option<PathBuf> {
+    output_arg("--verify-wheel-plates")
+}
+
 enum Command {
+    Plates(super::plates::Selection, PathBuf, macros::Reply<PathBuf>),
     VerifyVisibility(macros::Reply<VisibilityProof>),
     Projector(bool, u32, macros::Reply<()>),
     Set(Option<Config>),
@@ -67,6 +72,15 @@ pub struct Host {
 }
 
 impl Host {
+    pub async fn plates(
+        &self,
+        selected: super::plates::Selection,
+        parent: PathBuf,
+    ) -> Result<PathBuf, String> {
+        self.request(|reply| Command::Plates(selected, parent, reply))
+            .await
+    }
+
     pub fn stats(&self) -> Stats {
         self.shared
             .lock()
@@ -541,6 +555,62 @@ fn run(
                     stats.projector_age_ms = None;
                     stats.projector_song_time = None;
                     *shared.lock().map_err(|e| e.to_string())? = stats.clone();
+                    let _ = reply.try_send(result);
+                }
+                Command::Plates(selected, folder, reply) => {
+                    let result = match (engine.as_mut(), config.as_ref()) {
+                        (Some(r), Some(c))
+                            if c.layer_id == selected.layer_id
+                                && c.wheel == selected.wheel
+                                && c.motion == selected.motion
+                                && c.motion_take == selected.motion_take
+                                && c.visible_films == selected.visible_films
+                                && c.focus == selected.focus =>
+                        {
+                            consume_mouse(r, c.slide, c.gesture, c.mouse_pressure)?;
+                            macros::flush(app, c)?;
+                            let started = Instant::now();
+                            let times = last_presented_film_times.unwrap_or_else(|| {
+                                release_clock.film_times(
+                                    c.layer_id,
+                                    c.motion,
+                                    c.motion_take,
+                                    start.elapsed().saturating_sub(export_pause),
+                                )
+                            });
+                            unsafe {
+                                ShowWindow(child.0, SW_HIDE);
+                            }
+                            let mut stage = String::new();
+                            let result =
+                                pollster::block_on(r.export_4k_plates(&folder, times, |name| {
+                                    pump();
+                                    if unsafe { IsWindow(parent) == 0 } {
+                                        return Err(
+                                            "Plate export interrupted when the editor closed"
+                                                .into(),
+                                        );
+                                    }
+                                    if name != stage {
+                                        let _ = app.emit("tss-wheel-plate-progress", name);
+                                        stage = name.to_owned();
+                                    }
+                                    Ok(())
+                                }));
+                            if !c.preview_hidden && unsafe { IsWindow(parent) != 0 } {
+                                child.place(c.rect)?;
+                            }
+                            export_pause += started.elapsed();
+                            previous = None;
+                            samples.clear();
+                            report = Instant::now();
+                            result
+                        }
+                        _ => Err(
+                            "Wheel, pose, focus or film selection changed before plate capture"
+                                .into(),
+                        ),
+                    };
                     let _ = reply.try_send(result);
                 }
                 Command::Movie(job, reply) => {

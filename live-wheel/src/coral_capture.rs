@@ -278,3 +278,29 @@ fn capture_coral_wheel() -> Result<(), String> {
     .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[test]
+#[ignore = "requires one guarded discrete GPU and an existing TSS_PLATE_CAPTURE_DIR"]
+fn capture_digital_4k_plates() -> Result<(), String> {
+    let dir = PathBuf::from(
+        std::env::var_os("TSS_PLATE_CAPTURE_DIR").ok_or("Missing plate output folder")?,
+    );
+    let (mut r, _) = discrete_renderer([320, 180])?;
+    r.select_track(1);
+    r.set_motion(MotionPreset::WheelWithCoralBeads)?;
+    r.set_focus(Some(0.9))?;
+    r.set_footprint_sampling(true);
+    let times = [2.635, 0.75];
+    r.render_film_times_offscreen(times[0], times[1], times[0])?;
+    let preview = r.capture_rgba8()?.2;
+    crate::plates::check_preview_alignment(&mut r, times, &preview)?;
+    let bundle = pollster::block_on(r.export_4k_plates(&dir, times, |_| Ok(())))?;
+    r.render_film_times_offscreen(times[0], times[1], times[0])?;
+    assert_eq!(
+        r.capture_rgba8()?.2,
+        preview,
+        "Plate export changed the live pose or optics"
+    );
+    println!("Plate bundle {}", bundle.display());
+    Ok(())
+}

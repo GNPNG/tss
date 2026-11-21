@@ -1,0 +1,52 @@
+{
+  "wheel": "violet-blue",
+  "gpu": "AMD Radeon Pro 5300M",
+  "size": [
+    3840,
+    2160
+  ],
+  "sourceFilmSeconds": [
+    2.635,
+    0.75
+  ],
+  "distinctCodesPerRGBAChannel": {
+    "rear-solo.png": [
+      37206,
+      60299,
+      40561,
+      1
+    ],
+    "front-solo.png": [
+      65204,
+      46093,
+      35905,
+      1
+    ],
+    "BG.png": [
+      29370,
+      29979,
+      25315,
+      1
+    ],
+    "MID.png": [
+      65168,
+      37917,
+      50136,
+      61690
+    ],
+    "FG.png": [
+      60623,
+      59755,
+      64541,
+      65017
+    ],
+    "projection.png": [
+      65269,
+      63126,
+      46711,
+      1
+    ]
+  },
+  "maxAbsoluteLinearDifference": 0.000042744808105732446,
+  "rmsLinearDifference": 0.000007805702530091188
+}

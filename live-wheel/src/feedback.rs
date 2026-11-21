@@ -112,6 +112,52 @@ pub(crate) struct Feedback {
     linear_optics: [Pass; 4],
     params: gpu::Buffer,
 }
+pub(super) fn linear_optics(
+    device: &gpu::Device,
+    vertex: &gpu::ShaderModule,
+    format: gpu::TextureFormat,
+) -> [Pass; 4] {
+    let image = Binding::Image(gpu::TextureViewDimension::D2);
+    let base = [image, Binding::Sampler, Binding::Buffer];
+    let footprint = [
+        image,
+        Binding::Sampler,
+        Binding::Buffer,
+        Binding::Image(gpu::TextureViewDimension::D2Array),
+        image,
+        Binding::Buffer,
+        image,
+    ];
+    let optical = |label: &str, code: &[u8], inputs: &[Binding]| {
+        let module = device.create_shader_module(gpu::ShaderModuleDescriptor {
+            label: Some(label),
+            source: gpu::util::make_spirv(code),
+        });
+        pipeline(device, vertex, &module, "main", label, format, inputs)
+    };
+    [
+        optical(
+            "Linear Violet / Blue",
+            include_bytes!(concat!(env!("OUT_DIR"), "/violet-blue.spv")),
+            &base,
+        ),
+        optical(
+            "Linear wheel",
+            include_bytes!(concat!(env!("OUT_DIR"), "/wheel.spv")),
+            &base,
+        ),
+        optical(
+            "Linear finite-pixel Violet / Blue",
+            include_bytes!(concat!(env!("OUT_DIR"), "/violet-blue-footprint.spv")),
+            &footprint,
+        ),
+        optical(
+            "Linear finite-pixel wheel",
+            include_bytes!(concat!(env!("OUT_DIR"), "/wheel-footprint.spv")),
+            &footprint,
+        ),
+    ]
+}
 impl Feedback {
     pub fn new(device: &gpu::Device, size: [u32; 2], settings: FeedbackSettings) -> Self {
         let vertex = shader(device, "Program quad", include_str!("vertex.wgsl"));
@@ -126,53 +172,7 @@ impl Feedback {
             include_str!("feedback_output.wgsl"),
         );
         let image = Binding::Image(gpu::TextureViewDimension::D2);
-        let base = [image, Binding::Sampler, Binding::Buffer];
-        let footprint = [
-            image,
-            Binding::Sampler,
-            Binding::Buffer,
-            Binding::Image(gpu::TextureViewDimension::D2Array),
-            image,
-            Binding::Buffer,
-            image,
-        ];
-        let optical = |label: &str, code: &[u8], inputs: &[Binding]| {
-            let module = device.create_shader_module(gpu::ShaderModuleDescriptor {
-                label: Some(label),
-                source: gpu::util::make_spirv(code),
-            });
-            pipeline(
-                device,
-                &vertex,
-                &module,
-                "main",
-                label,
-                FIELD_FORMAT,
-                inputs,
-            )
-        };
-        let linear_optics = [
-            optical(
-                "Linear Violet / Blue",
-                include_bytes!(concat!(env!("OUT_DIR"), "/violet-blue.spv")),
-                &base,
-            ),
-            optical(
-                "Linear wheel",
-                include_bytes!(concat!(env!("OUT_DIR"), "/wheel.spv")),
-                &base,
-            ),
-            optical(
-                "Linear finite-pixel Violet / Blue",
-                include_bytes!(concat!(env!("OUT_DIR"), "/violet-blue-footprint.spv")),
-                &footprint,
-            ),
-            optical(
-                "Linear finite-pixel wheel",
-                include_bytes!(concat!(env!("OUT_DIR"), "/wheel-footprint.spv")),
-                &footprint,
-            ),
-        ];
+        let linear_optics = linear_optics(device, &vertex, FIELD_FORMAT);
         Self {
             settings,
             images: Images::new(device, size),

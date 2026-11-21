@@ -5,6 +5,7 @@ pub use projector::{ProjectorOutput, ProjectorTiming};
 mod fields;
 pub use feedback::FeedbackSettings;
 mod movie;
+mod plates;
 pub use movie::WheelMovie;
 mod material;
 mod motion;
@@ -223,6 +224,11 @@ fn check_extent(size: [u32; 2], max_dimension: u32) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+enum OpticalExposure<'a> {
+    Stack(stack::Exposure<'a>),
+    Plate(&'a plates::PlateTarget, [bool; 2]),
 }
 
 pub struct LiveWheel {
@@ -940,10 +946,14 @@ impl LiveWheel {
         rear_time: f64,
         front_time: f64,
         program_time: f64,
-        stack: Option<stack::Exposure<'_>>,
+        exposure: Option<OpticalExposure<'_>>,
     ) {
+        let (plate, visibility) = match &exposure {
+            Some(OpticalExposure::Plate(p, shown)) => (Some(*p), *shown),
+            _ => (None, self.slide_visibility),
+        };
         let size = self.preview_size();
-        if let Some(f) = &mut self.feedback {
+        if let Some(f) = self.feedback.as_mut().filter(|_| plate.is_none()) {
             f.prepare(&self.device, size);
         }
         let (a, b, fraction) = self.fields.sample_motion(self.motion, rear_time);
@@ -969,7 +979,7 @@ impl LiveWheel {
             .unwrap_or_default();
         // The finite-pixel pass uses rotation and pressure to choose the pupil
         // footprint. Keep a hidden film's deformation out of that decision.
-        for (pose, visible) in poses.iter_mut().zip(self.slide_visibility) {
+        for (pose, visible) in poses.iter_mut().zip(visibility) {
             if !visible {
                 *pose = SlidePose::default();
             }
@@ -1003,7 +1013,7 @@ impl LiveWheel {
             .get(&self.active)
             .and_then(|t| t.warp.as_ref())
             .unwrap_or(&self.zero);
-        let [rear, front] = self.slide_visibility;
+        let [rear, front] = visibility;
         let field_pass = &self.field_passes[usize::from(rear) + 2 * usize::from(front)];
         let fields = bind(
             &self.device,
@@ -1044,7 +1054,9 @@ impl LiveWheel {
         let optical_resources = [
             TextureView(&self.interpolated.view),
             Sampler(&self.sampler),
-            self.material_uniform.as_entire_binding(),
+            plate
+                .map_or(&self.material_uniform, |p| &p.material)
+                .as_entire_binding(),
             TextureView(&self.cache_view),
             TextureView(&mapping.view),
             self.pair_uniform.as_entire_binding(),
@@ -1063,7 +1075,7 @@ impl LiveWheel {
         } else {
             &optical_resources[..3]
         };
-        if let Some(layer) = stack {
+        if let Some(OpticalExposure::Stack(layer)) = exposure {
             let mut resources = entries.to_vec();
             resources.push(TextureView(layer.incident));
             let pass = layer.gpu.optics(integrate, self.wheel == "violet-blue");
@@ -1078,7 +1090,12 @@ impl LiveWheel {
             self.queue.submit(Some(enc.finish()));
             return;
         }
-        let (optic_pipe, destination) = if let Some(f) = &self.feedback {
+        let (optic_pipe, destination) = if let Some(p) = plate {
+            (
+                &p.optics[2 * usize::from(integrate) + usize::from(self.wheel != "violet-blue")],
+                &p.target.view,
+            )
+        } else if let Some(f) = &self.feedback {
             f.optics(integrate, self.wheel == "violet-blue")
         } else {
             (optic_pipe, &self.optics.view)
@@ -1091,7 +1108,7 @@ impl LiveWheel {
             optic_pipe,
             &optics,
         );
-        if let Some(f) = &mut self.feedback {
+        if let Some(f) = self.feedback.as_mut().filter(|_| plate.is_none()) {
             f.compose_from(
                 &self.device,
                 &self.queue,
