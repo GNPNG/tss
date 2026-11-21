@@ -127,12 +127,16 @@
         <label>End (s) <input id="range-end" type="number" min="0" step="any" value="0"></label>
         <button id="set-range" class="button quiet">Select range</button>
         <button id="select-all-time" class="button quiet">Select all</button>
+        <button id="deselect-time" class="button quiet">Deselect</button>
         <button id="clear-region" class="button quiet">Clear selected layer in range</button>
       </div>
       <details class="timeline-wand" id="timeline-wand"><summary>Magic wand and track templates</summary>
         <div class="timeline-tools" id="boundary-glyphs" role="group" aria-label="Boundary behavior"></div>
         <div class="timeline-tools">
           <label>Selected symbol behavior <select id="wand-mode"><option value="fixed">Fixed length</option><option value="stretch">Stretch to selection</option><option value="repeat">Repeat at interval</option><option value="recurrence">Recurring cue</option><option value="signal">Audio signal</option></select></label>
+          <label>Start anchor <select id="wand-start-anchor"><option value="time">Exact time</option><option value="beat">Observed beat</option><option value="onset">Observed onset</option><option value="lyric">Selected lyric cue</option><option value="energy">Dynamics</option></select></label>
+          <label>End anchor <select id="wand-end-anchor"><option value="time">Exact time</option><option value="beat">Observed beat</option><option value="onset">Observed onset</option><option value="lyric">Selected lyric cue</option><option value="energy">Dynamics</option></select></label>
+          <label>Anchor tolerance (s) <input id="wand-anchor-tolerance" type="number" min="0" step="any" value=".25"></label>
           <label>Length (s) <input id="wand-length" type="number" step="any" min=".001" value="1"></label>
           <label>Repeat interval (s) <input id="wand-interval" type="number" step="any" min=".001" value="1"></label>
           <label>Fade in (s) <input id="wand-in" type="number" step="any" min="0" value="0"></label>

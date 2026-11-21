@@ -797,6 +797,8 @@ input[type=range].hue-slider {
 .timeline-tools input,.timeline-tools select {padding:4px}
 .timeline-wand {border-top:1px solid #394437; padding-bottom:8px}
 .timeline-wand summary {padding:10px 20px; cursor:pointer}
+.timeline-actions {flex-wrap:wrap; justify-content:flex-end}
+#track-source {max-width:14em}
 .timeline-tools [aria-pressed=true] {border-color:#dfbb74}
 .visual-lane .timed-clip {position:absolute; top:7px; overflow:hidden; white-space:nowrap; min-width:1px; padding:2px; display:block}
 .time-selection {position:absolute; inset-block:0; pointer-events:none; background:#d7b65a26; border-inline:1px solid #dfbb74}

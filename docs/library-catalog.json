@@ -257,7 +257,7 @@
     "application": "Select, add, hide, reorder and delete layers. Mouse target and focus apply to the selected native preview.",
     "platform": "Windows and macOS for shared controls, native wheel on Windows",
     "scope": "Version 1 project documents support up to 64 MiB. The editor retains up to 128 history steps within its snapshot budget.",
-    "decision": "The editor saves and opens ordered layers, wheel settings, gestures, cues and linked audio. Undo, redo and named history navigation operate within the current session. Boolean masks, project merge and saved track templates remain open.",
+    "decision": "The editor saves and opens ordered layers, wheel settings, gestures, cues and linked audio. The timeline supports range editing, named history, shipped and user templates, saved song tracks, and regional project merge with gesture and layer ID remapping.",
     "evidence": "Headless editor controls with a real M4A and a mocked native bridge reproduced the project JSON after reopening it. Rust tests checked atomic replacement, matching local audio and relinking a moved song.",
     "sources": [
       "[Editor actions](../WebAssets/app.js)",

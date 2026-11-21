@@ -55,3 +55,22 @@ test('history retains nested state after mutation, branches, drops duplicate ste
   assert.equal(history.entries.length,128);
   assert.equal(history.stateAt(history.cursor).position,149);
 });
+
+test('portable media survives transfer with fresh mask IDs and no session grant',async()=>{
+  const {transferRegion}=await import('../../WebAssets/region-tracks.js');
+  const {bindProjectMedia}=await import('../../WebAssets/project-media.js');
+  const doc=fixture();
+  const media={name:'spray.mov',sha256:'f'.repeat(64),width:320,height:180,durationUs:2000000,still:false,
+    offsetUs:0,rate:1,loop:true,mode:'key',keyColor:'#00ff00',keyThreshold:.2,keySoftness:.1,gradientA:'#010203',
+    gradientB:'#998877',gradientRate:2,bounce:.3,blur:0,distortion:.4,maskA:1,maskB:null,maskOp:'union',shape:'diamond'};
+  doc.layers[0].media=media;
+  bindProjectMedia(doc.layers[0],{id:303,sha256:media.sha256,width:320,height:180,durationUs:2000000,still:false});
+  const portable={...doc,layers:doc.layers.map(layerSettings)};
+  assert.equal(portable.layers[0].media.assetId,undefined);validateProject(portable,palettes);
+  const copied=transferRegion(portable,{start:1,end:2},{start:3,end:5},new Set([1,7]),id=>id+10,'slice/');
+  assert.equal(copied.layers[0].media.maskA,11);assert.equal(copied.layers[0].media.sha256,media.sha256);
+  assert.equal(copied.layers[0].envelope[0].mediaStartUs,1000000);
+  assert.equal(copied.layers[0].envelope[0].mediaRate,.5);
+  assert.equal(copied.gestures.lyricGroups[0].occurrences[0].start,3);
+  assert.equal(copied.gestures.macros[0].events[0].layerId,11);
+});

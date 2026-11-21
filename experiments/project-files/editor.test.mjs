@@ -39,6 +39,7 @@ async function exerciseControls(windows) {
     case 'live_wheel_stats': return {running:false};
     case 'read_timed_lyrics': return ['song.vtt','WEBVTT\n\n00:00.000 --> 00:00.500\nGo\n\n00:01.000 --> 00:01.500\nGo'];
     case 'save_project': documentText=args.document;return 'Headliner.tss';
+    case 'resolve_visual_media': return args.name==='Plate.gif'?{id:42,name:args.name,sha256:args.sha256,width:400,height:240,durationUs:800000,still:false}:null;
     case 'open_project': return ['Headliner.tss',incoming,linked];
     default: throw Error('Unexpected command '+command);
     }
@@ -88,6 +89,17 @@ async function exerciseControls(windows) {
   const merged=JSON.parse(documentText);
   check(merged.layers.length===5 && new Set(merged.layers.map(l=>l.id)).size===5 && merged.layers[0].envelope[0].start===.25,'regional merge');
   if(windows)check(merged.gestures.macros.length===2 && merged.gestures.macros[1].events[0].layerId===merged.layers[1].id,'regional gesture remap');
+  const media={name:'Plate.gif',sha256:'a'.repeat(64),width:200,height:120,durationUs:800000,still:false,
+    offsetUs:0,rate:1,loop:true,mode:'color',keyEnabled:false,keyColor:'#00FF00',keyThreshold:.2,keySoftness:.1,
+    gradientA:'#000000',gradientB:'#FFFFFF',gradientRate:0,blur:0,distortion:0,bounce:0,maskA:null,maskB:null,
+    maskOp:'union',shape:'none',assetId:999};
+  merged.layers[0].media=media;
+  merged.layers[1].media={...media,name:'Offline.gif',sha256:'b'.repeat(64)};
+  incoming=JSON.stringify(merged);click('open-project');await idle();
+  check($('app-status').textContent.includes('Offline.gif'),'offline visual source named');
+  click('save-project');await idle();const restored=JSON.parse(documentText);
+  check(restored.layers[0].media.width===400 && restored.layers[1].media.width===200 &&
+    !restored.layers.some(l=>l.media?.assetId!==undefined),'portable media link, offline metadata and refreshed grant');
 }
 const chrome=process.env.CHROME_BIN;
 for (const windows of [false,true]) test((windows?'Native wheel':'Procedural')+' editor save, undo, redo, cancel, offline open, relink and reopen through its controls',

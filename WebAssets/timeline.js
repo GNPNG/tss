@@ -15,6 +15,9 @@ export function validEnvelope(envelope) {
     const a=c.sourceStart??c.start, b=c.sourceEnd??c.end;
     if (!number(a)||!number(b)||a>c.start||b<c.end||!number(b-a)) return false;
     if (![c.fadeIn,c.fadeOut].every(v=>number(v)&&v>=0&&v<=b-a+1e-9)) return false;
+    if(c.mediaStartUs!==undefined || c.mediaRate!==undefined) {
+      if(!Number.isSafeInteger(c.mediaStartUs)||c.mediaStartUs<0||!number(c.mediaRate)||c.mediaRate<0||c.mediaRate>8)return false;
+    }
     previous=c.end;
   }
   return true;
@@ -34,7 +37,9 @@ export function opacityAt(envelope,time) {
 export function clipInterval(clip,range) {
   const start=Math.max(clip.start,range.start), end=Math.min(clip.end,range.end);
   if(end<=start) return null;
-  return {...clip,start,end,sourceStart:clip.sourceStart??clip.start,sourceEnd:clip.sourceEnd??clip.end};
+  const out={...clip,start,end,sourceStart:clip.sourceStart??clip.start,sourceEnd:clip.sourceEnd??clip.end};
+  if(clip.mediaStartUs!==undefined)out.mediaStartUs=Math.round(clip.mediaStartUs+(start-clip.start)*1e6*clip.mediaRate);
+  return out;
 }
 export const fullEnvelope = duration => [{start:0,end:duration,level:1,fadeIn:0,fadeOut:0}];
 export function replaceRegion(envelope,range,replacement,duration) {
@@ -50,13 +55,19 @@ export function replaceRegion(envelope,range,replacement,duration) {
   for(const clip of replacement) {const kept=clipInterval(clip,range);if(kept)result.push(kept);}
   return result.sort((a,b)=>a.start-b.start);
 }
-export function mapEnvelope(envelope,source,target,duration) {
+export function mapEnvelope(envelope,source,target,duration,media) {
   const scale=(target.end-target.start)/(source.end-source.start);
-  const map=t=>target.start+(t-source.start)*scale;
-  return (envelope??fullEnvelope(duration)).map(c=>clipInterval(c,source)).filter(Boolean).map(c=>({
-    ...c,start:map(c.start),end:map(c.end),sourceStart:map(c.sourceStart),sourceEnd:map(c.sourceEnd),
-    fadeIn:c.fadeIn*scale,fadeOut:c.fadeOut*scale
-  }));
+  const map=t=>t===source.end?target.end:target.start+(t-source.start)*scale;
+  return (envelope??fullEnvelope(duration)).map(c=>clipInterval(c,source)).filter(Boolean).map(c=>{
+    const out={...c,start:map(c.start),end:map(c.end),sourceStart:map(c.sourceStart),sourceEnd:map(c.sourceEnd),
+      fadeIn:c.fadeIn*scale,fadeOut:c.fadeOut*scale};
+    if(media) {
+      out.mediaRate=(c.mediaRate??media.rate)/scale;
+      out.mediaStartUs=c.mediaStartUs??Math.round(media.offsetUs+c.start*1e6*media.rate);
+      if(out.mediaRate>8 || !Number.isSafeInteger(out.mediaStartUs))throw Error('This media excerpt exceeds the supported time or 8× playback rate. Choose a longer destination.');
+    }
+    return out;
+  });
 }
 
 function signalRuns(analysis,range,signal,threshold,gap) {
@@ -74,8 +85,39 @@ function signalRuns(analysis,range,signal,threshold,gap) {
   }
   return result;
 }
+const anchors=['time','beat','onset','lyric','energy'];
+function anchorRange(range,rule,groups,analysis) {
+  const tolerance=rule.anchorTolerance??0;
+  if(!number(tolerance)||tolerance<0)throw Error('Choose a nonnegative anchor tolerance.');
+  const adjusted={...range}, observations=new Map();
+  for(const edge of ['start','end']) {
+    const signal=rule[edge+'Anchor']??'time';
+    if(signal==='time')continue;
+    if(!anchors.includes(signal))throw Error('Unknown boundary anchor.');
+    if(!observations.has(signal)){
+      let hits=[];
+      if(signal==='beat')hits=beatObservations(analysis);
+      else if(signal==='lyric')hits=groups.find(g=>g.kind==='lyric'&&g.id===rule.cue)?.occurrences??[];
+      else if(analysis?.frames?.length)hits=signalRuns(analysis,{start:0,end:analysis.frames.length/analysis.fps},
+        signal,signal==='onset'?.01:rule.threshold,rule.gap);
+      observations.set(signal,hits);
+    }
+    let nearest=null;
+    for(const hit of observations.get(signal)) {
+      // Beats and onsets are point observations, lyrics and sections have two edges.
+      const t=signal==='beat'||signal==='onset'?hit.start:hit[edge];
+      if(t<range.start||t>range.end||Math.abs(t-range[edge])>tolerance)continue;
+      if(nearest===null||Math.abs(t-range[edge])<Math.abs(nearest-range[edge]))nearest=t;
+    }
+    if(nearest===null)throw Error('No '+signal+' '+edge+' anchor within tolerance. Change the tolerance or choose Exact time.');
+    adjusted[edge]=nearest;
+  }
+  if(!validRange(adjusted))throw Error('The matched boundaries leave an empty interval.');
+  return adjusted;
+}
 export function planIntervals(rule,range,{groups=[],analysis=null}={}) {
   if(!validRange(range))throw Error('Select a song interval first.');
+  range=anchorRange(range,rule,groups,analysis);
   const {mode,length,interval,fadeIn,fadeOut,level,autoScale,tolerance}=rule;
   if(!modes.includes(mode)||!number(length)||length<=0||!number(interval)||interval<=0||
     ![fadeIn,fadeOut,tolerance].every(n=>number(n)&&n>=0)||!number(level)||level<0||level>1)throw Error('Check the clip length, interval, fades, tolerance and level.');
@@ -105,7 +147,7 @@ export function planIntervals(rule,range,{groups=[],analysis=null}={}) {
     const sourceEnd=adaptive&&!fit?h.start+length:h.end, span=sourceEnd-h.start;
     const start=Math.max(h.start,range.start), end=Math.min(sourceEnd,range.end,hits[i+1]?.start??Infinity);
     if(end>start)result.push({start,end,sourceStart:h.start,sourceEnd,fadeIn:Math.min(span,fadeIn),
-      fadeOut:Math.min(span,fadeOut),level});
+      fadeOut:Math.min(span,fadeOut),level,rule:{...rule}});
   }
   return result;
 }
@@ -141,7 +183,7 @@ export function advisorIntervals(s,rule,groups,analysis) {
     throw Error('Choose a supported signal and fit.');
   const range={start:s.start,end:s.end};
   let anchors=[range];
-  if(s.signal==='lyric' || s.fit==='recurrence') {
+  if(s.signal==='lyric' || (s.signal==='time' && s.fit==='recurrence')) {
     const cue=groups.find(g=>g.id===rule.cue && (s.signal!=='lyric'||g.kind==='lyric'));
     if(!cue)throw Error('Choose a recurring cue in Magic wand, or switch to a manual time boundary.');
     anchors=cue.occurrences;
@@ -152,7 +194,7 @@ export function advisorIntervals(s,rule,groups,analysis) {
     const a=anchors[i];
     const start=Math.max(range.start,a.start),end=Math.min(range.end,a.end,anchors[i+1]?.start??Infinity);
     if(end<=start)continue;
-    out.push(...planIntervals({...rule,mode:s.fit==='elastic'||s.fit==='recurrence'?'stretch':s.fit,
+    out.push(...planIntervals({...rule,startAnchor:'time',endAnchor:'time',mode:s.fit==='elastic'||s.fit==='recurrence'?'stretch':s.fit,
       length:s.fit==='fixed' && s.signal==='time'?end-start:rule.length},{start,end}));
   }
   if(!out.length)throw Error('No matching observations within the selection. Choose another signal or a manual time boundary.');

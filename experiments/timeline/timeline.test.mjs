@@ -30,3 +30,18 @@ test('unmatched advisor signal does not grant the remainder of a song',()=>{
   const observations=beatObservations({fps:30,frames});
   assert.equal(observations.length,16);assert.equal(observations[1].start-observations[0].start,.5);
 });
+test('independent endpoint matching cannot move either endpoint beyond the selected range',()=>{
+  const groups=[{id:'line',kind:'lyric',occurrences:[{start:2.9,end:4},{start:3.18,end:4.1},{start:9,end:9.89}]}];
+  const r={...params,mode:'stretch',cue:'line',startAnchor:'lyric',endAnchor:'lyric',anchorTolerance:.2};
+  const [clip]=planIntervals(r,range,{groups});assert.equal(clip.start,3.18);assert.equal(clip.end,9.89);
+  assert.equal(planIntervals({...r,endAnchor:'time'},range,{groups})[0].end,10);
+  assert.throws(()=>planIntervals({...r,anchorTolerance:.02},range,{groups}),/within tolerance/);
+});
+test('transferring and splitting a video excerpt retain the absolute source frame',()=>{
+  const media={offsetUs:500000,rate:2};
+  const moved=mapEnvelope(null,{start:2,end:4},{start:0,end:4},4,media);
+  assert.equal(moved[0].mediaStartUs,4500000);assert.equal(moved[0].mediaRate,1);
+  const cut=replaceRegion(moved,{start:1,end:2.5},[],4);
+  assert.equal(cut[1].mediaStartUs,7000000);assert.ok(validEnvelope(cut));
+  assert.throws(()=>mapEnvelope(null,{start:2,end:4},{start:0,end:.25},4,media),/8×/);
+});

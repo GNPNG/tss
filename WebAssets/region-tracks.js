@@ -42,13 +42,21 @@ function copyRun(m,run,source,target,layerId,id) {
 export function transferRegion(doc,source,target,layerIds,idFor,prefix) {
   if(!validRange(source)||!validRange(target))throw Error('Choose nonempty source and destination regions.');
   const layers=[],mappedIds=new Map();
-  for(const l of doc.layers)if(layerIds.has(l.id)) {
-    const id=idFor(l.id);
-    mappedIds.set(l.id,id);
-    layers.push({...structuredClone(l),id,envelope:mapEnvelope(l.envelope,source,target,source.end)});
+  const scale=(target.end-target.start)/(source.end-source.start);
+  for(const l of doc.layers)if(layerIds.has(l.id))mappedIds.set(l.id,idFor(l.id));
+  for(const l of doc.layers)if(mappedIds.has(l.id)) {
+    const copy={...structuredClone(l),id:mappedIds.get(l.id),envelope:mapEnvelope(l.envelope,source,target,source.end,l.media)};
+    for(const interval of copy.envelope)if(interval.rule) {
+      interval.rule={...interval.rule};
+      if(interval.rule.cue)interval.rule.cue=prefix+interval.rule.cue;
+      for(const key of ['length','interval','fadeIn','fadeOut','gap','anchorTolerance']) {
+        if(Number.isFinite(interval.rule[key]))interval.rule[key]*=scale;
+      }
+    }
+    if(copy.media)for(const key of ['maskA','maskB'])copy.media[key]=mappedIds.get(copy.media[key])??null;
+    layers.push(copy);
   }
   const groups=[...doc.gestures.audioGroups,...doc.gestures.lyricGroups];
-  const scale=(target.end-target.start)/(source.end-source.start);
   const map=t=>target.start+(t-source.start)*scale;
   const groupCopy=g=>{
     const occurrences=g.occurrences.flatMap(hit=>{

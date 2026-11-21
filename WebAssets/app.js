@@ -13,6 +13,7 @@ import { PROJECT_FORMAT, layerSettings, validateProject, emptyGestures, EditHist
 import { audioCueGroups } from './phrase-cues.js';
 import { advisorIntervals, defaultBindings, glyphs, opacityAt, planIntervals, replaceRegion, validRange } from './timeline.js';
 import { transferRegion, removeRegionGestures } from './region-tracks.js';
+import {bindProjectMedia} from './project-media.js';
 
 const byId = (id) => document.getElementById(id);
 const preview = byId('preview');
@@ -34,6 +35,7 @@ let wheelMediaRequest;
 let projectName = '', detachedGestures = emptyGestures(), savedEdits = '', projectBusy = false;
 const editHistory = new EditHistory();
 const retainedNativeLayers = new Set();
+const visualGrants=new Map();
 let highestId = 0;
 const state = {
   range:null, savedDuration:0, bindings:defaultBindings(),
@@ -62,7 +64,8 @@ function liveSelection() {
 }
 const feedbackDeck = new VideoFeedbackControls(byId('video-feedback'), () => nativeSurface?.sync());
 function anchorFeedback(discontinuity = false, ended = false) {
-  feedbackDeck.clock({loaded:!!state.audioBuffer, playing:state.playing, position:currentPosition(),ended},discontinuity);
+  feedbackDeck.clock({loaded:!!(state.audioBuffer||state.audioRef), playing:state.playing,
+    position:state.audioBuffer?currentPosition():state.position,ended},discontinuity);
   if(discontinuity) projectorDeck?.flush();
   if(projectorDeck?.enabled || state.layers.some(l=>l.envelope!=null)) nativeSurface?.sync();
 }
@@ -501,6 +504,7 @@ function renderTimeline() {
       block.setAttribute('aria-label',layer.name+' '+block.textContent+' seconds');
       block.addEventListener('click',()=>{
         selectLayer(layer.id); setTimeRange(interval.start,interval.end);
+        if(interval.rule)restoreWandRule(interval.rule);
         byId('wand-length').value=interval.end-interval.start;
         byId('wand-in').value=interval.fadeIn;byId('wand-out').value=interval.fadeOut;byId('wand-level').value=interval.level;
         byId('timeline-wand').open=true;
@@ -600,7 +604,7 @@ function renderFrame(timestamp) {
       !state.renderError && !state.exporting && !document.hidden && !document.querySelector('dialog[open]')) {
     try {
       context.clearRect(0, 0, preview.width, preview.height);
-      const time = state.audioBuffer ? currentPosition() : timestamp / 1000;
+      const time = state.audioBuffer ? currentPosition() : state.audioRef ? state.position : timestamp / 1000;
       const features = featuresAt(state.analysis, time);
       for (const layer of [...state.layers].reverse()) {
         if (!layer.visible) continue;
@@ -875,7 +879,7 @@ wheelStudy.addEventListener('close', () => {
 });
 byId('play').addEventListener('click', () => { if (state.playing) pause(); else play().catch((error) => status(`Playback failed: ${error.message}`)); });
 byId('restart').addEventListener('click', () => seek(0).catch((error) => status(error.message)));
-byId('stop').addEventListener('click', () => { pause(); state.position = 0; updateTransport(); status('Stopped'); });
+byId('stop').addEventListener('click', () => { pause(); state.position = 0; anchorFeedback(true); macroDeck?.transportChanged(); updateTransport(); status('Stopped'); });
 byId('add-layer').addEventListener('click', () => {
   if(byId('track-source').value==='blank')addLayer();
   else projectOperation('Add saved or template track', addTrackFromSource);
@@ -889,15 +893,18 @@ function selectedTimeRange(){return validRange(state.range)?{...state.range}:nul
 function setTimeRange(start,end,record=true) {
   const range={start,end};
   if(!validRange(range)||end>timelineDuration()+1e-8)throw Error('Select an interval within the song duration.');
-  state.range={start,end:Math.min(end,timelineDuration())};refreshTimelineTools();
+  state.range={start,end:Math.min(end,timelineDuration())};paintRange();
   if(record) checkpoint('Select time range');
 }
 function selectedCues(){const d=macroDeck?.projectState()??detachedGestures;return [...d.audioGroups,...d.lyricGroups];}
-function refreshTimelineTools() {
+function paintRange() {
   const duration=timelineDuration(), r=selectedTimeRange();
   byId('range-start').value=r?.start??0;byId('range-end').value=r?.end??duration;
   selectionOverlay.hidden=!r||!duration;
   if(r&&duration){selectionOverlay.style.left=(100*r.start/duration)+'%';selectionOverlay.style.width=(100*(r.end-r.start)/duration)+'%';}
+}
+function refreshTimelineTools() {
+  paintRange();
   const cue=byId('wand-cue'), old=cue.value;
   cue.replaceChildren(new Option('Choose a recurring cue',''),...selectedCues().map(c=>new Option(c.label,c.id)));
   if([...cue.options].some(o=>o.value===old))cue.value=old;
@@ -912,9 +919,20 @@ function refreshTimelineTools() {
 const field=id=>byId('wand-'+id);
 const numeric=id=>field(id).valueAsNumber;
 function wandRule() {
-  return {mode:state.bindings[selectedGlyph],length:numeric('length'),interval:numeric('interval'),fadeIn:numeric('in'),fadeOut:numeric('out'),
+  return {glyph:selectedGlyph,mode:field('mode').value,length:numeric('length'),interval:numeric('interval'),fadeIn:numeric('in'),fadeOut:numeric('out'),
+    startAnchor:field('start-anchor').value,endAnchor:field('end-anchor').value,anchorTolerance:numeric('anchor-tolerance'),
     level:numeric('level'),autoScale:field('autoscale').checked,tolerance:numeric('tolerance'),cue:field('cue').value,
     signal:field('signal').value,threshold:numeric('threshold'),gap:numeric('gap')};
+}
+function restoreWandRule(rule) {
+  if(glyphs.includes(rule.glyph))selectedGlyph=rule.glyph;
+  refreshTimelineTools();
+  for(const [key,input] of Object.entries({mode:'mode',length:'length',interval:'interval',startAnchor:'start-anchor',
+      endAnchor:'end-anchor',anchorTolerance:'anchor-tolerance',fadeIn:'in',fadeOut:'out',level:'level',cue:'cue',
+      signal:'signal',threshold:'threshold',tolerance:'tolerance',gap:'gap'})) {
+    if(rule[key]!==undefined)field(input).value=rule[key];
+  }
+  field('autoscale').checked=!!rule.autoScale;
 }
 function timelineAction(label,fn) {
   try {fn(); checkpoint(label);status(label);}catch(e){status(e.message||String(e));}
@@ -934,7 +952,7 @@ function applyTimelineSuggestion(s) {
   if(s.fadeIn!==undefined)rule.fadeIn=s.fadeIn;
   if(s.fadeOut!==undefined)rule.fadeOut=s.fadeOut;
   const envelope=advisorIntervals({...s,signal:s.signal??'time',fit:s.fit??'elastic'},rule,selectedCues(),state.analysis);
-  const source=selectedLayer(), key=s.wheel??s.palette??source?.palette??'violet-blue';
+  const source=selectedLayer()?.media?null:selectedLayer(), key=s.wheel??s.palette??source?.palette??'violet-blue';
   if(!mathmosWheels.has(key)&&!LIQUID_PALETTES[key])throw Error('Choose a known wheel or palette.');
   if(s.opacity!==undefined&&(!Number.isFinite(s.opacity)||s.opacity<0||s.opacity>1))throw Error('Choose an opacity between 0 and 1.');
   const layer=makeLayer(), id=layer.id;
@@ -961,6 +979,7 @@ byId('set-range').addEventListener('click',()=>timelineAction('Select time range
   setTimeRange(byId('range-start').valueAsNumber,byId('range-end').valueAsNumber,false);
 }));
 byId('select-all-time').addEventListener('click',()=>timelineAction('Select entire song',()=>setTimeRange(0,timelineDuration(),false)));
+byId('deselect-time').addEventListener('click',()=>timelineAction('Deselect time range',()=>{state.range=null;paintRange();}));
 byId('apply-wand').addEventListener('click',()=>timelineAction('Apply boundary to selected layer',()=>replaceSelected(wandRule())));
 byId('clear-region').addEventListener('click',()=>projectOperation('Clear selected layer in range',async()=>{
   const range=selectedEditRange(), layer=selectedLayer();
@@ -992,6 +1011,10 @@ for (const id of ['hue', 'speed', 'scale', 'opacity']) {
   byId(id).addEventListener('input', (event) => { const layer = selectedLayer(); if (!layer) return; layer[id] = Number(event.target.value); renderControls(); });
 }
 function authoredState() {
+  for(const {media} of state.layers)if(media?.assetId!=null) {
+    const {assetId:id,sha256,name,durationUs,width,height,still}=media;
+    visualGrants.set(sha256,{id,sha256,name,durationUs,width,height,still});
+  }
   return {timeline:{range:state.range,duration:timelineDuration(),bindings:state.bindings}, layers:state.layers.map(layerSettings), selected:state.selected, nextId:state.nextId,
     focus:projectorFocus, feedback:feedbackDeck.projectState(), exportBaseline:byId('native-export-baseline').value,
     gestures:macroDeck?.projectState() ?? detachedGestures};
@@ -1019,7 +1042,10 @@ function restoreEdits(doc, newProject) {
   state.layers = doc.layers.map(config => {
     const existing = newProject ? null : old.get(config.id);
     if (existing) old.delete(existing.id);
-    return Object.assign(existing || {canvas:layerCanvas(), renderer:null}, {envelope:null}, layerSettings(config));
+    const layer=Object.assign(existing || {canvas:layerCanvas(), renderer:null}, {envelope:null,media:undefined}, layerSettings(config));
+    const grant=layer.media&&visualGrants.get(layer.media.sha256);
+    if(grant)bindProjectMedia(layer,grant);
+    return layer;
   });
   for (const layer of old.values()) {
     layer.renderer?.dispose();
@@ -1071,9 +1097,9 @@ function chooseReplacement() {
 }
 const palettes = () => new Set([...Object.keys(LIQUID_PALETTES), ...mathmosWheels.keys()]);
 const shippedTracks = new Map([
-  ['wheel',{name:'Violet / Blue wheel',palette:'violet-blue',motion:'wheel-flow'}],
-  ['beads',{name:'Coral bead release',palette:'violet-blue',motion:'wheel-with-coral-beads'}],
-  ['lagoon',{name:'Lagoon liquid',palette:'lagoon',motion:'wheel-flow'}],
+  ['wheel',{name:'Violet / Blue wheel',palette:'violet-blue',motion:'wheel-flow',rule:{glyph:'[---]',mode:'stretch',fadeIn:.25,fadeOut:.4}}],
+  ['beads',{name:'Coral bead release',palette:'violet-blue',motion:'wheel-with-coral-beads',rule:{glyph:'(---)',mode:'repeat',length:2,interval:4,fadeIn:.15,fadeOut:.4}}],
+  ['lagoon',{name:'Lagoon liquid',palette:'lagoon',motion:'wheel-flow',rule:{glyph:'*---*',mode:'signal',signal:'bass',threshold:.18,fadeIn:.08,fadeOut:.2}}],
 ]);
 const libraryCache=new Map();
 let copySequence=0;
@@ -1104,6 +1130,13 @@ function setGestureData(data){if(macroDeck)macroDeck.restoreProject(data);else d
 function regionProject(selectedOnly=false) {
   const doc=projectDocument(), range=selectedEditRange();
   const ids=new Set(selectedOnly?[state.selected]:doc.layers.map(l=>l.id));
+  if(selectedOnly){
+    const layers=new Map(doc.layers.map(l=>[l.id,l]));
+    for(const id of ids)for(const ref of ['maskA','maskB']){
+      const mask=layers.get(id)?.media?.[ref];
+      if(layers.has(mask))ids.add(mask);
+    }
+  }
   const region=transferRegion(doc,range,range,ids,id=>id,'region/');
   return validateProject({...doc,...region,position:range.start},palettes());
 }
@@ -1112,7 +1145,7 @@ async function saveLibraryTrack(kind) {
   if(kind==='song'&&!state.audioRef?.sha256)throw Error('Open the song to save a song-specific track.');
   await macroDeck?.finishPendingRecording();
   const doc=regionProject(true), key=libraryKey(kind);
-  const entries=[...library(kind),{id:newPrefix(),name,doc}];
+  const entries=[...library(kind),{id:newPrefix(),name,doc,rule:wandRule()}];
   localStorage.setItem(key,JSON.stringify(entries));
   libraryCache.set(key,entries);refreshTrackSources();
   byId('track-source').value=kind+':'+entries.at(-1).id;
@@ -1142,7 +1175,7 @@ function mergeClips(doc,source,placements,label,applyRule=false) {
   for(const key of Object.keys(imported))gestures[key]=[...gestures[key],...imported[key]];
   gestures.selected=imported.macros[0]?.id??gestures.selected;
   const added=[...created.values()];
-  const combined={...existing,layers:[...added,...existing.layers],nextId:next,selected:added[0].id,gestures};
+  const combined={...existing,layers:[...added,...existing.layers],nextId:next,selected:ids.get(doc.selected)??added[0].id,gestures};
   validateProject({...projectDocument(),...combined},palettes());
   restoreEdits(combined,false);highestId=next-1;
   checkpoint(label);status(label);
@@ -1155,17 +1188,19 @@ async function addTrackFromSource() {
   let range=selectedTimeRange();
   if(kind==='shipped'){
     if(!range)throw Error('Select a waveform interval or choose Select all.');
-    const s=shippedTracks.get(id), layer=makeLayer();
+    const s=shippedTracks.get(id), envelope=planIntervals(rule,range,{groups:selectedCues(),analysis:state.analysis});
+    if(!envelope.length)throw Error('The boundary found no matches in this selection.');
+    const layer=makeLayer();
     layer.name=s.name;layer.motion=s.motion;layer.palette=s.palette;
     layer.colors=[...(mathmosWheels.get(s.palette)?.colors??LIQUID_PALETTES[s.palette])];
     layer.nativeLive=mathmosWheels.has(s.palette);
-    layer.envelope=planIntervals(rule,range,{groups:selectedCues(),analysis:state.analysis});
-    if(!layer.envelope.length)throw Error('The boundary found no matches in this selection.');
+    layer.envelope=envelope;
     state.layers.unshift(layer);selectLayer(layer.id);checkpoint('Add '+s.name);status('Added '+s.name);return;
   }
   const entry=library(kind).find(e=>e.id===id);
   if(!entry)throw Error('Choose a saved track or template.');
   const doc=validateProject(entry.doc,palettes()), source=doc.timeline.range;
+  await resolveProjectMedia(doc);
   if(kind==='song'&&!range){mergeClips(doc,source,[source],'Restore song track '+entry.name);return;}
   if(!range)throw Error('Select a waveform interval or choose Select all.');
   const placements=planIntervals(rule,range,{groups:selectedCues(),analysis:state.analysis});
@@ -1174,6 +1209,26 @@ async function addTrackFromSource() {
 }
 for(const [button,kind] of [['save-song-track','song'],['save-user-template','user']]){
   byId(button).addEventListener('click',()=>projectOperation('Save track',()=>saveLibraryTrack(kind)));
+}
+byId('track-source').addEventListener('change',()=>{
+  const value=byId('track-source').value, colon=value.indexOf(':');
+  if(colon<0)return;
+  const kind=value.slice(0,colon),id=value.slice(colon+1);
+  const entry=kind==='shipped'?shippedTracks.get(id):library(kind).find(e=>e.id===id);
+  if(entry?.rule)restoreWandRule({...wandRule(),...entry.rule});
+});
+async function resolveProjectMedia(doc) {
+  const sources=new Map(doc.layers.filter(l=>l.media).map(l=>[l.media.sha256,l.media.name]));
+  const offline=[];
+  for(const [sha256,name] of sources) {
+    if(visualGrants.has(sha256))continue;
+    try {
+      const grant=desktopInvoke && await desktopInvoke('resolve_visual_media',{sha256,name});
+      if(grant?.sha256===sha256) {visualGrants.set(sha256,grant);continue;}
+    } catch(e) {offline.push(name+' ('+(e.message||e)+')');continue;}
+    offline.push(name);
+  }
+  return offline;
 }
 async function openProject(file,merge=false) {
   if (file && file.size > 64 * 1024 * 1024) throw Error('Project exceeds 64 MiB.');
@@ -1188,10 +1243,12 @@ async function openProject(file,merge=false) {
     const duration=doc.timeline?.duration || (state.audioRef && state.audioRef.sha256===doc.audio?.sha256 ? timelineDuration() : numeric('length'));
     const source=doc.timeline?.range??{start:0,end:duration};
     if(!validRange(source))throw Error('Set the source clip length for this project.');
+    await resolveProjectMedia(doc);
     mergeClips(doc,source,[target],'Merge '+name+' into selection');
     return;
   }
   if (!await chooseReplacement()) return;
+  const offlineMedia=await resolveProjectMedia(doc);
   const token = ++state.fileToken;
   let audio = null;
   if (selection) {
@@ -1217,7 +1274,8 @@ async function openProject(file,merge=false) {
   restoreEdits(doc, true);
   installAudio(audio, doc.audio, selection?.[1], selection?.[0], doc.position);
   resetHistory('Open project'); savedEdits = editSignature();
-  status(doc.audio && !audio ? 'Project opened. Relink ' + doc.audio.name + ' to play.' : 'Opened ' + name);
+  const audioNotice=doc.audio&&!audio?' Relink '+doc.audio.name+' to play.':'';
+  status('Opened '+name+'.'+audioNotice+(offlineMedia.length?' Offline visual media: '+offlineMedia.join(', '):''));
 }
 async function saveProject(regionOnly=false) {
   await macroDeck?.finishPendingRecording();
