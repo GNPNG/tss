@@ -1,0 +1,21 @@
+{
+  "executableRevision": "224df17",
+  "status": "Opened Star Aperture.tss.",
+  "privateDesktop": true,
+  "title": "Star Aperture.tss",
+  "audio": "two-slide-cues.m4a",
+  "duration": "00:02",
+  "canPlay": true,
+  "layerRows": [
+    "star-green.mp4",
+    "Artwork",
+    "moving-matte.mov",
+    "Hidden",
+    "Violet / Blue",
+    "Liquid light"
+  ],
+  "macros": [
+    "Pull the rear oil",
+    "Turn the front slide"
+  ]
+}

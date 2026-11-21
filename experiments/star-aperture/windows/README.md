@@ -15,3 +15,7 @@ For frame 42, the source timestamp selected frame 33 of the 24 FPS artwork and m
 The projector presented 20 frames on the one attached display. Minimizing the editor produced 13 offscreen submissions in 675 ms. Minimizing both windows produced zero submissions in 667 ms. Across launch, export and the projector checks, the guarded sample peaked at 68% GPU use, 350 MiB, 58 °C and 19.08 W. These telemetry samples span 27.536 s. [Windows editor checks](artwork-4k.webview.json) · [Guard samples](gpu.csv)
 
 To repeat, generate the fixture, set `TSS_PROOF_MEDIA` to the absolute path of `star-green.mp4` and `TSS_PROOF_MATTE` to `moving-matte.mov`. Set `TSS_WHEEL_EXPORT_PROOF` to a fresh PPM path and `TSS_WHEEL_EXPORT_PROOF_FRAME=42`. Run the guarded Windows editor with `--verify-wheel-export <two-slide-cues.m4a> <new-output.mp4>` and use absolute paths. [Source audio](../../slide-look-study/approval/windows-live/gesture-controls/export/two-slide-cues.m4a)
+
+## Opening the packaged example
+
+The executable built from `224df17` opened the delivered **Star Aperture.tss** through the editor's **Open project** button and Windows file picker on an isolated private desktop. The editor enabled **Play**, showed **two-slide-cues.m4a** at **00:02**, and restored the artwork, hidden moving matte, Violet / Blue wheel, and both named gesture macros. The Windows machine already had the two visual sources in its prepared-media cache. [Observed editor controls](project-open.json)
