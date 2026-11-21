@@ -1,0 +1,68 @@
+{
+  "format": "the-sacred-swirls",
+  "version": 1,
+  "audio": null,
+  "position": 0,
+  "timeline": {
+    "range": null,
+    "duration": 6,
+    "bindings": {
+      "|---|": "fixed",
+      "[---]": "stretch",
+      "(---)": "repeat",
+      "{---}": "recurrence",
+      "*---*": "signal"
+    }
+  },
+  "layers": [
+    {
+      "id": 1,
+      "name": "Wheel with coral beads",
+      "visible": true,
+      "palette": "violet-blue",
+      "colors": [
+        "#D4CFDC",
+        "#C579B2",
+        "#1771B5",
+        "#0EAAD6"
+      ],
+      "customColors": false,
+      "hue": 0,
+      "speed": 1,
+      "scale": 1,
+      "opacity": 1,
+      "nativeLive": true,
+      "motion": "wheel-with-coral-beads",
+      "motionTake": 1,
+      "visibleFilms": "both",
+      "slide": "front",
+      "gesture": "tug",
+      "tugResponse": {
+        "rear": 0.4,
+        "front": 0.4
+      },
+      "mousePressure": {
+        "rear": 0.5,
+        "front": 0.5
+      },
+      "renderWidth": 960
+    }
+  ],
+  "selected": 1,
+  "nextId": 2,
+  "focus": 0.9,
+  "feedback": {
+    "enabled": false,
+    "delay": 100,
+    "strength": 40,
+    "zoom": 103,
+    "rotation": 1
+  },
+  "exportBaseline": "neutral",
+  "gestures": {
+    "macros": [],
+    "audioGroups": [],
+    "lyricGroups": [],
+    "selected": null
+  }
+}

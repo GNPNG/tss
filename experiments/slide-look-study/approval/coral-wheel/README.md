@@ -1,5 +1,7 @@
 # Wheel with coral beads
 
+Choose **Open project** in the desktop editor and select [coral-wheel.tss](coral-wheel.tss). The project opens one Violet / Blue wheel with both films visible, 90% front focus and a 960-pixel preview. The live wheel runs without audio. Choose **Replay front beads** to restart the staggered cyan releases while the original rear film keeps turning. Drag on the preview to tug the front material at medium response.
+
 The [six-second projection](coral-wheel.mp4) pairs the Violet / Blue wheel’s original rear film with the small-drop front slide. Both start at zero. Watch the narrow necks along the upper edge of the blue bank as droplets separate and drift. The front reaches its last recorded state at 3.958 seconds. The rear wheel continues through the end of the clip. Projector focus stays at 90% toward the front.
 
 The [half-speed close-up](coral-wheel-detail-half-speed.mp4) follows the same six seconds, enlarged 2× from a 480 × 270 rectangle beginning at (108, 254) in the full 960 × 540 frame. Each source frame appears once at 12 fps. Several necks around the center let go between 0.875 and 1.583 seconds in the full projection, or 1.75–3.17 seconds in the close-up. Watch the small cyan beads pass over the pale opening between the violet shapes. The [full-gate still at 2.5 seconds](coral-wheel.png) uses the original sRGB samples. [Optical-cache separation measurements](../../../coral-release/small-drops/optical-events.csv)

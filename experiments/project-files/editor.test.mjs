@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 async function exerciseControls(platform) {
+  const coral = platform === 'Windows coral project';
   const windows = platform === 'Windows';
   Object.defineProperty(navigator,'userAgent',{value:platform+' project controls'});
   const $ = id => document.getElementById(id);
@@ -23,7 +24,7 @@ async function exerciseControls(platform) {
   const set = (id,value) => {
     const input=$(id);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
   };
-  const audio = new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
+  const audio = coral ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
   let documentText, incoming, linked=null, lastSelection=1;
   const advisorRequests=[],reviewedLyrics=[],previewRequests=[];
   let finishInference;
@@ -56,7 +57,7 @@ async function exerciseControls(platform) {
       advisorRequests.push(args);
       return new Promise(resolve=>{finishInference=()=>resolve({visual:'video',signal:'onset',fit:'repeat'});});
     case 'resolve_visual_media': return args.name==='Plate.gif'?{id:42,name:args.name,sha256:args.sha256,width:400,height:240,durationUs:800000,still:false}:null;
-    case 'open_project': return ['Headliner.tss',incoming,linked];
+    case 'open_project': return [coral ? 'coral-wheel.tss' : 'Headliner.tss',incoming,linked];
     default: throw Error('Unexpected command '+command);
     }
   }}};
@@ -64,6 +65,26 @@ async function exerciseControls(platform) {
   window.requestAnimationFrame=()=>0;
   await import('/app.js');
   await until(()=>$('edit-history').options.length>0);
+  if (coral) {
+    incoming=await (await fetch('/coral-wheel.tss')).text();
+    click('open-project');await idle();
+    check($('app-status').textContent==='Opened coral-wheel.tss.' && $('track-title').textContent==='coral-wheel.tss','normal project open');
+    check($('layer-count').textContent.startsWith('1') && $('selected-name').textContent==='Wheel with coral beads','selected coral wheel');
+    check($('mathmos-wheel').value==='violet-blue' && $('wheel-motion').value==='wheel-with-coral-beads' &&
+      $('wheel-films').value==='both' && $('wheel-slide').value==='front' && $('wheel-gesture').value==='tug' &&
+      $('wheel-focus').value==='90' && $('wheel-width').value==='960' && $('tug-response').value==='0.4','capture controls');
+    check($('play').disabled && $('relink-audio').hidden && $('source-name').textContent==='No audio selected','audio-free project');
+    await until(()=>previewRequests.at(-1)?.motion==='wheel-with-coral-beads');
+    const first=previewRequests.at(-1);
+    check(first.layerId===1 && first.wheel==='violet-blue' && first.renderWidth===960 && first.focus===.9 &&
+      first.visibleFilms==='both' && first.slide==='front' && first.gesture==='tug' && first.tugResponse===.4,'native configuration');
+    click('save-project');await idle();
+    check(JSON.stringify(JSON.parse(incoming))===documentText,'unaltered example round trip');
+    check(!$('replay-release').disabled && $('replay-release').textContent==='Replay front beads','available front replay');
+    click('replay-release');await until(()=>previewRequests.at(-1)?.motionTake===first.motionTake+1);
+    check(previewRequests.at(-1).visibleFilms==='both' && $('play').disabled,'silent replay preserves both films');
+    return;
+  }
   if (platform==='Macintosh') {
     await until(()=>previewRequests.some(c=>c?.wheel==='violet-blue'));
     const preview=previewRequests.at(-1);
@@ -161,7 +182,7 @@ async function exerciseControls(platform) {
     !restored.layers.some(l=>l.media?.assetId!==undefined),'portable media link, offline metadata and refreshed grant');
 }
 const chrome=process.env.CHROME_BIN;
-for (const platform of ['Linux','Windows','Macintosh']) test(platform==='Macintosh'?'Mac desktop native wheel selection, optics and modal visibility':platform+' editor project and region controls, reviewed advisor cues, lyric consent and undo',
+for (const platform of ['Linux','Windows','Macintosh','Windows coral project']) test(platform==='Windows coral project'?'Open and replay the standalone coral capture project without audio':platform==='Macintosh'?'Mac desktop native wheel selection, optics and modal visibility':platform+' editor project and region controls, reviewed advisor cues, lyric consent and undo',
   {skip:!chrome && 'Set CHROME_BIN to a Chrome executable', timeout:30000}, async()=>{
     const web=new URL('../../WebAssets/',import.meta.url);
     const media=new URL('../slide-look-study/approval/windows-live/gesture-controls/export/two-slide-cues.m4a',import.meta.url);
@@ -175,6 +196,10 @@ for (const platform of ['Linux','Windows','Macintosh']) test(platform==='Macinto
           const html=(await readFile(new URL('index.html',web),'utf8')).replace('<script type="module" src="app.js"></script>',
             '<script type="module">('+exerciseControls.toString()+')('+JSON.stringify(platform)+').then(()=>fetch("/report",{method:"POST",body:"pass"})).catch(e=>fetch("/report",{method:"POST",body:e.stack}));</script>');
           res.writeHead(200,{'Content-Type':'text/html'});res.end(html);return;
+        }
+        if(req.url==='/coral-wheel.tss') {
+          res.writeHead(200,{'Content-Type':'application/json'});
+          res.end(await readFile(new URL('../slide-look-study/approval/coral-wheel/coral-wheel.tss',import.meta.url)));return;
         }
         if(req.url==='/sample.m4a'){res.writeHead(200,{'Content-Type':'audio/mp4'});res.end(await readFile(media));return;}
         const allowed=/^\/(?:[a-z-]+\.js|styles\.css|assets\/(?:mathmos-wheels\.json|visual-advice\.json|tss-project-logo\.jpeg))$/;
