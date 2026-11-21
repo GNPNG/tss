@@ -1,0 +1,61 @@
+diff --git a/sailfish/templates/kernel_common.mako b/sailfish/templates/kernel_common.mako
+index ad90414..cef6e85 100644
+--- a/sailfish/templates/kernel_common.mako
++++ b/sailfish/templates/kernel_common.mako
+@@ -167,7 +167,7 @@
+ </%def>
+ 
+ <%def name="shared_mem_propagation_vars()">
+-  %if not propagate_on_read and propagation_enabled and node_addressing != 'indirect':
++  %if propagation_enabled and node_addressing == 'direct' and (access_pattern == 'AA' or not propagate_on_read):
+     %if supports_shuffle and propagate_with_shuffle:
+       // Shared variables for cross-warp propagation.
+       %for i in sym.get_prop_dists(grid, 1):
+diff --git a/sailfish/templates/models/binary_shan_chen.mako b/sailfish/templates/models/binary_shan_chen.mako
+index 150a986..2b00acd 100644
+--- a/sailfish/templates/models/binary_shan_chen.mako
++++ b/sailfish/templates/models/binary_shan_chen.mako
+@@ -99,7 +99,7 @@ ${kernel} void ShanChenCollideAndPropagate${grid_idx}(
+   ${scratch_space_if_required()}
+   ${iteration_number_if_required()})
+ {
+-  <% needs_barriers = propagation_enabled and access_pattern == 'AB' and not propagate_on_read and node_addressing != 'indirect' %>
++  <% needs_barriers = propagation_enabled and node_addressing == 'direct' and (access_pattern == 'AA' or not propagate_on_read) %>
+   ${cond(barrier_needs_all_threads and needs_barriers, 'bool alive = true;')}
+   ${local_indices_split(barriers=needs_barriers)}
+   ${indirect_index()}
+diff --git a/sailfish/templates/models/lb_binary_fluid.mako b/sailfish/templates/models/lb_binary_fluid.mako
+index 49b8248..f4b0479 100644
+--- a/sailfish/templates/models/lb_binary_fluid.mako
++++ b/sailfish/templates/models/lb_binary_fluid.mako
+@@ -266,7 +266,7 @@ ${kernel} void FreeEnergyCollideAndPropagateFluid(
+   ${scratch_space_if_required()}
+   ${iteration_number_if_required()})
+ {
+-  <% needs_barriers = propagation_enabled and access_pattern == 'AB' and not propagate_on_read and node_addressing != 'indirect' %>
++  <% needs_barriers = propagation_enabled and node_addressing == 'direct' and (access_pattern == 'AA' or not propagate_on_read) %>
+   ${cond(barrier_needs_all_threads and needs_barriers, 'bool alive = true;')}
+   ${local_indices_split(barriers=needs_barriers)}
+   ${indirect_index()}
+@@ -334,7 +334,7 @@ ${kernel} void FreeEnergyCollideAndPropagateOrderParam(
+   ${scratch_space_if_required()}
+   ${iteration_number_if_required()})
+ {
+-  <% needs_barriers = propagation_enabled and access_pattern == 'AB' and not propagate_on_read and node_addressing != 'indirect' %>
++  <% needs_barriers = propagation_enabled and node_addressing == 'direct' and (access_pattern == 'AA' or not propagate_on_read) %>
+   ${cond(barrier_needs_all_threads and needs_barriers, 'bool alive = true;')}
+   ${local_indices_split(barriers=needs_barriers)}
+   ${indirect_index()}
+diff --git a/sailfish/templates/propagation.mako b/sailfish/templates/propagation.mako
+index 8ff9a2d..dcbafa3 100644
+--- a/sailfish/templates/propagation.mako
++++ b/sailfish/templates/propagation.mako
+@@ -412,7 +412,7 @@
+         %endif
+       %endif
+     // inplace propagation does not require propagation-only nodes.
+-    } else if (!propagation_only) {
++    } else if (!propagation_only ${cond(barrier_needs_all_threads and node_addressing == 'direct', '&& alive')}) {
+       ${propagate_inplace_opposite_slot(dist_out, dist_in)}
+     }
+   %else:

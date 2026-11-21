@@ -36,3 +36,38 @@ The two phase sequences each contained 21 frames with positive, finite component
 The matching NVIDIA/AMD drop snapshots had exactly equal initial densities but diverged after 1000 steps: maximum absolute rho difference 0.01932466 and phi difference 0.002264865. No cross-device acceptance tolerance has been established.
 
 The fixed 2D direct-addressed AB path was exercised on nonmultiple domain dimensions and a wall geometry, without proving all barrier paths or configurations. `--propagate_on_read` produced invalid values and is unsupported in this study; the finite check was changed to fail closed. A separate wall test had small negative density near -0.0059, and a default G12=1.2 phase run had negative density near -0.002: neither is physically validated. The production design still needs fluid, numerical, optical, performance, integration, dependency and licensing review.
+
+## AA direct-addressed OpenCL propagation
+
+The earlier patch still emitted references to undeclared `alive` in AA mode. AA alternates between opposite-slot writes on even iterations and shared-memory propagation on odd iterations. [The incremental patch](aa-opencl.patch) enables lane masking for both iterations, allocates the shared arrays used on odd iterations, and guards even-iteration writes for padded and excluded lanes. Apply it **after** `tss-sailfish.patch` at the pinned upstream revision. The AB results above used the earlier patch.
+
+The [regression fixture](aa-regression/render.mjs) renders Sailfish's D2Q9 indexing, node loading and propagation templates with the corresponding Shan–Chen and two free-energy collision headers. It assigns each direction and site a distinct marker in place of a collision calculation. Clang 17 reproduced the undeclared identifier with both AA settings of `--propagate_on_read`. After the patch, the three kernel fragments compiled across all four combinations of AA/AB and the on-read flag. For both AB settings the generated fixture was byte-identical before and after.
+
+The [native OpenCL test](aa-regression/markers.c) ran 12 dispatches on the Radeon Pro 5300M with an 8 × 1 workgroup and a 41 × 7 lattice padded to 48 × 7. All padded output cells retained their initial markers on both parities. The even step wrote every active site's distributions into opposite slots and preserved the markers at the excluded and propagation-only sites. On the odd step, all nine directions in the checked interior region, including sites across workgroup boundaries, matched their source coordinates. Both guarded runs completed and released the reservation. The Intel CPU driver compiled the probe and reported a maximum workgroup size of one for these kernels, which prevented the eight-lane runtime test on that device.
+
+This fixture exercises propagation in isolation. Full AA collision evolution, component-mass drift and wall physics remain unverified. The AB on-read numerical failure above remains open.
+
+### Repeat the regression
+
+Use a fresh checkout in `SOURCE` with `tss-sailfish.patch` already applied. Set `STUDY` to this directory, `OUT` to a fresh output directory and `MAKO_RENDER` to the Mako executable in the Sailfish study environment. The renderer also accepts `CLANG` to select a compiler.
+
+```sh
+export MAKO_RENDER
+node "$STUDY/aa-regression/render.mjs" "$SOURCE" "$OUT/before" before
+git -C "$SOURCE" apply "$STUDY/aa-opencl.patch"
+node "$STUDY/aa-regression/render.mjs" "$SOURCE" "$OUT/after" after
+cmp "$OUT/before/AB-read.cl" "$OUT/after/AB-read.cl"
+cmp "$OUT/before/AB-write.cl" "$OUT/after/AB-write.cl"
+```
+
+On the tested Mac, use the existing Radeon reservation when the editor and other GPU jobs are closed. Set `GUARD` to the compiled `experiments/gpu-job-control-rust/target/debug/tss-gpu-job` executable.
+
+```sh
+/usr/bin/clang -std=c11 -Wno-deprecated-declarations -framework OpenCL \
+  "$STUDY/aa-regression/markers.c" -o "$OUT/markers"
+for mode in AA-write AA-read; do
+  "$GUARD" run --reservation /tmp/tss-radeon-pro-5300m-reservation --timeout 30 \
+    --output-log "$OUT/$mode.log" -- "$OUT/markers" "$OUT/after/$mode.cl" \
+    'AMD Radeon Pro 5300M Compute Engine' || exit 1
+done
+```

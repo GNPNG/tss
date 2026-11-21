@@ -1,0 +1,351 @@
+diff --git a/sailfish/backend_opencl.py b/sailfish/backend_opencl.py
+index 6f65d29..cf8e9f1 100644
+--- a/sailfish/backend_opencl.py
++++ b/sailfish/backend_opencl.py
+@@ -59,6 +59,7 @@ class OpenCLBackend(object):
+         self.buffers = {}
+         self.arrays = {}
+         self._iteration_kernels = []
++        self._pending_default = []
+         self.config = options
+ 
+     @property
+@@ -116,42 +117,44 @@ class OpenCLBackend(object):
+     def to_buf(self, cl_buf, source=None):
+         if source is None:
+             if cl_buf in self.buffers:
+-                cl.enqueue_write_buffer(self.default_queue, cl_buf,
++                cl.enqueue_copy(self.default_queue, cl_buf,
+                         self.buffers[cl_buf]).wait()
+             else:
+                 raise ValueError('Unknown compute buffer and source not specified.')
+         else:
+             if source.base is not None:
+-                cl.enqueue_write_buffer(self.default_queue, cl_buf,
++                cl.enqueue_copy(self.default_queue, cl_buf,
+                         source.base).wait()
+             else:
+-                cl.enqueue_write_buffer(self.default_queue, cl_buf,
++                cl.enqueue_copy(self.default_queue, cl_buf,
+                         source).wait()
+ 
+     def from_buf(self, cl_buf, target=None):
+         if target is None:
+             if cl_buf in self.buffers:
+-                cl.enqueue_read_buffer(self.default_queue, cl_buf,
+-                        self.buffers[cl_buf]).wait()
++                cl.enqueue_copy(self.default_queue, self.buffers[cl_buf],
++                        cl_buf).wait()
+             else:
+                 raise ValueError('Unknown compute buffer and target not specified.')
+         else:
+             if target.base is not None:
+-                cl.enqueue_read_buffer(self.default_queue, cl_buf,
+-                        target.base).wait()
++                cl.enqueue_copy(self.default_queue, target.base,
++                        cl_buf).wait()
+             else:
+-                cl.enqueue_read_buffer(self.default_queue, cl_buf,
+-                        target).wait()
++                cl.enqueue_copy(self.default_queue, target,
++                        cl_buf).wait()
+ 
+     def to_buf_async(self, cl_buf, stream=None):
+         queue = stream.queue if stream is not None else self.default_queue
+-        cl.enqueue_write_buffer(queue, cl_buf, self.buffers[cl_buf],
++        event = cl.enqueue_copy(queue, cl_buf, self.buffers[cl_buf],
+                 is_blocking=False)
++        (stream.pending if stream is not None else self._pending_default).append(event)
+ 
+     def from_buf_async(self, cl_buf, stream=None):
+         queue = stream.queue if stream is not None else self.default_queue
+-        cl.enqueue_read_buffer(queue, cl_buf, self.buffers[cl_buf],
++        event = cl.enqueue_copy(queue, self.buffers[cl_buf], cl_buf,
+                 is_blocking=False)
++        (stream.pending if stream is not None else self._pending_default).append(event)
+ 
+     def build(self, source):
+         preamble = ''
+@@ -209,6 +212,7 @@ class OpenCLBackend(object):
+ 
+     def sync(self):
+         self.default_queue.finish()
++        self._pending_default = []
+ 
+     def make_stream(self):
+         return StreamWrapper(cl.CommandQueue(self.ctx,
+@@ -250,11 +254,13 @@ class EventWrapper(object):
+ class StreamWrapper(object):
+     def __init__(self, cmd_queue):
+         self.queue = cmd_queue
++        self.pending = []
+ 
+     def wait_for_event(self, event):
+         cl.enqueue_marker(self.queue, [event.event])
+ 
+     def synchronize(self):
+         self.queue.finish()
++        self.pending = []
+ 
+ backend=OpenCLBackend
+diff --git a/sailfish/controller.py b/sailfish/controller.py
+index 0e3bfff..5723735 100644
+--- a/sailfish/controller.py
++++ b/sailfish/controller.py
+@@ -736,6 +736,9 @@ class LBSimulationController(object):
+ 
+             if not self.config.debug_single_process:
+                 self._simulation_process.join()
++                if self._simulation_process.exitcode != 0:
++                    raise RuntimeError('Machine master failed with exit code {0}'.format(
++                        self._simulation_process.exitcode))
+ 
+         if self.config.mode == 'benchmark':
+             mlups_total = 0.0
+diff --git a/sailfish/io.py b/sailfish/io.py
+index 8fd8e73..929cbe7 100644
+--- a/sailfish/io.py
++++ b/sailfish/io.py
+@@ -331,8 +331,12 @@ class NPYOutput(LBOutput):
+         self.mask_nonfluid_nodes()
+         fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='.npz')
+         data = {}
+-        data.update(self._scalar_fields)
+-        data.update(self._vector_fields)
++        # The saver runs on another thread while simulation buffers are reused.
++        # Snapshot the values before enqueueing, so a frame cannot contain a
++        # later iteration or partially overwritten arrays.
++        data.update((name, field.copy()) for name, field in self._scalar_fields.items())
++        data.update((name, np.array([component.copy() for component in field]))
++                    for name, field in self._vector_fields.items())
+         self._save(fname, **data)
+ 
+     def dump_dists(self, dists, i):
+diff --git a/sailfish/master.py b/sailfish/master.py
+index 28e0312..3af572b 100644
+--- a/sailfish/master.py
++++ b/sailfish/master.py
+@@ -21,6 +21,14 @@ import zmq
+ from sailfish import subdomain_runner, util, io
+ from sailfish.connector import ZMQSubdomainConnector, ZMQRemoteSubdomainConnector, CompressedZMQRemoteSubdomainConnector
+ 
++def _git_revision(root_dir):
++    """Return the checkout revision, or None when Git cannot report one."""
++    try:
++        return subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root_dir,
++                                       stderr=subprocess.PIPE).rstrip()
++    except (OSError, subprocess.CalledProcessError):
++        return None
++
+ def _start_subdomain_runner(subdomain_spec, config, sim, num_subdomains,
+         backend_class, gpu_id, output,
+         quit_event, master_addr, timing_info_to_master):
+@@ -311,6 +319,13 @@ class LBMachineMaster(object):
+         for ipcfile in ipc_files:
+             os.unlink(ipcfile)
+ 
++        for runner in self.runners:
++            runner.join()
++        failed = [(runner.name, runner.exitcode) for runner in self.runners
++                  if runner.exitcode not in (0, None)]
++        if failed:
++            raise RuntimeError('Subdomain process failed: {0}'.format(failed))
++
+     def run(self):
+         self.config.logger.info('Machine master starting with PID {0} at {1}'.format(
+             os.getpid(), time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())))
+@@ -319,13 +334,9 @@ class LBMachineMaster(object):
+         # Log Sailfish version if running from a git repository.
+         sailfish_root_dir = os.path.join(os.path.realpath(
+             os.path.dirname(__file__)), '..')
+-        try:
+-            git_hash = subprocess.check_output('cd %s ; git rev-parse HEAD' %
+-                                               sailfish_root_dir,
+-                                               shell=True).rstrip()
++        git_hash = _git_revision(sailfish_root_dir)
++        if git_hash:
+             self.config.logger.info('Sailfish version: {0}'.format(git_hash))
+-        except subprocess.CalledProcessError:
+-            pass
+ 
+         self.config.logger.info('Handling subdomains: {0}'.format([b.id for b in
+             self.subdomain_specs]))
+diff --git a/sailfish/subdomain_runner.py b/sailfish/subdomain_runner.py
+index 1d3e308..466baad 100644
+--- a/sailfish/subdomain_runner.py
++++ b/sailfish/subdomain_runner.py
+@@ -1724,7 +1724,8 @@ class SubdomainRunner(object):
+                                 "output for iteration {0}".format(
+                                 self._sim.iteration))
+                         self._quit_event.set()
+-                        break
++                        raise RuntimeError('Invalid fluid output at iteration {0}'.format(
++                                self._sim.iteration))
+                     self._output.save(self._sim.iteration)
+                 elif sync_req:
+                     # Required so that custom code in "after_step" below does
+@@ -1754,6 +1755,11 @@ class SubdomainRunner(object):
+             if output_req:
+                 if self._host_indirect_address is not None:
+                     self._unravel_fields()
++                if (self.config.check_invalid_results_host and
++                    not self._output.verify()):
++                    self._quit_event.set()
++                    raise RuntimeError('Invalid final fluid output at iteration {0}'.format(
++                            self._sim.iteration))
+                 self._output.save(self._sim.iteration)
+ 
+             self._profile.record_end()
+diff --git a/sailfish/templates/kernel_common.mako b/sailfish/templates/kernel_common.mako
+index 8b819c8..ad90414 100644
+--- a/sailfish/templates/kernel_common.mako
++++ b/sailfish/templates/kernel_common.mako
+@@ -128,9 +128,9 @@
+     %endif
+ 
+     if (options & OPTION_BULK) {
+-      ${local_indices_bulk(no_outside=no_outside)}
++      ${local_indices_bulk(no_outside=no_outside, barriers=barriers)}
+     } else {
+-      ${local_indices_boundary(no_outside=no_outside)}
++      ${local_indices_boundary(no_outside=no_outside, barriers=barriers)}
+     }
+   %else:
+     ${local_indices(no_outside=no_outside, barriers=barriers)}
+@@ -188,13 +188,18 @@
+   %endif
+ </%def>
+ 
+-<%def name="load_node_type()">
++<%def name="load_node_type(barriers=True)">
++  %if barrier_needs_all_threads and barriers:
++  int ncode = alive ? map[gi] : 0;
++  int type = alive ? decodeNodeType(ncode) : 0;
++  %else:
+   int ncode = map[gi];
+   int type = decodeNodeType(ncode);
++  %endif
+ 
+   // Unused nodes do not participate in the simulation.
+   if (isExcludedNode(type)) {
+-    ${cond(barrier_needs_all_threads, 'alive = false', 'return')};
++    ${cond(barrier_needs_all_threads and barriers, 'alive = false', 'return')};
+   }
+ 
+   int orientation = decodeNodeOrientation(ncode);
+@@ -242,7 +247,7 @@
+ ## Defines local indices for bulk kernels.
+ ## This is the same as local_indices(), but with proper offsets to skip
+ ## the boundary.
+-<%def name="local_indices_bulk(no_outside=True)">
++<%def name="local_indices_bulk(no_outside=True, barriers=False)">
+   lx = get_local_id(0); // ID inside the current block
+   <%
+     if block.has_face_conn(block.X_LOW) or block.periodic_x:
+@@ -284,13 +289,13 @@
+   %if no_outside:
+     // Nothing to do if we're outside of the simulation domain.
+     if (gx > ${lat_nx-1}) {
+-      return;
++      ${cond(barrier_needs_all_threads and barriers, 'alive = false', 'return')};
+     }
+   %endif
+ </%def>
+ 
+ ## Defines local indices for boundary kernels.
+-<%def name="local_indices_boundary(no_outside=True)">
++<%def name="local_indices_boundary(no_outside=True, barriers=False)">
+   lx = get_local_id(0); // ID inside the current block
+   int gid = get_group_id(0) + get_group_id(1) * get_global_size(0) / get_local_size(0);
+ 
+@@ -451,7 +456,7 @@
+   %if no_outside:
+     // Nothing to do if we're outside of the simulation domain.
+     if (gx > ${lat_nx-1}) {
+-      return;
++      ${cond(barrier_needs_all_threads and barriers, 'alive = false', 'return')};
+     }
+   %endif
+ </%def>
+diff --git a/sailfish/templates/models/binary_shan_chen.mako b/sailfish/templates/models/binary_shan_chen.mako
+index 15cdd3f..150a986 100644
+--- a/sailfish/templates/models/binary_shan_chen.mako
++++ b/sailfish/templates/models/binary_shan_chen.mako
+@@ -30,7 +30,7 @@ ${kernel} void ShanChenPrepareMacroFields(
+ {
+   ${local_indices_split()}
+   ${indirect_index()}
+-  ${load_node_type()}
++  ${load_node_type(barriers=False)}
+ 
+   // Do not update the macroscopic fields for nodes which do not
+   // represent any fluid.
+@@ -99,12 +99,14 @@ ${kernel} void ShanChenCollideAndPropagate${grid_idx}(
+   ${scratch_space_if_required()}
+   ${iteration_number_if_required()})
+ {
+-  ${local_indices_split()}
++  <% needs_barriers = propagation_enabled and access_pattern == 'AB' and not propagate_on_read and node_addressing != 'indirect' %>
++  ${cond(barrier_needs_all_threads and needs_barriers, 'bool alive = true;')}
++  ${local_indices_split(barriers=needs_barriers)}
+   ${indirect_index()}
+   ${shared_mem_propagation_vars()}
+-  ${load_node_type()}
++  ${load_node_type(barriers=needs_barriers)}
+   Dist d0;
+-  if (!isPropagationOnly(type)) {
++  if (!isPropagationOnly(type) ${cond(barrier_needs_all_threads and needs_barriers, '&& alive')}) {
+     ${guo_density_node_index_shift_intro()}
+     float g${grid_idx}m0 = gg${grid_idx}m0[gi];
+     ${sc_calculate_force(grid_idx=grid_idx)}
+diff --git a/sailfish/templates/models/lb_binary_fluid.mako b/sailfish/templates/models/lb_binary_fluid.mako
+index 02bc562..49b8248 100644
+--- a/sailfish/templates/models/lb_binary_fluid.mako
++++ b/sailfish/templates/models/lb_binary_fluid.mako
+@@ -140,7 +140,7 @@ ${kernel} void FreeEnergyPrepareMacroFields(
+ {
+   ${local_indices_split()}
+   ${indirect_index()}
+-  ${load_node_type()}
++  ${load_node_type(barriers=False)}
+ 
+   if (isPropagationOnly(type)) {
+     return;
+@@ -266,13 +266,15 @@ ${kernel} void FreeEnergyCollideAndPropagateFluid(
+   ${scratch_space_if_required()}
+   ${iteration_number_if_required()})
+ {
+-  ${local_indices_split()}
++  <% needs_barriers = propagation_enabled and access_pattern == 'AB' and not propagate_on_read and node_addressing != 'indirect' %>
++  ${cond(barrier_needs_all_threads and needs_barriers, 'bool alive = true;')}
++  ${local_indices_split(barriers=needs_barriers)}
+   ${indirect_index()}
+   ${shared_mem_propagation_vars()}
+-  ${load_node_type()}
++  ${load_node_type(barriers=needs_barriers)}
+ 
+   Dist d0;
+-  if (!isPropagationOnly(type)) {
++  if (!isPropagationOnly(type) ${cond(barrier_needs_all_threads and needs_barriers, '&& alive')}) {
+     ${guo_density_node_index_shift_intro()}
+ 
+     float lap1, grad1[${dim}];
+@@ -332,13 +334,15 @@ ${kernel} void FreeEnergyCollideAndPropagateOrderParam(
+   ${scratch_space_if_required()}
+   ${iteration_number_if_required()})
+ {
+-  ${local_indices_split()}
++  <% needs_barriers = propagation_enabled and access_pattern == 'AB' and not propagate_on_read and node_addressing != 'indirect' %>
++  ${cond(barrier_needs_all_threads and needs_barriers, 'bool alive = true;')}
++  ${local_indices_split(barriers=needs_barriers)}
+   ${indirect_index()}
+   ${shared_mem_propagation_vars()}
+-  ${load_node_type()}
++  ${load_node_type(barriers=needs_barriers)}
+ 
+   Dist d0;
+-  if (!isPropagationOnly(type)) {
++  if (!isPropagationOnly(type) ${cond(barrier_needs_all_threads and needs_barriers, '&& alive')}) {
+     ${guo_density_node_index_shift_intro()}
+     // Cache the distributions in local variables.
+     getDist(
