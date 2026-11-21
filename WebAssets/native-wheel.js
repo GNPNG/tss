@@ -3,7 +3,7 @@ export function hasRelease(motion) {
 }
 
 // The editor forwards viewport/selection changes only. The native renderer
-// captures mouse motion and presents directly into its Windows child surface.
+// captures mouse motion and presents directly into its child surface.
 export class NativeWheelSurface {
   constructor(invoke, element, selection, report) {
     this.invoke = invoke;
@@ -36,8 +36,8 @@ export class NativeWheelSurface {
     if (b.width <= 1 || b.height <= 1) return null;
     const outside = b.right <= 0 || b.bottom <= 0 || b.left >= innerWidth || b.top >= innerHeight;
     if(!selected.keepPresenting && outside) return null;
-    // Rounding both edges keeps the native child flush with the WebView2
-    // content even at fractional Windows display scales or webview zoom.
+    // Rounding both edges keeps the native child flush with the webview
+    // content at fractional display scales or webview zoom.
     const px = (value) => Math.round(value * devicePixelRatio);
     const x = px(b.left), y = px(b.top);
     return { ...selected, previewHidden:covered || outside, rect: { x, y, width: px(b.right) - x, height: px(b.bottom) - y } };
@@ -49,7 +49,7 @@ export class NativeWheelSurface {
     if (key === this.desiredKey) return this.pending;
     this.desiredKey = key;
     if (config) this.surfaceRequested = true;
-    // Keep the newest desired state while serializing HWND changes. A slow
+    // Keep the newest desired state while serializing native view changes. A slow
     // show cannot arrive after a subsequent hide for a modal or layer switch.
     this.pending = this.pending.then(async () => {
       if (key !== this.desiredKey) return;

@@ -1,4 +1,4 @@
-# Live Mathmos wheels on Windows
+# Live Mathmos wheels
 
 From the repository root, build and launch the desktop editor in PowerShell. Building requires the project's Rust 1.88 toolchain, the Windows Tauri prerequisites and `glslc` from the Vulkan SDK (`VULKAN_SDK`, `PATH`, or the compiler path in `GLSLC`). The executable uses the installed Vulkan graphics driver. CUDA is unnecessary. [Windows Tauri prerequisites](https://v2.tauri.app/start/prerequisites/#windows)
 
@@ -8,9 +8,19 @@ cargo run --locked --release --manifest-path src-tauri/Cargo.toml --features tau
 
 The Windows host enumerates hardware adapters that can present to the editor and prefers a discrete GPU. To select one, set `$env:TSS_LIVE_ADAPTER = 'GTX 970'` before launching. The filter accepts a case-insensitive substring, including names of integrated and non-NVIDIA GPUs. A GTX 970 with a suitable Vulkan driver can be tried through this same build. The live readout identifies the adapter and reports its measured cadence.
 
+## macOS editor preview
+
+Build the desktop editor with Rust 1.88, the Xcode command line tools and `glslc` on the compiler search path. The Mac preview opens Violet / Blue in a Metal-backed AppKit view. The **Live selected wheel** checkbox switches the selected track between its live wheel and the existing study controls. The width control starts at 640 pixels. The native readout identifies the active adapter, render size and measured frame cadence.
+
+```sh
+cargo +1.88.0 run --locked --manifest-path src-tauri/Cargo.toml --features tauri/custom-protocol
+```
+
+The host prefers a discrete presenting adapter. To select the Radeon on a dual-GPU Mac, launch with `TSS_LIVE_ADAPTER='Radeon'`. For a bounded inspection, append `-- --verify-mac-preview /path/to/new-directory` to the command above. The editor records five presentations, dispatches a local AppKit drag into the preview, writes the wheel image and measurements, and exits. It also requests an image of its own window using macOS screen capture.
+
 ## Performance controls
 
-1. Select a visible liquid track and choose a preset under **Mathmos oil wheels**. **Live selected wheel** opens that track in the native preview. Windows starts with Violet / Blue.
+1. Select a visible liquid track and choose a preset under **Mathmos oil wheels**. **Live selected wheel** opens that track in the native preview. Windows and macOS start with Violet / Blue.
 2. Choose **Rear slide** or **Front slide** under **Mouse target**. Choose **Material tug** or **Rotate slide** under **Mouse action**, then hold the left button and drag on the native image. A tug pulls the selected liquid locally. **Material response** sets **Heavy**, **Medium**, or **Light** for that slide. Rotation turns the whole selected slide about the optical center. Releasing the button holds the pose. Each track keeps two independent slide poses.
 3. Select **640 × 360** or **960 × 540** under **Live resolution**. These cap the optical render width. A smaller viewport renders at its own width. The last pass scales the optical image to the stage.
 4. Move **Projector focus** between the rear and front planes. It overrides the default fitted focus across both slides and tracks. **Restore wheel focus** returns to the spatially varying focus used in the wheel study. **View study** opens the recorded reference. The live readout under the stage shows adapter, optical resolution, FPS and p95 frame interval.

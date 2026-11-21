@@ -256,6 +256,8 @@ async fn cancel_export(manager: State<'_, ExportManager>) -> Result<(), String> 
 }
 
 fn main() {
+    #[cfg(target_os = "macos")]
+    live::watch_verification();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(lyrics::Transcriber::default())

@@ -1,36 +1,42 @@
 use serde::{Deserialize, Serialize};
 use tauri::{State, WebviewWindow};
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use tss_live_wheel::media_track::MediaSettings;
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 #[path = "../../live-wheel/src/media_track.rs"]
 mod media_track;
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 use media_track::MediaSettings;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use tss_live_wheel::{MotionPreset, OpacityEnvelope};
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 #[path = "../../live-wheel/src/envelope.rs"]
 mod envelope;
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 use envelope::OpacityEnvelope;
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 #[path = "../../live-wheel/src/preset.rs"]
 mod preset;
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 use preset::MotionPreset;
-#[cfg(any(windows, test))]
+#[cfg(any(windows, target_os = "macos", test))]
 mod mouse_pressure;
 pub mod movie;
 pub mod plates;
-#[cfg(any(windows, test))]
+#[cfg(any(windows, target_os = "macos", test))]
 mod release_clock;
 
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
 pub use windows::Host;
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "macos")]
+pub(crate) use macos::watch_verification;
+#[cfg(target_os = "macos")]
+pub use macos::Host;
+#[cfg(not(any(windows, target_os = "macos")))]
 #[derive(Default)]
 pub struct Host;
 
@@ -59,7 +65,7 @@ enum VisibleFilms {
     Clear,
 }
 impl VisibleFilms {
-    #[cfg(any(windows, test))]
+    #[cfg(any(windows, target_os = "macos", test))]
     fn slides(self) -> [bool; 2] {
         [
             matches!(self, Self::Both | Self::Rear),
@@ -212,7 +218,7 @@ pub struct FeedbackConfig {
     zoom: f32,
     rotation_degrees: f32,
 }
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 impl FeedbackConfig {
     fn native(&self) -> tss_live_wheel::FeedbackSettings {
         tss_live_wheel::FeedbackSettings {
@@ -357,7 +363,9 @@ pub async fn set_live_wheel(
 ) -> Result<(), String> {
     #[cfg(windows)]
     return host.set(window, config);
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    return host.set(window, config).await;
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let _ = (window, host);
         if config.is_some() {
@@ -370,9 +378,9 @@ pub async fn set_live_wheel(
 
 #[tauri::command]
 pub fn forget_live_wheel_layer(host: State<'_, Host>, layer_id: u64) -> Result<(), String> {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     return host.forget(layer_id);
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let _ = (host, layer_id);
         Ok(())
@@ -381,9 +389,9 @@ pub fn forget_live_wheel_layer(host: State<'_, Host>, layer_id: u64) -> Result<(
 
 #[tauri::command]
 pub fn live_wheel_stats(host: State<'_, Host>) -> Stats {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     return host.stats();
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let _ = host;
         Stats::default()

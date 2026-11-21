@@ -6,7 +6,9 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-async function exerciseControls(windows) {
+async function exerciseControls(platform) {
+  const windows = platform === 'Windows';
+  Object.defineProperty(navigator,'userAgent',{value:platform+' project controls'});
   const $ = id => document.getElementById(id);
   const check = (ok, message) => { if (!ok) throw Error(message); };
   async function until(predicate) {
@@ -23,10 +25,9 @@ async function exerciseControls(windows) {
   };
   const audio = new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
   let documentText, incoming, linked=null, lastSelection=1;
-  const advisorRequests=[],reviewedLyrics=[];
+  const advisorRequests=[],reviewedLyrics=[],previewRequests=[];
   let finishInference;
   if (windows) {
-    Object.defineProperty(navigator,'userAgent',{value:'Windows project controls'});
     const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',audio)), b=>b.toString(16).padStart(2,'0')).join('');
     const events=['down','up'].map((phase,t)=>({phase,t,layerId:1,slide:'front',gesture:'pressure',amount:1-t,tugResponse:.4,point:[.5,.5]}));
     const macro={id:'take',name:'Pulse',duration:1,events,songStart:0,enabled:true,fit:true,cue:'recording-position',muted:[],amount:1,step:0,cap:2};
@@ -40,7 +41,8 @@ async function exerciseControls(windows) {
       check(args.fps>0 && args.frames.every(f=>f.length===4 && f.every(x=>Number.isFinite(x) && x>=0 && x<=1)), 'native audio modulation envelope');
       return;
     case 'read_pending_audio': return lastSelection===9 ? new Uint8Array([1,2,3]) : audio.slice();
-    case 'set_live_wheel': case 'forget_live_wheel_layer': case 'live_wheel_benchmark_config': return null;
+    case 'set_live_wheel': previewRequests.push(args.config);return null;
+    case 'set_visual_audio_features': case 'forget_live_wheel_layer': case 'live_wheel_benchmark_config': return null;
     case 'live_wheel_stats': return {running:false};
     case 'read_timed_lyrics': return ['song.vtt','WEBVTT\n\n00:00.000 --> 00:00.500\nGo\n\n00:01.000 --> 00:01.500\nGo'];
     case 'save_project': documentText=args.document;return 'Headliner.tss';
@@ -62,6 +64,17 @@ async function exerciseControls(windows) {
   window.requestAnimationFrame=()=>0;
   await import('/app.js');
   await until(()=>$('edit-history').options.length>0);
+  if (platform==='Macintosh') {
+    await until(()=>previewRequests.some(c=>c?.wheel==='violet-blue'));
+    const preview=previewRequests.at(-1);
+    check(preview.renderWidth===640 && preview.rect.width>0 && preview.rect.height>0,'Mac uses live wheel and device pixel viewport');
+    check(!$('native-wheel-controls').hidden && !$('artwork-add').hidden,'Mac exposes live optics and media controls');
+    set('wheel-films','front');await until(()=>previewRequests.at(-1)?.visibleFilms==='front');
+    set('wheel-focus','68');await until(()=>previewRequests.at(-1)?.focus===.68);
+    click('show-logo');await until(()=>previewRequests.at(-1)===null);
+    $('logo-dialog').close();await until(()=>previewRequests.at(-1)?.wheel==='violet-blue');
+    return;
+  }
   await window.tssImportAudio();
   $('advice-panel').open=true;
   set('advice-direction','Violet at the downbeat');click('advice-suggest');
@@ -148,7 +161,7 @@ async function exerciseControls(windows) {
     !restored.layers.some(l=>l.media?.assetId!==undefined),'portable media link, offline metadata and refreshed grant');
 }
 const chrome=process.env.CHROME_BIN;
-for (const windows of [false,true]) test((windows?'Native wheel':'Procedural')+' editor project and region controls, reviewed advisor cues, lyric consent and undo',
+for (const platform of ['Linux','Windows','Macintosh']) test(platform==='Macintosh'?'Mac desktop native wheel selection, optics and modal visibility':platform+' editor project and region controls, reviewed advisor cues, lyric consent and undo',
   {skip:!chrome && 'Set CHROME_BIN to a Chrome executable', timeout:30000}, async()=>{
     const web=new URL('../../WebAssets/',import.meta.url);
     const media=new URL('../slide-look-study/approval/windows-live/gesture-controls/export/two-slide-cues.m4a',import.meta.url);
@@ -160,7 +173,7 @@ for (const windows of [false,true]) test((windows?'Native wheel':'Procedural')+'
         if(req.url==='/report') {let body='';for await(const part of req)body+=part;res.end();report(body);return;}
         if(req.url==='/') {
           const html=(await readFile(new URL('index.html',web),'utf8')).replace('<script type="module" src="app.js"></script>',
-            '<script type="module">('+exerciseControls.toString()+')('+windows+').then(()=>fetch("/report",{method:"POST",body:"pass"})).catch(e=>fetch("/report",{method:"POST",body:e.stack}));</script>');
+            '<script type="module">('+exerciseControls.toString()+')('+JSON.stringify(platform)+').then(()=>fetch("/report",{method:"POST",body:"pass"})).catch(e=>fetch("/report",{method:"POST",body:e.stack}));</script>');
           res.writeHead(200,{'Content-Type':'text/html'});res.end(html);return;
         }
         if(req.url==='/sample.m4a'){res.writeHead(200,{'Content-Type':'audio/mp4'});res.end(await readFile(media));return;}

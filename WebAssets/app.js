@@ -30,7 +30,8 @@ const wheelSelect = byId('mathmos-wheel');
 const wheelStudy = byId('wheel-study');
 const wheelVideo = byId('wheel-study-video');
 const windowsDesktop = !!window.__TAURI__?.core && /Windows/i.test(navigator.userAgent);
-let startingNative = windowsDesktop;
+const nativeDesktop = windowsDesktop || (!!window.__TAURI__?.core && /Macintosh/i.test(navigator.userAgent));
+let startingNative = nativeDesktop;
 let projectorFocus = null;
 let projectorDeck = null;
 let visualMedia = null;
@@ -52,7 +53,7 @@ function wheelGestureSelection() { return selectedLayer()?.media ? null : liveSe
 function liveSelection() {
   const layer = selectedLayer();
   const isWheel = l => l?.nativeLive && !l.media && !l.customColors && mathmosWheels.has(l.palette);
-  if (!windowsDesktop || !layer || (!isWheel(layer) && !layer.media) || state.exporting) return null;
+  if (!nativeDesktop || !layer || (!isWheel(layer) && !layer.media) || state.exporting) return null;
   const stack = programLayers(state.layers,isWheel);
   if (!stack.some(l=>!l.matteOnly)) return null;
   const timed = stack.some(l=>l.envelope!=null || l.media);
@@ -86,7 +87,7 @@ function reportNativeStats(stats) {
   readout.textContent = `${stats.adapter} · ${stats.width} × ${stats.height} · ${stats.fps.toFixed(1)} FPS · p95 ${stats.p95Ms.toFixed(1)} ms · queue limit ${stats.frameLatency} frames`;
 }
 
-const nativeSurface = windowsDesktop ? new NativeWheelSurface(
+const nativeSurface = nativeDesktop ? new NativeWheelSurface(
   window.__TAURI__.core.invoke, preview, liveSelection, reportNativeStats
 ) : null;
 async function prepareWheel(){
@@ -257,7 +258,7 @@ function installAudio(data, ref, path = null, selectionId = null, position = 0) 
   pause();
   state.audioBuffer = data?.decoded ?? null;
   state.analysis = data?.analysis ?? null;
-  if (windowsDesktop) {
+  if (nativeDesktop) {
     const analysis=state.analysis;
     desktopInvoke('set_visual_audio_features',{fps:analysis?.fps??30,frames:analysis?.frames.map(f=>[f.bass,f.mid,f.treble,f.energy])??[]}).catch(e=>status(String(e)));
   }
@@ -374,8 +375,8 @@ async function loadWheelPresets() {
       mathmosWheels.set(preset.id, preset);
       wheelSelect.add(new Option(preset.name, preset.id));
     }
-    if (windowsDesktop) {
-      const benchmark = await window.__TAURI__.core.invoke('live_wheel_benchmark_config');
+    if (nativeDesktop) {
+      const benchmark = windowsDesktop ? await window.__TAURI__.core.invoke('live_wheel_benchmark_config') : null;
       if (benchmark) {
         await window.__TAURI__.event.listen('tss-benchmark-release', () => byId('replay-release').click());
         await window.__TAURI__.event.listen('tss-benchmark-wheel', ({ payload }) => {
@@ -455,7 +456,7 @@ function makeLayer() {
   const id = Math.max(state.nextId, highestId + 1);
   highestId = id;
   state.nextId = id + 1;
-  return { id, name: `Liquid ${id}`, visible: true, palette: 'orchid', colors: [...LIQUID_PALETTES.orchid], customColors: false, hue: 0, speed: 1, scale: 1, opacity: state.layers.length ? 0.7 : 1, canvas, renderer: null, nativeLive: windowsDesktop,
+  return { id, name: `Liquid ${id}`, visible: true, palette: 'orchid', colors: [...LIQUID_PALETTES.orchid], customColors: false, hue: 0, speed: 1, scale: 1, opacity: state.layers.length ? 0.7 : 1, canvas, renderer: null, nativeLive: nativeDesktop,
     motion: 'wheel-flow', motionTake: 0, visibleFilms: 'both',
     slide: 'rear', gesture: 'tug', tugResponse: { rear: 0.4, front: 0.4 }, mousePressure: { rear: 0.5, front: 0.5 }, renderWidth: 640 };
 }
@@ -559,7 +560,7 @@ function renderControls() {
   wheelExporter?.refresh();
   plateExporter?.refresh();
   byId('video-feedback').hidden = !live;
-  byId('native-wheel-controls').hidden = !windowsDesktop || !wheel;
+  byId('native-wheel-controls').hidden = !nativeDesktop || !wheel;
   byId('native-performance').hidden = !live;
   byId('native-wheel-controls').hidden ||= !!layer?.media;
   byId('live-wheel').checked = !!live;
@@ -862,7 +863,7 @@ byId('wheel-focus-reset').addEventListener('click', () => {
 wheelSelect.addEventListener('change', () => {
   const layer = selectedLayer();
   const preset = mathmosWheels.get(wheelSelect.value);
-  if (layer && preset) { layer.nativeLive = windowsDesktop; applyPalette(layer, preset.id, preset.colors); }
+  if (layer && preset) { layer.nativeLive = nativeDesktop; applyPalette(layer, preset.id, preset.colors); }
 });
 byId('show-wheel-study').addEventListener('click', async () => {
   const preset = mathmosWheels.get(selectedLayer()?.palette);
@@ -1363,13 +1364,13 @@ function addArtwork(media) {
   checkpoint('Add artwork');
   return layer;
 }
-visualMedia = windowsDesktop ? installVisualMedia({
+visualMedia = nativeDesktop ? installVisualMedia({
   invoke:desktopInvoke, selected:selectedLayer,layers:()=>state.layers,
   isWheel:l=>l?.nativeLive&&!l.customColors&&mathmosWheels.has(l.palette),
   add:addArtwork,
   changed:label=>{renderTimeline();renderControls();checkpoint(label);},report:status,
 }) : null;
-byId('artwork-add').hidden=!windowsDesktop;
+byId('artwork-add').hidden=!nativeDesktop;
 if (!context) showRenderError(new Error('Canvas 2D is not available'));
 else addLayer();
 renderTimeline(); renderControls(); updateTransport(); requestAnimationFrame(renderFrame);
