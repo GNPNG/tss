@@ -890,3 +890,5 @@ input[type=range].hue-slider {
 #lyrics-review { margin-top: .8rem; }
 #lyrics-review textarea { display: block; width: 100%; margin: .5rem 0; padding: .6rem; font: inherit; resize: vertical; }
 #lyrics-review[hidden], #lyrics-review [hidden] { display: none; }
+#advice-direction { width: 100%; display: block; padding: .5rem; font: inherit; }
+#advice-review[hidden] { display: none; }

@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod advisor;
 mod export;
 mod export_smoke;
 mod lyrics;
@@ -291,6 +292,7 @@ fn main() {
             read_pending_audio,
             confirm_audio,
             read_timed_lyrics,
+            advisor::suggest_visual_layer,
             lyrics::transcribe_song,
             lyrics::cancel_transcription,
             lyrics::save_reviewed_lyrics,

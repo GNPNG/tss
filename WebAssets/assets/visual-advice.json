@@ -1,0 +1,21 @@
+{
+  "visual": {
+    "oil": "Transmitted oil films, a swirl, a glass slide or fluid droplets.",
+    "geometric": "An abstract geometric pattern such as shapes, stars, circles, polygons or a tunnel.",
+    "silhouette": "A keyed dancer, animal, figure or rotoscoped silhouette.",
+    "video": "A full-colour video or cartoon clip."
+  },
+  "signal": {
+    "energy_rise": "Rising loudness, crescendo or increasing energy.",
+    "onset": "Sudden attack, onset or transient.",
+    "beat": "Beat, pulse or rhythmic timing.",
+    "lyric": "A sung word, line of lyrics or verse.",
+    "time": "An exact time interval independent of the audio."
+  },
+  "fit": {
+    "fixed": "Use a fixed original duration.",
+    "elastic": "Stretch movement to fit the selected interval.",
+    "repeat": "Loop an element repeatedly within the selected region.",
+    "recurrence": "Return at every subsequent occurrence of a recurring cue."
+  }
+}
