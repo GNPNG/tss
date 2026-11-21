@@ -5,13 +5,40 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
     path::{Component, Path, PathBuf},
-    sync::atomic::{AtomicU64, Ordering},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex,
+    },
 };
 use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
 const MAX_PROJECT: usize = 64 * 1024 * 1024;
 static TEMP_ID: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Default)]
+pub(crate) struct ProjectDirectory(Mutex<Option<PathBuf>>);
+
+pub(crate) fn project_media_sibling(app: &tauri::AppHandle, name: &str) -> Option<PathBuf> {
+    let dir = app.try_state::<ProjectDirectory>()?;
+    let selected = dir.0.lock().ok()?;
+    sibling_file(selected.as_ref()?, name)
+}
+
+fn sibling_file(dir: &Path, name: &str) -> Option<PathBuf> {
+    let component = Path::new(name);
+    if !matches!(
+        component.components().collect::<Vec<_>>().as_slice(),
+        [Component::Normal(_)]
+    ) || name.contains(['/', '\\'])
+    {
+        return None;
+    }
+    let file = dir.join(component);
+    fs::symlink_metadata(&file)
+        .is_ok_and(|m| m.is_file())
+        .then_some(file)
+}
 
 #[derive(Deserialize)]
 struct AudioRef {
@@ -145,6 +172,11 @@ pub async fn open_project(
         return Ok(None);
     };
     let path = file.into_path().map_err(|e| e.to_string())?;
+    let directory = fs::canonicalize(&path)
+        .map_err(|e| e.to_string())?
+        .parent()
+        .ok_or("Project has no parent folder.")?
+        .to_owned();
     let links = links_directory(&app)?;
     let (document, audio, name) = tauri::async_runtime::spawn_blocking(move || {
         let document = read_project(&path)?;
@@ -163,6 +195,10 @@ pub async fn open_project(
     })
     .await
     .map_err(|e| e.to_string())??;
+    *app.state::<ProjectDirectory>()
+        .0
+        .lock()
+        .map_err(|e| e.to_string())? = Some(directory);
     let selection = if let Some(audio) = audio {
         let mut state = paths.audio.lock().map_err(|e| e.to_string())?;
         let id = state.begin();

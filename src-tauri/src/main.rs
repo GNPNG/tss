@@ -263,6 +263,7 @@ fn main() {
             }
         })
         .manage(SelectedPaths::default())
+        .manage(project::ProjectDirectory::default())
         .manage(ExportManager::default())
         .manage(live::Host::default())
         .manage(performer::Performer::default())
