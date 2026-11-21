@@ -27,7 +27,7 @@ async function exerciseControls(platform) {
   const set = (id,value) => {
     const input=$(id);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
   };
-  const audio = coral || oils || solver ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
+  const audio = coral || oils || (solver && !helperAvailable) ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
   let documentText, incoming, linked=null, lastSelection=1;
   const advisorRequests=[],reviewedLyrics=[],previewRequests=[],movieRequests=[];
   let finishInference;
@@ -137,6 +137,18 @@ async function exerciseControls(platform) {
       latest().stack.some(l=>l.simulation?.seed===firstSeed),'switching one track to a recorded study preserves its neighbour');
     const recorded=await save();
     check(!Object.hasOwn(recorded.layers.find(l=>l.id===latest().layerId),'simulationSeed'),'saved recorded study has no solver seed');
+    await window.tssImportAudio();
+    set('range-start','.25');set('range-end','1.25');click('set-range');
+    set('advice-direction','Copy the coral motion');click('advice-suggest');
+    await until(()=>advisorRequests.length>0);
+    finishInference();await until(()=>!$('advice-review').hidden);
+    set('advice-visual','oil');set('advice-signal','time');set('advice-fit','elastic');
+    set('advice-cue','Coral cue');click('advice-apply');
+    await until(()=>$('selected-name').textContent==='Coral cue');
+    check($('wheel-motion').value==='wheel-with-coral-beads' && !latest()?.simulation,
+      'a reviewed cue copied from a recorded study must keep its motion source');
+    const cue=(await save()).layers[0];
+    check(cue.motion==='wheel-with-coral-beads' && cue.simulationSeed===undefined,'the copied coral cue can be saved and reopened');
     const legacy=await (await fetch('/coral-wheel.tss')).text();
     await reopen(legacy);
     await until(()=>latest()?.motion==='wheel-with-coral-beads' && !latest().stack);

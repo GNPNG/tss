@@ -450,10 +450,11 @@ function chooseSlidePreset(id) {
   slideSelect.dispatchEvent(new Event('change'));
 }
 
-function makeLayer() {
+function makeLayer(source) {
   const id = Math.max(state.nextId, highestId + 1);
   highestId = id;
   state.nextId = id + 1;
+  if (source) return {...structuredClone(layerSettings(source)), id};
   return { id, name: `Liquid ${id}`, visible: true, palette: 'orchid', colors: [...LIQUID_PALETTES.orchid], customColors: false, hue: 0, speed: 1, scale: 1, opacity: state.layers.length ? 0.7 : 1, nativeLive: nativeDesktop,
     ...(solverAvailable ? {simulationSeed:newFluidSeed()} : {}), motion: 'wheel-flow', motionTake: 0, visibleFilms: 'both',
     slide: 'rear', gesture: 'tug', tugResponse: { rear: 0.4, front: 0.4 }, mousePressure: { rear: 0.5, front: 0.5 }, renderWidth: 640 };
@@ -1016,8 +1017,7 @@ function applyTimelineSuggestion(s) {
   const source=selectedLayer()?.media?null:selectedLayer(), key=s.wheel??s.palette??source?.palette??'violet-blue';
   if(!slidePresets.has(key)&&!LIQUID_PALETTES[key])throw Error('Choose a known slide or palette.');
   if(s.opacity!==undefined&&(!Number.isFinite(s.opacity)||s.opacity<0||s.opacity>1))throw Error('Choose an opacity between 0 and 1.');
-  const layer=makeLayer(), id=layer.id;
-  if(source)Object.assign(layer,structuredClone(layerSettings(source)));
+  const layer=makeLayer(source), id=layer.id;
   if(source?.palette!==key || s.wheel || s.palette){
     layer.palette=key;layer.colors=[...(slidePresets.get(key)?.colors??LIQUID_PALETTES[key])];
     layer.customColors=false;layer.nativeLive=nativeDesktop;
