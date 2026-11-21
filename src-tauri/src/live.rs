@@ -8,10 +8,10 @@ mod preset;
 #[cfg(not(windows))]
 use preset::MotionPreset;
 #[cfg(any(windows, test))]
-mod release_clock;
-#[cfg(any(windows, test))]
 mod mouse_pressure;
 pub mod movie;
+#[cfg(any(windows, test))]
+mod release_clock;
 
 #[cfg(windows)]
 mod windows;
@@ -342,29 +342,125 @@ pub struct BenchmarkConfig {
     render_width: u32,
     verify_export: bool,
     coral_trial: bool,
+    motion: MotionPreset,
+    focus: Option<f32>,
 }
 
-#[cfg(windows)]
-fn coral_trial() -> bool {
-    std::env::args_os().any(|arg| arg == "--coral-trial")
+#[cfg(any(windows, test))]
+impl BenchmarkConfig {
+    fn from_flags(
+        pressure: bool,
+        coral: bool,
+        beads: bool,
+        preview_960: bool,
+        verify_export: bool,
+    ) -> Self {
+        let motion = if beads {
+            MotionPreset::WheelWithCoralBeads
+        } else if coral {
+            MotionPreset::CoralRelease
+        } else {
+            MotionPreset::WheelFlow
+        };
+        Self {
+            wheel: "violet-blue",
+            slide: if coral || beads {
+                Slide::Front
+            } else {
+                Slide::Rear
+            },
+            gesture: if pressure && !coral && !beads {
+                Gesture::Pressure
+            } else {
+                Gesture::Tug
+            },
+            render_width: if preview_960 { 960 } else { 640 },
+            verify_export,
+            coral_trial: motion == MotionPreset::CoralRelease,
+            motion,
+            focus: beads.then_some(0.90),
+        }
+    }
+
+    #[cfg(windows)]
+    fn current() -> Self {
+        let flag = |name: &str| std::env::args_os().any(|arg| arg == name);
+        Self::from_flags(
+            windows::pressure_trial(),
+            flag("--coral-trial"),
+            flag("--coral-beads-trial"),
+            flag("--preview-960"),
+            crate::export_smoke::enabled(),
+        )
+    }
+
+    fn matches_optics(&self, c: &Config, preview: [u32; 2]) -> bool {
+        c.motion == self.motion
+            && c.focus == self.focus
+            && c.render_width == self.render_width
+            && preview == [self.render_width, self.render_width * 9 / 16]
+    }
 }
 
 #[tauri::command]
 pub fn live_wheel_benchmark_config() -> Option<BenchmarkConfig> {
     #[cfg(windows)]
     if windows::benchmark_output().is_some() || crate::export_smoke::enabled() {
-        return Some(BenchmarkConfig {
-            wheel: "violet-blue",
-            slide: if coral_trial() { Slide::Front } else { Slide::Rear },
-            gesture: if windows::pressure_trial() {
-                Gesture::Pressure
-            } else {
-                Gesture::Tug
-            },
-            render_width: 640,
-            verify_export: crate::export_smoke::enabled(),
-            coral_trial: coral_trial(),
-        });
+        return Some(BenchmarkConfig::current());
     }
     None
+}
+
+#[cfg(test)]
+mod benchmark_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn benchmark_selects_the_named_motion_and_actual_preview() {
+        for (pressure, coral, beads, motion, slide, gesture, focus) in [
+            (false, false, false, "wheel-flow", "rear", "tug", None),
+            (true, false, false, "wheel-flow", "rear", "pressure", None),
+            (false, true, false, "coral-release", "front", "tug", None),
+            (
+                false,
+                false,
+                true,
+                "wheel-with-coral-beads",
+                "front",
+                "tug",
+                Some(0.90_f32),
+            ),
+        ] {
+            for width in [640, 960] {
+                let settings =
+                    BenchmarkConfig::from_flags(pressure, coral, beads, width == 960, false);
+                let ui = json!(settings);
+                assert_eq!(ui["motion"], motion);
+                assert_eq!(ui["slide"], slide);
+                assert_eq!(ui["gesture"], gesture);
+                assert_eq!(ui["focus"], json!(focus));
+                assert_eq!(ui["renderWidth"], width);
+                let mut c: Config = serde_json::from_value(json!({
+                    "layerId":1, "wheel":"violet-blue", "motion":motion, "slide":slide, "gesture":gesture,
+                    "renderWidth":width, "focus":focus, "rect":{"x":0,"y":0,"width":1200,"height":680}
+                })).unwrap();
+                let size = [width, width * 9 / 16];
+                assert!(settings.matches_optics(&c, size));
+                assert!(!settings.matches_optics(&c, [width - 16, size[1] - 9]));
+                c.render_width = width - 16;
+                assert!(!settings.matches_optics(&c, size));
+                c.render_width = width;
+                c.focus = Some(0.5);
+                assert!(!settings.matches_optics(&c, size));
+                c.focus = focus;
+                c.motion = if coral {
+                    MotionPreset::WheelWithCoralBeads
+                } else {
+                    MotionPreset::CoralRelease
+                };
+                assert!(!settings.matches_optics(&c, size));
+            }
+        }
+    }
 }

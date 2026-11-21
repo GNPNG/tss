@@ -1,7 +1,9 @@
 // Interactive benchmark uses the editor's existing wheel picker and child window.
 // A local HWND stroke exercises normal input handling without moving the OS pointer.
+use super::super::BenchmarkConfig;
 use super::*;
 use std::io::Write;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const RUNS: [(&str, Slide, Gesture); 8] = [
     ("violet-blue", Slide::Rear, Gesture::Tug),
@@ -19,15 +21,30 @@ pub(crate) fn pressure_trial() -> bool {
     std::env::args_os().any(|arg| arg == "--pressure-trial")
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReplayObservation {
+    motion_take: u64,
+    requested_ms: f64,
+    first_presented_ms: Option<f64>,
+}
+
+fn unix_ms() -> Result<u64, String> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .map_err(|e| e.to_string())
+}
+
 pub(super) struct Benchmark {
     path: PathBuf,
     footprint_sampling: bool,
     index: usize,
     count: usize,
-    pressure: bool,
-    coral: bool,
+    settings: BenchmarkConfig,
     initial_take: u64,
-    replay_requests: u64,
+    replays: Vec<ReplayObservation>,
+    measured_from_unix_ms: Option<u64>,
     pressing: bool,
     began: Option<Instant>,
     stroke_started: Instant,
@@ -45,16 +62,19 @@ pub(super) struct Benchmark {
 
 impl Benchmark {
     pub fn new(path: PathBuf, footprint_sampling: bool) -> Self {
+        let settings = BenchmarkConfig::current();
+        let single =
+            settings.gesture == Gesture::Pressure || settings.motion != MotionPreset::WheelFlow;
         Self {
             path,
             footprint_sampling,
             index: 0,
-            pressure: pressure_trial(),
-            coral: super::super::coral_trial(),
+            settings,
             initial_take: 0,
-            replay_requests: 0,
+            replays: Vec::new(),
+            measured_from_unix_ms: None,
             pressing: false,
-            count: if pressure_trial() || super::super::coral_trial() {
+            count: if single {
                 1
             } else if std::env::args_os().any(|arg| arg == "--gesture-pair") {
                 2
@@ -301,30 +321,43 @@ impl Benchmark {
         Ok(())
     }
     pub fn before(&mut self, r: &mut LiveWheel, hwnd: HWND, c: &Config) -> Result<(), String> {
-        let (wheel, slide, gesture) = if self.coral {
-            ("violet-blue", Slide::Front, Gesture::Tug)
-        } else if self.pressure {
-            ("violet-blue", Slide::Rear, Gesture::Pressure)
+        let release = self.settings.motion != MotionPreset::WheelFlow;
+        let pressure = self.settings.gesture == Gesture::Pressure;
+        let (wheel, slide, gesture) = if release || pressure {
+            (
+                self.settings.wheel,
+                self.settings.slide,
+                self.settings.gesture,
+            )
         } else {
             RUNS[self.index]
         };
         if c.wheel != wheel
             || c.slide != slide
             || c.gesture != gesture
-            || (self.coral && c.motion != tss_live_wheel::MotionPreset::CoralRelease)
+            || !self.settings.matches_optics(c, r.preview_size())
         {
-            if Instant::now() > self.deadline {
+            if self.began.is_some() || Instant::now() > self.deadline {
                 return Err(format!(
-                    "Editor did not select the requested controls for {wheel}"
+                    "Expected {wheel} {slide_name}/{gesture_name}, {motion:?}, focus {focus:?}, width {width}; got {actual_wheel} {actual_slide}/{actual_gesture}, {actual_motion:?}, focus {actual_focus:?}, width {actual_width}, rendered {preview:?}",
+                    slide_name=json!(slide), gesture_name=json!(gesture), motion=self.settings.motion,
+                    focus=self.settings.focus, width=self.settings.render_width, actual_wheel=c.wheel,
+                    actual_slide=json!(c.slide), actual_gesture=json!(c.gesture), actual_motion=c.motion,
+                    actual_focus=c.focus, actual_width=c.render_width, preview=r.preview_size()
                 ));
             }
             return Ok(());
         }
         if self.began.is_none() {
             if self.index == 0 {
-                if self.coral {
+                if release {
+                    let beads = self.settings.motion == MotionPreset::WheelWithCoralBeads;
                     let frame = |r: &mut LiveWheel, time| -> Result<Vec<u8>, String> {
-                        r.render_offscreen(time)?;
+                        if beads {
+                            r.render_film_times_offscreen(2., time, 0.)?;
+                        } else {
+                            r.render_offscreen(time)?;
+                        }
                         Ok(r.capture_rgba8()?.2)
                     };
                     let first = frame(r, 0.)?;
@@ -347,15 +380,27 @@ impl Benchmark {
                     self.proof = json!({"sampleTimes":[0.,1.9,4.,6.],
                         "earlyChangedPixelsAtLeast3Codes":early, "lateChangedPixelsAtLeast3Codes":late,
                         "heldByteIdentical":true});
+                    if beads {
+                        let replay = frame(r, 0.)?;
+                        r.render_film_times_offscreen(3.5, 6., 0.)?;
+                        let moving_rear = changed(&held, &r.capture_rgba8()?.2);
+                        if replay != first || moving_rear == 0 {
+                            return Err("Front beads failed to replay at fixed rear phase or the rear wheel stopped with the front held".into());
+                        }
+                        self.proof["fixedRearSeconds"] = json!(2.);
+                        self.proof["frontReplayByteIdenticalToStart"] = json!(true);
+                        self.proof["rearTimesWithFrontHeldAt6Seconds"] = json!([2., 3.5]);
+                        self.proof["rearChangedPixelsAtLeast3Codes"] = json!(moving_rear);
+                    }
                     self.initial_take = c.motion_take;
-                } else if self.pressure {
+                } else if pressure {
                     self.pressure_proof(r, hwnd, c)?;
                 } else {
                     self.proof(r, hwnd, c)?;
                 }
             }
-            if self.index < 2 && !self.coral {
-                let suffix = if self.pressure {
+            if self.index < 2 && !release {
+                let suffix = if pressure {
                     "pressure.frames"
                 } else if self.index == 0 {
                     "tug.frames"
@@ -370,12 +415,12 @@ impl Benchmark {
             }
             self.stroke_started = Instant::now();
             self.began = Some(self.stroke_started);
-            if !self.pressure {
+            if !pressure {
                 scripted_mouse(hwnd, c.rect, WM_LBUTTONDOWN, [0.64, 0.5]);
             }
         }
         let phase = self.stroke_started.elapsed().as_secs_f64() * 2.35;
-        if self.pressure {
+        if pressure {
             let held = self.stroke_started.elapsed().as_secs_f64() % 2.0 < 1.3;
             let center = [0.48 + 0.055 * phase.sin(), 0.52 + 0.04 * phase.cos()];
             let message = match (self.pressing, held) {
@@ -423,14 +468,38 @@ impl Benchmark {
         if elapsed < WARM {
             return Ok(false);
         }
-        if self.coral
-            && self.replay_requests < 3
-            && (elapsed - WARM).as_secs() >= self.replay_requests * 4
-            && c.motion_take == self.initial_take + self.replay_requests
-        {
-            app.emit("tss-benchmark-release", ())
-                .map_err(|e| e.to_string())?;
-            self.replay_requests += 1;
+        if self.measured_from_unix_ms.is_none() {
+            self.measured_from_unix_ms =
+                Some(unix_ms()?.saturating_sub((elapsed - WARM).as_millis() as u64));
+        }
+        let release = self.settings.motion != MotionPreset::WheelFlow;
+        if release {
+            let elapsed_ms = (elapsed - WARM).as_secs_f64() * 1000.;
+            if let Some(replay) = self.replays.last_mut() {
+                if replay.first_presented_ms.is_none()
+                    && did_present
+                    && c.motion_take == replay.motion_take
+                {
+                    replay.first_presented_ms = Some(elapsed_ms);
+                }
+            }
+            let count = self.replays.len() as u64;
+            if count < 3
+                && (elapsed - WARM).as_secs() >= count * 4
+                && c.motion_take == self.initial_take + count
+                && self
+                    .replays
+                    .last()
+                    .is_none_or(|p| p.first_presented_ms.is_some())
+            {
+                app.emit("tss-benchmark-release", ())
+                    .map_err(|e| e.to_string())?;
+                self.replays.push(ReplayObservation {
+                    motion_take: c.motion_take + 1,
+                    requested_ms: elapsed_ms,
+                    first_presented_ms: None,
+                });
+            }
         }
         if did_present {
             self.presents += 1;
@@ -448,13 +517,19 @@ impl Benchmark {
         if self.intervals.is_empty() || self.drags == 0 {
             return Err("Insufficient interactive frame samples".into());
         }
-        if self.coral && (self.replay_requests != 3 || c.motion_take != self.initial_take + 3) {
-            return Err("The editor did not replay all three coral releases".into());
+        if release
+            && (self.replays.len() != 3
+                || c.motion_take != self.initial_take + 3
+                || self.replays.iter().any(|p| p.first_presented_ms.is_none()))
+        {
+            return Err("The editor did not present all three coral replays".into());
         }
         scripted_mouse(hwnd, c.rect, WM_LBUTTONUP, [0.5, 0.5]);
         let n = self.intervals.len() as f64;
         let seconds = self.intervals.iter().sum::<f64>() / 1000.;
-        self.results.push(json!({"wheel":c.wheel,"motion":c.motion,"replayRequests":self.replay_requests,"slide":c.slide,"gesture":c.gesture,"tugResponse":c.tug_response,"presented":self.presents,
+        self.results.push(json!({"wheel":c.wheel,"motion":c.motion,"replayRequests":self.replays.len(),
+            "replays":self.replays,"measuredFromUnixMs":self.measured_from_unix_ms,"measuredThroughUnixMs":unix_ms()?,
+            "slide":c.slide,"gesture":c.gesture,"tugResponse":c.tug_response,"presented":self.presents,
             "skipped":self.skips,"mouseMovesApplied":self.drags,"secondsBetweenPresents":seconds,
             "fps": n/seconds,"p50Ms":percentile(&mut self.intervals,0.5),
             "p95Ms":percentile(&mut self.intervals,0.95),"p99Ms":percentile(&mut self.intervals,0.99),
@@ -478,6 +553,7 @@ impl Benchmark {
         .map_err(|e| e.to_string())?;
         self.deadline = now + Duration::from_secs(25);
         self.began = None;
+        self.measured_from_unix_ms = None;
         self.last = None;
         self.intervals.clear();
         self.presents = 0;

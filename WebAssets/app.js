@@ -324,10 +324,15 @@ async function loadWheelPresets() {
         layer.gesture = benchmark?.gesture ?? 'tug';
         layer.renderWidth = benchmark?.renderWidth ?? 640;
         chooseWheel(benchmark?.wheel ?? 'violet-blue');
-        if (benchmark?.coralTrial) {
+        if (benchmark) {
           const control = byId('wheel-motion');
-          control.value = 'coral-release';
+          control.value = benchmark.motion;
           control.dispatchEvent(new Event('change'));
+          if (benchmark.focus != null) {
+            const focus = byId('wheel-focus');
+            focus.value = String(Math.round(100 * benchmark.focus));
+            focus.dispatchEvent(new Event('input'));
+          }
         }
         if (benchmark?.verifyExport) {
           const { verifyWheelExport } = await import('./verify-wheel-export.js');
