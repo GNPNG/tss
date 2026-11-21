@@ -1,0 +1,185 @@
+{
+  "adapter": "AMD Radeon Pro 5300M",
+  "backend": "Metal",
+  "checks": [
+    {
+      "both_hidden_clock_invariant": true,
+      "both_hidden_movie_matches": true,
+      "finite_pixel_setting": false,
+      "size": [
+        320,
+        180
+      ],
+      "solos": [
+        {
+          "both_restored_exactly": true,
+          "changed_from_both": 29095,
+          "changed_with_hidden_clock_and_deformations": 0,
+          "changed_with_visible_clock": 17783,
+          "gestures_applied_while_hidden_match_visible_replay": true,
+          "movie_matches_solo_and_recombined": true,
+          "visible": "rear"
+        },
+        {
+          "both_restored_exactly": true,
+          "changed_from_both": 47878,
+          "changed_with_hidden_clock_and_deformations": 0,
+          "changed_with_visible_clock": 27210,
+          "gestures_applied_while_hidden_match_visible_replay": true,
+          "movie_matches_solo_and_recombined": true,
+          "visible": "front"
+        }
+      ],
+      "wheel": "violet-blue"
+    },
+    {
+      "both_hidden_clock_invariant": true,
+      "both_hidden_movie_matches": true,
+      "finite_pixel_setting": true,
+      "size": [
+        320,
+        180
+      ],
+      "solos": [
+        {
+          "both_restored_exactly": true,
+          "changed_from_both": 29365,
+          "changed_with_hidden_clock_and_deformations": 0,
+          "changed_with_visible_clock": 18886,
+          "gestures_applied_while_hidden_match_visible_replay": true,
+          "movie_matches_solo_and_recombined": true,
+          "visible": "rear"
+        },
+        {
+          "both_restored_exactly": true,
+          "changed_from_both": 48269,
+          "changed_with_hidden_clock_and_deformations": 0,
+          "changed_with_visible_clock": 27386,
+          "gestures_applied_while_hidden_match_visible_replay": true,
+          "movie_matches_solo_and_recombined": true,
+          "visible": "front"
+        }
+      ],
+      "wheel": "violet-blue"
+    },
+    {
+      "both_hidden_clock_invariant": true,
+      "both_hidden_movie_matches": true,
+      "finite_pixel_setting": false,
+      "size": [
+        320,
+        180
+      ],
+      "solos": [
+        {
+          "both_restored_exactly": true,
+          "changed_from_both": 32344,
+          "changed_with_hidden_clock_and_deformations": 0,
+          "changed_with_visible_clock": 17104,
+          "gestures_applied_while_hidden_match_visible_replay": true,
+          "movie_matches_solo_and_recombined": true,
+          "visible": "rear"
+        },
+        {
+          "both_restored_exactly": true,
+          "changed_from_both": 47440,
+          "changed_with_hidden_clock_and_deformations": 0,
+          "changed_with_visible_clock": 26782,
+          "gestures_applied_while_hidden_match_visible_replay": true,
+          "movie_matches_solo_and_recombined": true,
+          "visible": "front"
+        }
+      ],
+      "wheel": "blue-red"
+    },
+    {
+      "both_hidden_clock_invariant": true,
+      "both_hidden_movie_matches": true,
+      "finite_pixel_setting": true,
+      "size": [
+        320,
+        180
+      ],
+      "solos": [
+        {
+          "both_restored_exactly": true,
+          "changed_from_both": 32537,
+          "changed_with_hidden_clock_and_deformations": 0,
+          "changed_with_visible_clock": 18211,
+          "gestures_applied_while_hidden_match_visible_replay": true,
+          "movie_matches_solo_and_recombined": true,
+          "visible": "rear"
+        },
+        {
+          "both_restored_exactly": true,
+          "changed_from_both": 47832,
+          "changed_with_hidden_clock_and_deformations": 0,
+          "changed_with_visible_clock": 26987,
+          "gestures_applied_while_hidden_match_visible_replay": true,
+          "movie_matches_solo_and_recombined": true,
+          "visible": "front"
+        }
+      ],
+      "wheel": "blue-red"
+    }
+  ],
+  "film_seconds": "rear = front = frame / 24",
+  "finite_pixel_sampling": true,
+  "focus": 0.9,
+  "fps": 24,
+  "frames_per_view": 96,
+  "motion": "wheel-with-coral-beads",
+  "source_format": "full-range sRGB RGBA8",
+  "source_size": [
+    960,
+    540
+  ],
+  "views": [
+    "rear",
+    "front",
+    "both"
+  ],
+  "wheel": "violet-blue",
+  "source_rgba8_sha256": {
+    "rear": "5987a18bdca6505f64412261ff0fc967909d60db1b512c5e3972b9a0c204bec2",
+    "front": "4b544148c5edbe26adff13405ca9c338d03bb09ed0a5be5da6dd128d45d66ba6",
+    "both": "9a3eabb9d07adcf1d9fe1f3224782c11cea228d000b548bef9cbd21a98558b76"
+  },
+  "original_two_film_comparison": {
+    "reference": "Prior coral-wheel approval raw RGBA8 on AMD Radeon Pro 5300M via Metal",
+    "reference_raw_frames": 144,
+    "reference_full_sequence_sha256": "fd198c33c386d36c45bdf884ce0ffd41e2a5f3a6f5ae98adaee4c34c78f1410c",
+    "first_frame_index": 0,
+    "last_frame_index": 95,
+    "frames_compared": 96,
+    "identical_frames": 96,
+    "changed_bytes": 0,
+    "bytes_compared": 199065600,
+    "default_both_still_frame": 60,
+    "default_both_rgba8_sha256": "ed64c220430ba1732eeaa7dc99d06cc385c3ca30099288d93d446e334a82c88b"
+  },
+  "viewing_copy": {
+    "file": "coral-solo.mp4",
+    "codec": "H.264",
+    "layout": "Rear, front and both from left to right. Each panel contains the full 960 x 540 native frame, with the label above the gate.",
+    "size": [
+      2880,
+      596
+    ],
+    "fps": 24,
+    "range": "limited",
+    "transfer": "BT.709",
+    "primaries": "BT.709",
+    "matrix": "BT.709"
+  },
+  "comparison_still": {
+    "file": "coral-solo.png",
+    "source_frame": 60,
+    "seconds": 2.5,
+    "source_format": "RGB8 sRGB",
+    "size": [
+      2880,
+      596
+    ]
+  }
+}
