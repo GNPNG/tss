@@ -19,10 +19,12 @@ try {
     }
     $quickstart = Get-Content (Join-Path $repo 'docs/windows-preview.md') -Raw -Encoding UTF8
     $base = "https://github.com/GNPNG/tss/blob/$Tag/"
-    $quickstart = $quickstart.Replace('](../', "]($base").Replace('](performance-surfaces.md)', '](PERFORMANCE-SURFACES.md)')
+    $quickstart = $quickstart.Replace('](../', "]($base").Replace('](performance-surfaces.md)', '](PERFORMANCE-SURFACES.md)').Replace('](visual-media.md)', '](VISUAL-MEDIA.md)')
     $utf8 = New-Object System.Text.UTF8Encoding($false)
     [IO.File]::WriteAllText((Join-Path $scratch 'WINDOWS-QUICKSTART.md'), $quickstart, $utf8)
     Copy-Item -LiteralPath (Join-Path $repo 'docs/performance-surfaces.md') -Destination (Join-Path $scratch 'PERFORMANCE-SURFACES.md')
+    $media = Get-Content (Join-Path $repo 'docs/visual-media.md') -Raw -Encoding UTF8
+    [IO.File]::WriteAllText((Join-Path $scratch 'VISUAL-MEDIA.md'), $media.Replace('](windows-preview.md)', '](WINDOWS-QUICKSTART.md)'), $utf8)
     $files = @(Get-ChildItem -LiteralPath $scratch -File | Sort-Object Name | ForEach-Object FullName)
     $archive = Join-Path $scratch $name
     Compress-Archive -LiteralPath $files -DestinationPath $archive -CompressionLevel Optimal

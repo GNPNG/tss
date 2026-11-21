@@ -4,16 +4,16 @@ RUSTUP_TOOLCHAIN = "1.88.0"
 [tasks.dev]
 description = "Run The Sacred Swirls desktop application"
 depends = ["performer:dev"]
-run = "cargo run --manifest-path src-tauri/Cargo.toml"
+run = "cargo run --locked --manifest-path src-tauri/Cargo.toml"
 
 [tasks.build]
 description = "Build The Sacred Swirls desktop application"
 depends = ["performer:release"]
-run = "cargo build --release --manifest-path src-tauri/Cargo.toml"
+run = "cargo build --locked --release --features tauri/custom-protocol --manifest-path src-tauri/Cargo.toml"
 
 [tasks.test]
 description = "Run Rust tests"
-run = "cargo test --manifest-path src-tauri/Cargo.toml"
+run = "cargo test --locked --manifest-path src-tauri/Cargo.toml"
 
 [tasks."performer:dev"]
 description = "Build the compiled performance-surface listener beside the debug editor"

@@ -13,6 +13,8 @@ Extract the Windows x64 portable ZIP and run `the-sacred-swirls.exe`. The native
 
 For smaller droplets with the original wheel behind them, select **Wheel with coral beads**. Watch the buds on the edge of the front film. **Replay front beads** restarts their release while the rear oil continues moving.
 
+**Add a keyed or full-colour artwork track.** In builds with **Add artwork**, use that button on the timeline to import a clip, GIF or still. Open **Artwork settings** for key colour, cycling gradients, playback speed and Boolean masks. Choose **Export artwork program in 4K** to export the combined program and song. [Footage, alpha and mask controls](visual-media.md)
+
 Use **Projected films** to see **Rear only**, **Front only**, **Both films** or **Clear glass** on the selected wheel. The hidden film keeps moving and retains its gestures. Changing the selection clears earlier video-feedback echoes. The audience sees the change at the configured projector delay. A native wheel export uses the film selection active when the export begins.
 
 **Use a performance surface.** Keep `tss-performer.exe` beside the editor. Start the listener from the deck, pair the controller, then assign its visual track, slide and action. Two separate devices can perform together. The guide covers the TLS certificate, pairing link, sensor signals and tested configurations. [Performance surfaces](performance-surfaces.md)
