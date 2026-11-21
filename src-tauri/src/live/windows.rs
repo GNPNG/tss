@@ -795,6 +795,7 @@ fn run(
                                     motion: s.motion,
                                     films: s.visible_films.slides(),
                                     opacity: s.opacity,
+                                    envelope: s.envelope.clone(),
                                 })
                                 .collect(),
                         )?;

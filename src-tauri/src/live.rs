@@ -1,7 +1,12 @@
 use serde::{Deserialize, Serialize};
 use tauri::{State, WebviewWindow};
 #[cfg(windows)]
-use tss_live_wheel::MotionPreset;
+use tss_live_wheel::{MotionPreset, OpacityEnvelope};
+#[cfg(not(windows))]
+#[path = "../../live-wheel/src/envelope.rs"]
+mod envelope;
+#[cfg(not(windows))]
+use envelope::OpacityEnvelope;
 #[cfg(not(windows))]
 #[path = "../../live-wheel/src/preset.rs"]
 mod preset;
@@ -262,6 +267,8 @@ pub(super) struct StackLayer {
     #[serde(default)]
     visible_films: VisibleFilms,
     opacity: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    envelope: Option<OpacityEnvelope>,
 }
 
 fn default_pressure() -> f32 {

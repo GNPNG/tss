@@ -8,6 +8,12 @@ pub struct WheelLayer {
     pub motion: MotionPreset,
     pub films: [bool; 2],
     pub opacity: f32,
+    pub envelope: Option<OpacityEnvelope>,
+}
+impl WheelLayer {
+    pub(super) fn opacity_at(&self, time: f64) -> f32 {
+        self.opacity * self.envelope.as_ref().map_or(1., |e| e.level_at(time))
+    }
 }
 
 pub(super) struct Exposure<'a> {
@@ -153,7 +159,7 @@ impl LiveWheel {
         // With every wheel transparent, render the lamp through one zero-strength pass.
         let visible_count = layers.iter().filter(|l| l.opacity > 0.).count();
         let count = visible_count.max(1);
-        let single = visible_count == 1 && layers.iter().any(|l| l.opacity == 1.);
+        let single = visible_count == 1 && layers.iter().any(|l| l.opacity_at(program_time) == 1.);
         let intervals = (count * 2 - 1) as f32;
         for (index, layer) in layers
             .iter()
@@ -169,7 +175,7 @@ impl LiveWheel {
             let mut material = self.materials[&layer.wheel];
             material.lens = [
                 self.focus.unwrap_or(-1.),
-                layer.opacity,
+                layer.opacity_at(program_time),
                 (2 * index) as f32 / intervals,
                 (2 * index + 1) as f32 / intervals,
             ];
@@ -267,6 +273,49 @@ mod tests {
 
     #[test]
     #[ignore = "uses an isolated SwiftShader CPU Vulkan ICD"]
+    fn timeline_gain_uses_song_time_and_matches_explicit_optical_opacity() {
+        let size = [128, 72];
+        let mut r = crate::feedback_test::fixture(size);
+        let layer = WheelLayer {
+            id: 1,
+            wheel: "violet-blue".into(),
+            motion: MotionPreset::WheelFlow,
+            films: [true; 2],
+            opacity: 1.,
+            envelope: None,
+        };
+        let gain: OpacityEnvelope = serde_json::from_value(serde_json::json!([{
+            "start":1.,"end":4.,"fadeIn":2.,"fadeOut":1.,"level":1.
+        }]))
+        .unwrap();
+        r.select_track(1);
+        let frame = |r: &mut LiveWheel, program_time: f64| {
+            r.render_film_times_offscreen(0.6, 0.6, program_time)
+                .unwrap();
+            r.capture_rgba8().unwrap().2
+        };
+        r.set_stack(vec![WheelLayer {
+            opacity: 0.5,
+            ..layer.clone()
+        }])
+        .unwrap();
+        let half = frame(&mut r, 20.);
+        r.set_stack(vec![WheelLayer {
+            envelope: Some(gain),
+            ..layer.clone()
+        }])
+        .unwrap();
+        let silent = frame(&mut r, 0.);
+        assert_eq!(frame(&mut r, 2.), half);
+        assert_ne!(silent, half);
+        assert_eq!(frame(&mut r, 4.), silent);
+        let full = frame(&mut r, 3.);
+        r.set_stack(vec![layer]).unwrap();
+        assert_eq!(frame(&mut r, 3.), full);
+    }
+
+    #[test]
+    #[ignore = "uses an isolated SwiftShader CPU Vulkan ICD"]
     fn independent_wheel_stack_preserves_single_output_and_movie_state() {
         let size = [128, 72];
         let mut r = crate::feedback_test::fixture(size);
@@ -276,6 +325,7 @@ mod tests {
             motion: MotionPreset::WheelFlow,
             films: [true, true],
             opacity: 1.,
+            envelope: None,
         };
         let overlay = WheelLayer {
             id: 2,
@@ -283,6 +333,7 @@ mod tests {
             motion: MotionPreset::WheelWithCoralBeads,
             films: [true, true],
             opacity: 0.68,
+            envelope: None,
         };
         r.select_track(base.id);
         r.set_footprint_sampling(true);

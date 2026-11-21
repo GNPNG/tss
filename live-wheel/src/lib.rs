@@ -19,6 +19,8 @@ pub use fields::bundled_fields;
 pub use motion::SlideGesture;
 use motion::SlidePose;
 pub use preset::MotionPreset;
+mod envelope;
+pub use envelope::{OpacityEnvelope, OpacityRegion};
 mod stack;
 pub use stack::WheelLayer;
 pub use wgpu;
@@ -935,7 +937,7 @@ impl LiveWheel {
     ) {
         if self.stack.is_empty()
             || self.stack.len() == 1
-                && self.stack[0].opacity == 1.
+                && self.stack[0].opacity_at(program_time) == 1.
                 && self.stack[0].wheel == self.wheel
                 && self.stack[0].motion == self.motion
                 && self.stack[0].films == self.slide_visibility
