@@ -1,0 +1,246 @@
+{
+  "adapter": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design (Vulkan)",
+  "size": [
+    640,
+    360
+  ],
+  "songDurationSeconds": 2,
+  "restarts": 4,
+  "elapsed": 10.426331,
+  "presentDelta": 390,
+  "presentFps": 37.405296263853508,
+  "samples": [
+    {
+      "elapsed": 0.026620699999999997,
+      "fps": 42.08179674902724,
+      "p95Ms": 26.0821,
+      "presents": 73,
+      "playing": true,
+      "playheadPercent": 1.06667
+    },
+    {
+      "elapsed": 0.438241,
+      "fps": 42.08179674902724,
+      "p95Ms": 26.0821,
+      "presents": 73,
+      "playing": true,
+      "playheadPercent": 21.0667
+    },
+    {
+      "elapsed": 0.8181314,
+      "fps": 39.3038105951383,
+      "p95Ms": 37.4247,
+      "presents": 99,
+      "playing": true,
+      "playheadPercent": 41.0667
+    },
+    {
+      "elapsed": 1.1922202,
+      "fps": 39.3038105951383,
+      "p95Ms": 37.4247,
+      "presents": 99,
+      "playing": true,
+      "playheadPercent": 59.4667
+    },
+    {
+      "elapsed": 1.5683885,
+      "fps": 39.3038105951383,
+      "p95Ms": 37.4247,
+      "presents": 99,
+      "playing": true,
+      "playheadPercent": 78.5333
+    },
+    {
+      "elapsed": 1.9412151,
+      "fps": 40.00145176000534,
+      "p95Ms": 30.0075,
+      "presents": 140,
+      "playing": true,
+      "playheadPercent": 97.0667
+    },
+    {
+      "elapsed": 2.3143183,
+      "fps": 40.00145176000534,
+      "p95Ms": 30.0075,
+      "presents": 151,
+      "playing": false,
+      "playheadPercent": 100
+    },
+    {
+      "elapsed": 2.6936174,
+      "fps": 40.00145176000534,
+      "p95Ms": 30.0075,
+      "presents": 164,
+      "playing": true,
+      "playheadPercent": 18
+    },
+    {
+      "elapsed": 3.0583252,
+      "fps": 39.7349401348425,
+      "p95Ms": 29.9039,
+      "presents": 180,
+      "playing": true,
+      "playheadPercent": 36.5333
+    },
+    {
+      "elapsed": 3.4223873,
+      "fps": 39.7349401348425,
+      "p95Ms": 29.9039,
+      "presents": 180,
+      "playing": true,
+      "playheadPercent": 54.5333
+    },
+    {
+      "elapsed": 3.7909821,
+      "fps": 40.057953110895745,
+      "p95Ms": 27.077,
+      "presents": 221,
+      "playing": true,
+      "playheadPercent": 72.9333
+    },
+    {
+      "elapsed": 4.1520591,
+      "fps": 40.057953110895745,
+      "p95Ms": 27.077,
+      "presents": 221,
+      "playing": true,
+      "playheadPercent": 91.4667
+    },
+    {
+      "elapsed": 4.5218321999999995,
+      "fps": 40.057953110895745,
+      "p95Ms": 27.077,
+      "presents": 244,
+      "playing": false,
+      "playheadPercent": 100
+    },
+    {
+      "elapsed": 4.8873134,
+      "fps": 39.556332222163,
+      "p95Ms": 27.3241,
+      "presents": 261,
+      "playing": true,
+      "playheadPercent": 17.4667
+    },
+    {
+      "elapsed": 5.270461,
+      "fps": 39.556332222163,
+      "p95Ms": 27.3241,
+      "presents": 261,
+      "playing": true,
+      "playheadPercent": 36.4
+    },
+    {
+      "elapsed": 5.6358937,
+      "fps": 39.556332222163,
+      "p95Ms": 27.3241,
+      "presents": 261,
+      "playing": true,
+      "playheadPercent": 54.9333
+    },
+    {
+      "elapsed": 6.0108042,
+      "fps": 39.85395953948263,
+      "p95Ms": 29.837,
+      "presents": 302,
+      "playing": true,
+      "playheadPercent": 73.4667
+    },
+    {
+      "elapsed": 6.3883189,
+      "fps": 39.85395953948263,
+      "p95Ms": 29.837,
+      "presents": 302,
+      "playing": true,
+      "playheadPercent": 92.4
+    },
+    {
+      "elapsed": 6.7519861999999993,
+      "fps": 39.85395953948263,
+      "p95Ms": 29.837,
+      "presents": 332,
+      "playing": false,
+      "playheadPercent": 100
+    },
+    {
+      "elapsed": 7.1266668,
+      "fps": 39.479358069585714,
+      "p95Ms": 30.3458,
+      "presents": 342,
+      "playing": true,
+      "playheadPercent": 17.4667
+    },
+    {
+      "elapsed": 7.5012303,
+      "fps": 39.479358069585714,
+      "p95Ms": 30.3458,
+      "presents": 342,
+      "playing": true,
+      "playheadPercent": 36.9333
+    },
+    {
+      "elapsed": 7.875634,
+      "fps": 40.014698081783216,
+      "p95Ms": 29.9301,
+      "presents": 383,
+      "playing": true,
+      "playheadPercent": 54.9333
+    },
+    {
+      "elapsed": 8.2514367,
+      "fps": 40.014698081783216,
+      "p95Ms": 29.9301,
+      "presents": 383,
+      "playing": true,
+      "playheadPercent": 74.5333
+    },
+    {
+      "elapsed": 8.6240715,
+      "fps": 40.014698081783216,
+      "p95Ms": 29.9301,
+      "presents": 383,
+      "playing": true,
+      "playheadPercent": 92.5333
+    },
+    {
+      "elapsed": 8.9926659,
+      "fps": 39.992693334927715,
+      "p95Ms": 26.2108,
+      "presents": 423,
+      "playing": false,
+      "playheadPercent": 100
+    },
+    {
+      "elapsed": 9.3553474999999988,
+      "fps": 39.992693334927715,
+      "p95Ms": 26.2108,
+      "presents": 430,
+      "playing": true,
+      "playheadPercent": 17.4667
+    },
+    {
+      "elapsed": 9.719703299999999,
+      "fps": 39.992693334927715,
+      "p95Ms": 26.2108,
+      "presents": 430,
+      "playing": true,
+      "playheadPercent": 35.4667
+    },
+    {
+      "elapsed": 10.090344,
+      "fps": 39.96315796467238,
+      "p95Ms": 28.6528,
+      "presents": 463,
+      "playing": true,
+      "playheadPercent": 54
+    },
+    {
+      "elapsed": 10.4529517,
+      "fps": 39.96315796467238,
+      "p95Ms": 28.6528,
+      "presents": 463,
+      "playing": true,
+      "playheadPercent": 72.5333
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "revision": "4dbc35e9335a6691b66cbda6def5db4b133c5acb",
+  "label": "v0.1.0-rc.1",
+  "packageSha256": "DB8F30106DD9814CF5621224122CD4E4D7C800B15402DD14349DB64949F7D258",
+  "editorSha256": "1D8175C3F97FCF9DFD4D2AAC689D2B9632D80C5D9ED7456809DD029AB9AFA3A2",
+  "performerSha256": "A895E10A799D04C8CCFB1CC4B0EC896DA55833327F81F8624881CBB53E9B67D3",
+  "projectSha256": "B06EEEFAD62F31FB9A97ED14352FDC1926AE509A9F5C5A41753D31C1D754208B",
+  "recordedEventCount": 10,
+  "recordedPhases": [
+    "down",
+    "move",
+    "up"
+  ],
+  "editor": {
+    "title": "Oil and Star.tss",
+    "duration": "00:02",
+    "layers": [
+      "star-green.mp4",
+      "moving-matte.mov",
+      "Violet / Blue"
+    ],
+    "macros": [
+      "Pull the rear oil",
+      "Turn the front slide",
+      "Oil and Star slide pull",
+      "Timed front oil turn"
+    ],
+    "baseline": "neutral"
+  },
+  "reopenedFilmOils": {
+    "rear": "wheel",
+    "front": "pdms-1000",
+    "motion": "wheel-flow",
+    "selected": "Violet / Blue",
+    "source": "two-slide-cues.m4a",
+    "canPlay": true,
+    "stats": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design (Vulkan) · 640 × 360 · 42.1 FPS · p95 26.1 ms · queue limit 2 frames"
+  },
+  "scheduledEvents": {
+    "withoutFrontTurn": 10,
+    "withFrontTurn": 20
+  },
+  "archiveReopenedAndVerified": true
+}
