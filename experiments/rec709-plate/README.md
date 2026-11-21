@@ -30,3 +30,5 @@ The original raw reference and the application use the same finite-sample quanti
 rustup run 1.88.0 rustc --test --edition 2021 experiments/rec709-plate/plate.rs -o /tmp/tss-rec709-plate-tests
 /tmp/tss-rec709-plate-tests
 ```
+
+The Windows editor at `2a2ace1` exported the same six UHD plate types through the normal Tauri control on the GTX 1650 Ti Max-Q. All 24,883,200 reconstructed linear RGB samples were compared after independent FFmpeg decoding. Maximum absolute error was 0.00004208 and RMS error was 0.00000781. [Windows channel counts and measurements](windows-4k-verification.json)
