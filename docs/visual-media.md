@@ -24,7 +24,7 @@ The picker accepts MP4, M4V, MOV, WebM, MKV, AVI, GIF, APNG, PNG, JPEG, WebP, TI
 
 For predictable colour use an SDR sRGB source or Rec.709-tagged video. The reader converts Rec.709 transfer values to sRGB for the native compositor. It assumes untagged stills use sRGB and untagged YUV video uses Rec.709. Convert wide-gamut/HDR sources first. This media path prepares 8-bit overlays. The production still exporter has its own 16-bit output path.
 
-The fixture tests import a transparent PNG, an animated GIF and a variable-frame-rate MOV, seek across a frame boundary in both directions, and check the colour at partially covered preview edges.
+The fixture tests import a transparent PNG, an animated GIF and a variable-frame-rate MOV, seek across a frame boundary in both directions, and check the colour at partially covered preview edges. A ProRes 4444 test imports a 64 × 32 clip with a 90° display rotation and checks both alpha levels in the resulting 32 × 64 frames.
 
 ```sh
 cargo test --locked --manifest-path src-tauri/Cargo.toml media::
