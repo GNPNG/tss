@@ -198,3 +198,37 @@ test('a timed stationary press records and releases without requiring drag motio
   assert.deepEqual(take.events.map(e=>[e.t,e.phase,e.amount]),[[.01,'down',.8],[.5,'up',0]]);
   assert.deepEqual(deck.exportEvents(4,3).map(e=>[e.time,e.phase,e.amount]),[[1.01,'down',.8],[1.5,'up',0]]);
 });
+
+test('matching front-slide takes on two wheels retain separate contacts through selection changes', async () => {
+  const takes = [1,2].map(layerId => ({
+    id:String(layerId),name:'Front '+layerId,enabled:true,muted:[],duration:1,amount:1,step:0,cap:1,
+    fit:false,cue:'recording-position',songStart:1,
+    events:['down','move','up'].map((phase,index) => ({
+      layerId,slide:'front',gesture:'tug',tugResponse:0.4,phase,t:index/2,point:[0.1*layerId+index/10,0.4]
+    }))
+  }));
+  const elements=new Map(), calls=[];
+  globalThis.document={
+    getElementById(id){if (!elements.has(id)) elements.set(id,new Control());return elements.get(id);},
+    createElement(){return new Control();}
+  };
+  globalThis.Option=class {};
+  globalThis.localStorage={getItem:()=>JSON.stringify({macros:takes}),setItem(){}};
+  let position=0,layerId=1;
+  const deck=initMacroDeck({listen:async()=>{},selection:()=>({layerId,stack:[{layerId:1},{layerId:2}]}),
+    seek(){},clock:()=>({position,playing:true}),invoke:async(_,{batch})=>{
+      calls.push(...batch.samples.map(s=>({...s,layerId:batch.layerId})));
+    }});
+  await deck.songLoaded('wheel-stack',null,()=>true);
+  deck.transportChanged();
+  position=1; deck.tick();
+  await new Promise(resolve=>setTimeout(resolve,0));
+  layerId=2; position=2.1; deck.tick();
+  await new Promise(resolve=>setTimeout(resolve,0));
+  for (const id of [1,2]) {
+    const live=calls.filter(s=>s.layerId===id).map(s=>[s.phase,s.point]);
+    const movie=deck.exportEvents(id,3).map(s=>[s.phase,s.point]);
+    assert.deepEqual(live,movie);
+    assert.deepEqual(live.map(([phase])=>phase),['down','move','up']);
+  }
+});

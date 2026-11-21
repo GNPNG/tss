@@ -631,7 +631,9 @@ impl LiveWheel {
     pub fn set_slide_visibility(&mut self, rear: bool, front: bool) {
         if self.slide_visibility != [rear, front] {
             self.slide_visibility = [rear, front];
-            self.reset_feedback_history();
+            if self.stack.is_empty() {
+                self.reset_feedback_history();
+            }
         }
     }
     pub fn forget_track(&mut self, id: u64) {
@@ -649,7 +651,11 @@ impl LiveWheel {
     pub fn set_motion(&mut self, preset: MotionPreset) -> Result<(), String> {
         if self.motion != preset {
             self.switch_motion(preset)?;
-            self.reset_feedback_history();
+            // A stack changes its program history when its projected layers change.
+            // Selecting a different wheel only changes the input target.
+            if self.stack.is_empty() {
+                self.reset_feedback_history();
+            }
         }
         Ok(())
     }
