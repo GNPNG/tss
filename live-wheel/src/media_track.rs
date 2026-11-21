@@ -7,6 +7,7 @@ pub enum MediaMode {
     Key,
     Silhouette,
     Gradient,
+    Rainbow,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -15,6 +16,8 @@ pub enum Cutout {
     Circle,
     Diamond,
     Star,
+    #[serde(rename = "star-tunnel")]
+    StarTunnel,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -53,6 +56,13 @@ pub struct MediaSettings {
     pub mask_b: Option<u64>,
     pub mask_op: MaskOp,
     pub shape: Cutout,
+    #[serde(default = "unit_speed")]
+    pub tunnel_speed: f32,
+    #[serde(default)]
+    pub tunnel_bass: f32,
+}
+fn unit_speed() -> f32 {
+    1.
 }
 impl MediaSettings {
     pub fn valid(&self) -> bool {
@@ -62,6 +72,8 @@ impl MediaSettings {
             && self.offset_us >= 0
             && (0.0..=8.).contains(&self.rate)
             && (0.0..=12.).contains(&self.gradient_rate)
+            && (0.0..=8.).contains(&self.tunnel_speed)
+            && (0.0..=1.).contains(&self.tunnel_bass)
             && self
                 .key_color
                 .iter()

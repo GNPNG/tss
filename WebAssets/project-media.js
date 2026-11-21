@@ -1,7 +1,7 @@
 // Session-local decoder handles never enter a portable project or track template.
 const mediaKeys = ['name','sha256','durationUs','width','height','still','offsetUs','rate','loop','mode',
   'keyEnabled','keyColor','keyThreshold','keySoftness','gradientA','gradientB','gradientRate','bounce','blur','distortion',
-  'maskA','maskB','maskOp','shape'];
+  'maskA','maskB','maskOp','shape','tunnelSpeed','tunnelBass'];
 
 export function portableMediaSettings(media) {
   return Object.fromEntries(mediaKeys.filter(k=>media[k]!==undefined).map(k=>[k,media[k]]));
@@ -18,9 +18,10 @@ export function validMediaSettings(m) {
   return !!m && typeof m==='object' && typeof m.name==='string' && m.name.length>0 && !/[\\/\u0000]/.test(m.name) &&
     typeof m.sha256==='string'&&/^[0-9a-f]{64}$/.test(m.sha256) && uint(m.durationUs) && uint(m.width) && m.width>0 &&
     uint(m.height) && m.height>0 && typeof m.still==='boolean' && uint(m.offsetUs) && range(m.rate,0,8) && typeof m.loop==='boolean' &&
-    ['color','key','silhouette','gradient'].includes(m.mode) && (m.keyEnabled===undefined||typeof m.keyEnabled==='boolean') &&
+    ['color','key','silhouette','gradient','rainbow'].includes(m.mode) && (m.keyEnabled===undefined||typeof m.keyEnabled==='boolean') &&
     [m.keyColor,m.gradientA,m.gradientB].every(color) &&
     [m.keyThreshold,m.keySoftness,m.bounce,m.blur,m.distortion].every(v=>range(v,0,1)) && range(m.gradientRate,0,12) &&
     mask(m.maskA) && mask(m.maskB) && ['intersect','union','subtract','xor'].includes(m.maskOp) &&
-    ['none','circle','diamond','star'].includes(m.shape);
+    ['none','circle','diamond','star','star-tunnel'].includes(m.shape) &&
+    (m.tunnelSpeed===undefined || range(m.tunnelSpeed,0,8)) && (m.tunnelBass===undefined || range(m.tunnelBass,0,1));
 }

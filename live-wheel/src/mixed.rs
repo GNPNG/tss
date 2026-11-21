@@ -146,6 +146,7 @@ impl LiveWheel {
         Ok(())
     }
 
+    /// Audio values are bass, midrange, treble, and the accumulated bass amplitude in seconds.
     pub fn prepare_media(
         &mut self,
         time: f64,
@@ -263,7 +264,12 @@ impl LiveWheel {
                 m.gradient_a[2],
                 m.gradient_rate,
             ],
-            [m.gradient_b[0], m.gradient_b[1], m.gradient_b[2], 0.],
+            [
+                m.gradient_b[0],
+                m.gradient_b[1],
+                m.gradient_b[2],
+                m.tunnel_bass,
+            ],
             [m.bounce, m.blur, m.distortion, m.key_softness],
             [
                 m.mask_a.is_some() as u8 as f32,
@@ -276,7 +282,7 @@ impl LiveWheel {
                 m.mode as u8 as f32,
                 m.shape as u8 as f32,
                 f32::from(m.key_enabled as u8),
-                0.,
+                m.tunnel_speed,
             ],
         ];
         self.queue
@@ -687,6 +693,35 @@ mod tests {
                 .filter(|(a, b)| a != b)
                 .count()
                 > 500
+        );
+
+        let mut tunnel = track(1);
+        tunnel.media.mode = MediaMode::Rainbow;
+        tunnel.media.still = true;
+        tunnel.media.shape = crate::media_track::Cutout::StarTunnel;
+        tunnel.media.tunnel_bass = 1.;
+        let empty_phase = frame(&mut r, vec![tunnel], vec![1], 0.25);
+        r.prepare_media(0.25, true, [0., 0., 0., 0.3], decoded)
+            .unwrap();
+        r.render_program_to(None, 0.25, 0.25);
+        let advanced = r.capture_rgba8().unwrap().2;
+        let mut channels = [false; 3];
+        for (p, q) in advanced.chunks_exact(4).zip(empty_phase.chunks_exact(4)) {
+            if p != q {
+                for k in 0..3 {
+                    channels[k] |= p[k].abs_diff(q[k]) > 80;
+                }
+            }
+        }
+        assert_eq!(
+            channels, [true; 3],
+            "all rainbow primaries reached the advancing tunnel"
+        );
+        r.prepare_media(0.25, true, [0.; 4], decoded).unwrap();
+        r.render_program_to(None, 0.25, 0.25);
+        assert!(
+            r.capture_rgba8().unwrap().2 == empty_phase,
+            "seek must restore the precise tunnel phase"
         );
 
         // Optical transmission after opaque artwork alters the artwork. Inverted

@@ -40,17 +40,33 @@ fn sample_media(uv:vec2<f32>)->vec4<f32>{
         let wave=0.5-0.5*cos(6.2831853*(lum+uv.x*0.25+cfg.clock.x*cfg.colorA.w));
         color=mix(linear(cfg.colorA.rgb),linear(cfg.colorB.rgb),wave);
     }
+    if cfg.flags.x==4. {
+        let hue=fract(uv.y*0.8+dot(color,vec3<f32>(0.2126,0.7152,0.0722))*0.2+cfg.clock.x*cfg.colorA.w);
+        let rgb=clamp(abs(fract(hue+vec3<f32>(0.,2./3.,1./3.))*6.-3.)-1.,vec3<f32>(0.),vec3<f32>(1.));
+        color=linear(rgb);
+    }
     let q=2.*(uv-0.5);
     var boundary=-1.;
     if cfg.flags.y==1. {boundary=length(q)-1.;}
     if cfg.flags.y==2. {boundary=abs(q.x)+abs(q.y)-1.;}
-    if cfg.flags.y==3. {
+    if cfg.flags.y==3. || cfg.flags.y==4. {
         let arc=3.14159265/5.;
         let angle=atan2(q.y,q.x)+1.5707963;
         let theta=abs(fract((angle+arc)/(2.*arc))*2.*arc-arc);
         let inner=.42;
         let radius=inner*sin(arc)/(inner*sin(arc-theta)+sin(theta));
-        boundary=length(q)-radius;
+        if cfg.flags.y==3. {
+            boundary=length(q)-radius;
+        } else {
+            // Equal log-radius intervals represent successive stars in perspective.
+            let radial=length(q)/radius;
+            let phase=cfg.flags.w*(cfg.clock.x+cfg.colorB.w*cfg.audio.w);
+            let cycles=phase-log2(max(radial,0.0001));
+            let band=0.5+0.5*cos(6.2831853*cycles);
+            let pixel=cfg.clock.w/max(length(q),0.0001);
+            let ring=smoothstep(0.35-min(pixel,0.3),0.35+min(pixel,0.3),band);
+            alpha*=mix(ring,0.5,smoothstep(0.2,1.,pixel));
+        }
     }
     alpha*=1.-smoothstep(-cfg.clock.w,cfg.clock.w,boundary);
     return vec4<f32>(color*alpha,alpha);

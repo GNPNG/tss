@@ -57,8 +57,9 @@
           <details id="artwork-settings" open hidden>
             <summary>Artwork settings</summary><label><input type="checkbox" data-media="keyEnabled"> Apply chroma key</label><p id="artwork-source"></p><button type="button" id="artwork-relink" class="button quiet" hidden>Relink source</button>
             <div class="native-choices">
-            <label>Treatment<select data-media="mode"><option value="color">Original color and alpha</option><option value="key">Chroma key</option><option value="silhouette">Silhouette</option><option value="gradient">Cycling gradient</option></select></label>
-            <label>Cutout<select data-media="shape"><option value="none">None</option><option value="circle">Circle</option><option value="diamond">Diamond</option><option value="star">Star</option></select></label>
+            <label>Treatment<select data-media="mode"><option value="color">Original color and alpha</option><option value="key">Chroma key</option><option value="silhouette">Silhouette</option><option value="gradient">Cycling gradient</option><option value="rainbow">Rainbow silhouette</option></select></label>
+            <label>Cutout<select data-media="shape"><option value="none">None</option><option value="circle">Circle</option><option value="diamond">Diamond</option><option value="star">Star</option><option value="star-tunnel">Star-wipe tunnel</option></select></label>
+            <label>Tunnel speed (octaves/s)<input type="number" data-media="tunnelSpeed" min="0" max="8" step="any"></label><label>Bass acceleration<input type="range" data-media="tunnelBass" min="0" max="1" step="0.01"></label>
             <label>Key color<input type="color" data-media="keyColor"></label><label>Key range<input type="range" data-media="keyThreshold" min="0" max="1" step="0.01"></label><label>Key softness<input type="range" data-media="keySoftness" min="0" max="1" step="0.01"></label>
             <label>Silhouette / gradient start<input type="color" data-media="gradientA"></label><label>Gradient end<input type="color" data-media="gradientB"></label>
             <label>Cycles per second<input type="number" data-media="gradientRate" min="0" max="12" step="any"></label>

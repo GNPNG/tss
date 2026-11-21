@@ -3,7 +3,7 @@ export { bindVisualMedia };
 export function newMedia(grant) {
   const media={sha256:grant.sha256,name:grant.name,offsetUs:0,rate:1,loop:true,mode:'color',
     keyEnabled:false,keyColor:'#00ff00',keyThreshold:0.12,keySoftness:0.08,gradientA:'#ff2070',gradientB:'#08cfff',gradientRate:0.25,
-    bounce:0,blur:0,distortion:0,maskA:null,maskB:null,maskOp:'intersect',shape:'none'};
+    bounce:0,blur:0,distortion:0,maskA:null,maskB:null,maskOp:'intersect',shape:'none',tunnelSpeed:1,tunnelBass:0};
   bindVisualMedia({media},grant);
   return media;
 }
@@ -47,6 +47,7 @@ export function installVisualMedia({invoke,selected,layers,add,changed,report,is
         el.replaceChildren(new Option('None',''));
         for(const l of layers()) if(l.id!==layer.id && (l.media || isWheel(l))) el.add(new Option(l.name,String(l.id)));
       }
+      if (k==='tunnelSpeed'||k==='tunnelBass') {el.closest('label').hidden=m.shape!=='star-tunnel'; el.value=m[k]??(k==='tunnelSpeed'?1:0);continue;}
       if(el.type==='checkbox')el.checked=m[k];
       else el.value=m[k]==null?'':String(k==='offsetUs'?m[k]/1e6:m[k]);
     }
