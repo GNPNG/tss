@@ -470,7 +470,7 @@ fn run(
     let mut known_tracks = std::collections::BTreeSet::<u64>::new();
     let mut performers = std::collections::BTreeMap::<u64, macros::Playback>::new();
     let mut release_clock = super::release_clock::ReleaseClock::default();
-    let mut last_presented_field_time = None;
+    let mut last_presented_film_times = None;
     let mut export_pause = Duration::ZERO;
     let mut program_anchor: Option<(Instant, f64, bool)> = None;
     let mut projector: Option<projector::Projector> = None;
@@ -557,15 +557,15 @@ fn run(
                                 ShowWindow(child.0, SW_HIDE);
                             }
                             let pause_started = Instant::now();
-                            let field_time = last_presented_field_time.unwrap_or_else(|| {
-                                release_clock.field_time(
+                            let film_times = last_presented_film_times.unwrap_or_else(|| {
+                                release_clock.film_times(
                                     c.layer_id,
                                     c.motion,
                                     c.motion_take,
                                     start.elapsed().saturating_sub(export_pause),
                                 )
                             });
-                            let result = movie::render(r, job, field_time, app, parent);
+                            let result = movie::render(r, job, film_times, app, parent);
                             export_pause += pause_started.elapsed();
                             if !c.preview_hidden && unsafe { IsWindow(parent) != 0 } {
                                 child.place(c.rect)?;
@@ -758,7 +758,7 @@ fn run(
                             && c.motion_take == next.motion_take
                     }) {
                         r.set_motion(next.motion)?;
-                        last_presented_field_time = None;
+                        last_presented_film_times = None;
                         if next.motion == MotionPreset::CoralRelease
                             && config.as_ref().is_some_and(|old| {
                                 old.layer_id == next.layer_id
@@ -841,7 +841,8 @@ fn run(
         macros::flush(app, c)?;
         stats.drags += drags as u64;
         let frame_time = start.elapsed().saturating_sub(export_pause);
-        let field_time = release_clock.field_time(c.layer_id, c.motion, c.motion_take, frame_time);
+        let film_times = release_clock.film_times(c.layer_id, c.motion, c.motion_take, frame_time);
+        let [rear_time, front_time] = film_times;
         let program_time =
             program_anchor.map_or(frame_time.as_secs_f64(), |(instant, pos, playing)| {
                 pos + if playing {
@@ -851,11 +852,11 @@ fn run(
                 }
             });
         let did_present = if editor_hidden {
-            r.render_program_offscreen(field_time, program_time)?;
+            r.render_film_times_offscreen(rear_time, front_time, program_time)?;
             offscreen_submissions += 1;
             false
         } else {
-            r.render_with_program_time(&surface, field_time, program_time)?
+            r.render_film_times(&surface, rear_time, front_time, program_time)?
         };
         if let Some(p) = projector.as_mut() {
             let capture = (did_present || editor_hidden)
@@ -878,12 +879,12 @@ fn run(
         }
         let now = Instant::now();
         if did_present || editor_hidden {
-            last_presented_field_time = Some(field_time);
+            last_presented_film_times = Some(film_times);
         }
         if did_present {
             stats.presents += 1;
             if let Some(record) = capture.as_mut() {
-                if record.frame_at(r, c, frame_time, field_time, stats.drags)? {
+                if record.frame_at(r, c, frame_time, film_times, stats.drags)? {
                     capture = None;
                 }
             }

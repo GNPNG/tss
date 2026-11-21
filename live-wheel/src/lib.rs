@@ -8,12 +8,16 @@ mod movie;
 pub use movie::WheelMovie;
 mod material;
 mod motion;
-mod pressure;
 mod preset;
+mod pressure;
+mod small_front;
+use small_front::{cache_slots, upload_frame, SmallFront};
+#[cfg(test)]
+mod coral_layer_proof;
 pub use fields::bundled_fields;
-pub use preset::MotionPreset;
 pub use motion::SlideGesture;
 use motion::SlidePose;
+pub use preset::MotionPreset;
 pub use wgpu;
 
 use bytemuck::{Pod, Zeroable};
@@ -38,11 +42,12 @@ struct FramePair {
     first: u32,
     second: u32,
     fraction: f32,
-    _pad: u32,
+    front_fraction: f32,
     rotation: [f32; 4],
     centers: [f32; 4],
     cache_rect: [f32; 4],
     pressure: [[f32; 4]; 2],
+    front_frames: [u32; 4],
 }
 
 struct Target {
@@ -231,6 +236,7 @@ pub struct LiveWheel {
     fields: Fields,
     motion: MotionPreset,
     inactive_fields: Option<Fields>,
+    small_front: Option<SmallFront>,
     cache: gpu::Texture,
     cache_view: gpu::TextureView,
     slots: [Option<u32>; 2],
@@ -456,8 +462,8 @@ impl LiveWheel {
             &[image, Sampler],
         );
         let cache = device.create_texture(&gpu::TextureDescriptor {
-            label: Some("Two adjacent RG8 distance frames"),
-            size: extent(fields.size, 2),
+            label: Some("Adjacent film frames for independent slide clocks"),
+            size: extent(fields.size, 4),
             mip_level_count: 1,
             sample_count: 1,
             dimension: gpu::TextureDimension::D2,
@@ -510,6 +516,7 @@ impl LiveWheel {
             fields,
             motion: MotionPreset::WheelFlow,
             inactive_fields: None,
+            small_front: None,
             cache,
             cache_view,
             slots: [None, None],
@@ -609,16 +616,26 @@ impl LiveWheel {
         if self.motion == preset {
             return Ok(());
         }
-        if self.inactive_fields.is_none() {
-            let coral = Fields::coral_release()?;
-            if !coral.same_glass_as(&self.fields) {
-                return Err("Coral release requires the registered full-slide geometry".into());
+        if preset == MotionPreset::WheelWithCoralBeads && self.small_front.is_none() {
+            if !self.fields.matches_small_front() {
+                return Err(
+                    "Small coral droplets require the registered full-slide geometry".into(),
+                );
             }
-            self.inactive_fields = Some(coral);
+            self.small_front = Some(SmallFront::load()?);
         }
-        std::mem::swap(&mut self.fields, self.inactive_fields.as_mut().unwrap());
+        if self.motion == MotionPreset::CoralRelease || preset == MotionPreset::CoralRelease {
+            if self.inactive_fields.is_none() {
+                let coral = Fields::coral_release()?;
+                if !coral.same_glass_as(&self.fields) {
+                    return Err("Coral release requires the registered full-slide geometry".into());
+                }
+                self.inactive_fields = Some(coral);
+            }
+            std::mem::swap(&mut self.fields, self.inactive_fields.as_mut().unwrap());
+            self.slots = [None, None];
+        }
         self.motion = preset;
-        self.slots = [None, None];
         self.reset_feedback_history();
         Ok(())
     }
@@ -710,42 +727,15 @@ impl LiveWheel {
         }
     }
     fn cache_pair(&mut self, a: u32, b: u32) -> [u32; 2] {
-        let mut result = [0u32; 2];
-        for (i, wanted) in [a, b].into_iter().enumerate() {
-            let slot = if let Some(found) = self.slots.iter().position(|s| *s == Some(wanted)) {
-                found
-            } else {
-                let other = if i == 0 { b } else { a };
-                let next = self
-                    .slots
-                    .iter()
-                    .position(|s| *s != Some(other))
-                    .unwrap_or(0);
-                self.queue.write_texture(
-                    gpu::ImageCopyTexture {
-                        texture: &self.cache,
-                        mip_level: 0,
-                        origin: gpu::Origin3d {
-                            x: 0,
-                            y: 0,
-                            z: next as u32,
-                        },
-                        aspect: gpu::TextureAspect::All,
-                    },
-                    self.fields.frame(wanted),
-                    gpu::ImageDataLayout {
-                        offset: 0,
-                        bytes_per_row: Some(self.fields.size[0] * 2),
-                        rows_per_image: Some(self.fields.size[1]),
-                    },
-                    extent(self.fields.size, 1),
-                );
-                self.slots[next] = Some(wanted);
-                next
-            };
-            result[i] = slot as u32;
-        }
-        result
+        cache_slots(&mut self.slots, [a, b], |slot, frame| {
+            upload_frame(
+                &self.queue,
+                &self.cache,
+                self.fields.size,
+                slot,
+                self.fields.frame(frame),
+            );
+        })
     }
     pub fn render(
         &mut self,
@@ -760,10 +750,19 @@ impl LiveWheel {
         time_seconds: f64,
         program_time: f64,
     ) -> Result<bool, String> {
+        self.render_film_times(surface, time_seconds, time_seconds, program_time)
+    }
+    pub fn render_film_times(
+        &mut self,
+        surface: &gpu::Surface<'_>,
+        rear: f64,
+        front: f64,
+        program_time: f64,
+    ) -> Result<bool, String> {
         if self.actual_size.contains(&0) {
             return Ok(false);
         }
-        if !time_seconds.is_finite() || !program_time.is_finite() {
+        if !rear.is_finite() || !front.is_finite() || !program_time.is_finite() {
             return Err("Invalid live frame time".into());
         }
         let frame = match surface.get_current_texture() {
@@ -776,7 +775,7 @@ impl LiveWheel {
             Err(e) => return Err(e.to_string()),
         };
         let out = frame.texture.create_view(&Default::default());
-        self.render_program_to(Some(&out), time_seconds, program_time);
+        self.render_films_to(Some(&out), rear, front, program_time);
         frame.present();
         Ok(true)
     }
@@ -787,10 +786,18 @@ impl LiveWheel {
         time_seconds: f64,
         program_time: f64,
     ) -> Result<(), String> {
-        if !time_seconds.is_finite() || !program_time.is_finite() {
+        self.render_film_times_offscreen(time_seconds, time_seconds, program_time)
+    }
+    pub fn render_film_times_offscreen(
+        &mut self,
+        rear: f64,
+        front: f64,
+        program_time: f64,
+    ) -> Result<(), String> {
+        if !rear.is_finite() || !front.is_finite() || !program_time.is_finite() {
             return Err("Invalid live frame time".into());
         }
-        self.render_program_to(None, time_seconds, program_time);
+        self.render_films_to(None, rear, front, program_time);
         Ok(())
     }
     pub fn render_offscreen(&mut self, time_seconds: f64) -> Result<(), String> {
@@ -871,12 +878,35 @@ impl LiveWheel {
         time_seconds: f64,
         program_time: f64,
     ) {
+        self.render_films_to(out, time_seconds, time_seconds, program_time);
+    }
+    fn render_films_to(
+        &mut self,
+        out: Option<&gpu::TextureView>,
+        rear_time: f64,
+        front_time: f64,
+        program_time: f64,
+    ) {
         let size = self.preview_size();
         if let Some(f) = &mut self.feedback {
             f.prepare(&self.device, size);
         }
-        let (a, b, fraction) = self.fields.sample_motion(self.motion, time_seconds);
+        let (a, b, fraction) = self.fields.sample_motion(self.motion, rear_time);
         let [first, second] = self.cache_pair(a, b);
+        let (front_frames, front_fraction) = if self.motion == MotionPreset::WheelWithCoralBeads {
+            let (a, b, alpha) = self
+                .fields
+                .sample_motion(MotionPreset::CoralRelease, front_time);
+            (
+                self.small_front
+                    .as_mut()
+                    .expect("loaded by set_motion")
+                    .frames(&self.queue, &self.cache, a, b),
+                alpha,
+            )
+        } else {
+            ([first, second], fraction)
+        };
         let poses = self
             .tracks
             .get(&self.active)
@@ -891,7 +921,8 @@ impl LiveWheel {
                 first,
                 second,
                 fraction,
-                _pad: 0,
+                front_fraction,
+                front_frames: [front_frames[0], front_frames[1], 0, 0],
                 rotation: [r[0], r[1], f[0], f[1]],
                 centers: [rc[0], rc[1], fc[0], fc[1]],
                 cache_rect: self.fields.view_to_cache(),
@@ -1052,9 +1083,9 @@ mod feedback_test;
 #[cfg(test)]
 mod footprint_test;
 #[cfg(test)]
-mod software_test;
-#[cfg(test)]
 mod pressure_test;
+#[cfg(test)]
+mod software_test;
 #[cfg(test)]
 mod warp_diagnostic;
 

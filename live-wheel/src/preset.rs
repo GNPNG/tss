@@ -7,4 +7,5 @@ pub enum MotionPreset {
     #[default]
     WheelFlow,
     CoralRelease,
+    WheelWithCoralBeads,
 }

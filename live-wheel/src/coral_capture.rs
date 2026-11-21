@@ -6,13 +6,7 @@ use std::{
     time::Instant,
 };
 
-/// Capture the actual editor optics on one explicitly selected hardware GPU.
-/// Each readback finishes before the next optical frame is submitted.
-#[test]
-#[ignore = "requires a reserved hardware GPU and an unused capture directory"]
-fn capture_coral_release() -> Result<(), String> {
-    let path =
-        PathBuf::from(std::env::var_os("TSS_CORAL_CAPTURE_DIR").ok_or("Missing capture path")?);
+fn discrete_renderer(size: [u32; 2]) -> Result<(LiveWheel, gpu::AdapterInfo), String> {
     let adapter_match =
         std::env::var("TSS_LIVE_ADAPTER").map_err(|_| "Missing hardware adapter name")?;
     if adapter_match.trim().is_empty() {
@@ -53,7 +47,6 @@ fn capture_coral_release() -> Result<(), String> {
         ),
     )
     .map_err(|e| e.to_string())?;
-    let size = [640, 360];
     let cfg = gpu::SurfaceConfiguration {
         usage: gpu::TextureUsages::RENDER_ATTACHMENT,
         format: gpu::TextureFormat::Bgra8Unorm,
@@ -65,7 +58,7 @@ fn capture_coral_release() -> Result<(), String> {
         view_formats: vec![],
     };
     let fields = Fields::from_slice(&bundled_fields()?)?;
-    let mut renderer = pollster::block_on(LiveWheel::from_device(
+    let renderer = pollster::block_on(LiveWheel::from_device(
         device,
         queue,
         cfg,
@@ -73,6 +66,18 @@ fn capture_coral_release() -> Result<(), String> {
         info.name.clone(),
         size,
     ))?;
+    Ok((renderer, info))
+}
+
+/// Capture the actual editor optics on one explicitly selected hardware GPU.
+/// Each readback finishes before the next optical frame is submitted.
+#[test]
+#[ignore = "requires a reserved hardware GPU and an unused capture directory"]
+fn capture_coral_release() -> Result<(), String> {
+    let path =
+        PathBuf::from(std::env::var_os("TSS_CORAL_CAPTURE_DIR").ok_or("Missing capture path")?);
+    let size = [640, 360];
+    let (mut renderer, info) = discrete_renderer(size)?;
     renderer.set_wheel("violet-blue")?;
     renderer.set_focus(Some(1.0))?;
     let capture = |r: &mut LiveWheel| -> Result<Vec<u8>, String> {
@@ -198,6 +203,74 @@ fn tug_comparison(renderer: &mut LiveWheel, path: &std::path::Path) -> Result<()
     fs::write(
         path.join("comparison.json"),
         serde_json::to_vec_pretty(&meta).unwrap(),
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires a reserved discrete GPU and a new TSS_CORAL_CAPTURE_DIR"]
+fn capture_coral_wheel() -> Result<(), String> {
+    let path =
+        PathBuf::from(std::env::var_os("TSS_CORAL_CAPTURE_DIR").ok_or("Missing capture path")?);
+    let size = [960, 540];
+    let (mut renderer, info) = discrete_renderer(size)?;
+    renderer.set_preview_width(size[0])?;
+    renderer.set_footprint_sampling(true);
+    renderer.set_wheel("violet-blue")?;
+    renderer.set_motion(MotionPreset::WheelWithCoralBeads)?;
+    renderer.set_focus(Some(0.90))?;
+    let layer_proof = crate::coral_layer_proof::verify(&mut renderer)?;
+    let sample = |r: &mut LiveWheel, rear: f64, front: f64| -> Result<Vec<u8>, String> {
+        r.render_film_times_offscreen(rear, front, rear)?;
+        let (w, h, rgba) = r.capture_rgba8()?;
+        if [w, h] != size {
+            return Err(format!("Unexpected capture extent {w} × {h}"));
+        }
+        Ok(rgba)
+    };
+    // With both source times pinned, only the clock under test may change pixels.
+    let changed = |a: &[u8], b: &[u8]| {
+        a.chunks_exact(4)
+            .zip(b.chunks_exact(4))
+            .filter(|(p, q)| (0..3).any(|k| p[k].abs_diff(q[k]) >= 3))
+            .count()
+    };
+    let first = sample(&mut renderer, 0., 0.)?;
+    let rear_only = sample(&mut renderer, 1.5, 0.)?;
+    let front_only = sample(&mut renderer, 0., 3.5)?;
+    let rear_late = sample(&mut renderer, 5.5, 7.)?;
+    let end = sample(&mut renderer, 4., 4.)?;
+    let held_front = sample(&mut renderer, 4., 7.)?;
+    assert!(changed(&first, &rear_only) > 0 && changed(&first, &front_only) > 0);
+    assert!(held_front == end && changed(&end, &rear_late) > 0);
+    fs::create_dir(&path).map_err(|e| e.to_string())?;
+    let mut sink =
+        BufWriter::new(File::create_new(path.join("frames.rgba")).map_err(|e| e.to_string())?);
+    let mut timings = Vec::new();
+    for n in 0..144 {
+        let t = f64::from(n) / 24.;
+        let start = Instant::now();
+        let frame = sample(&mut renderer, t, t)?;
+        timings.push(start.elapsed().as_secs_f64() * 1000.);
+        sink.write_all(&frame).map_err(|e| e.to_string())?;
+    }
+    sink.flush().map_err(|e| e.to_string())?;
+    let capture = serde_json::json!({
+        "adapter":info.name,"backend":format!("{:?}",info.backend),"size":size,
+        "motion":"wheel-with-coral-beads","wheel":"violet-blue","fps":24,"frames":144,"focus":0.90,
+        "format":"full-range sRGB RGBA8", "finite_pixel_sampling": true, "layer_proof": layer_proof,
+        "source_clock_checks":{
+            "changed_pixels_at_least_three_codes":{
+                "rear_0_to_1p5_front_zero":changed(&first,&rear_only),
+                "front_0_to_3p5_rear_zero":changed(&first,&front_only),
+                "rear_4_to_5p5_front_held":changed(&end,&rear_late)},
+            "front_at_4_and_7_identical_when_rear_held_at_4":true},
+        "render_plus_readback_ms":timings
+    });
+    fs::write(
+        path.join("capture.json"),
+        serde_json::to_vec_pretty(&capture).unwrap(),
     )
     .map_err(|e| e.to_string())?;
     Ok(())

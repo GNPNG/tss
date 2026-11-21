@@ -1,3 +1,7 @@
+export function hasRelease(motion) {
+  return motion === 'coral-release' || motion === 'wheel-with-coral-beads';
+}
+
 // The editor forwards viewport/selection changes only. The native renderer
 // captures mouse motion and presents directly into its Windows child surface.
 export class NativeWheelSurface {

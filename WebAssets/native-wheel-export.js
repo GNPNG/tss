@@ -1,3 +1,5 @@
+import { hasRelease } from './native-wheel.js';
+
 // Capture the selected track and its scheduled performance once. Frames stay native.
 export function wheelMovieRequest(selection, duration, events, baseline) {
   return {
@@ -7,7 +9,7 @@ export function wheelMovieRequest(selection, duration, events, baseline) {
     duration,
     events,
     baseline: baseline === 'auto'
-      ? (events.length || selection.motion === 'coral-release' ? 'neutral' : 'current')
+      ? (events.length || hasRelease(selection.motion) ? 'neutral' : 'current')
       : baseline,
   };
 }

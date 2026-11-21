@@ -15,6 +15,16 @@ pub enum Baseline {
     Neutral,
 }
 
+impl Baseline {
+    #[cfg(any(windows, test))]
+    pub(super) fn film_origins(self, last_presented: [f64; 2]) -> [f64; 2] {
+        match self {
+            Self::Current => last_presented,
+            Self::Neutral => [0.; 2],
+        }
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Event {
@@ -127,7 +137,7 @@ pub async fn cancel_native_wheel_export(control: State<'_, ExportControl>) -> Re
 mod tests {
     use super::*;
     #[test]
-    fn legacy_wheel_requests_and_explicit_coral_takes_decode_independently() {
+    fn legacy_wheel_requests_and_explicit_release_takes_decode_independently() {
         let mut body = serde_json::json!({"layerId":2,"wheel":"violet-blue",
             "duration":2.0,"baseline":"neutral","events":[]});
         let parse = |value| serde_json::from_value::<Request>(value);
@@ -139,8 +149,21 @@ mod tests {
         let coral = parse(body.clone()).unwrap();
         assert_eq!(coral.motion, super::super::MotionPreset::CoralRelease);
         assert_eq!(coral.motion_take, 4);
+        body["motion"] = serde_json::json!("wheel-with-coral-beads");
+        let mixed = parse(body.clone()).unwrap();
+        assert_eq!(
+            mixed.motion,
+            super::super::MotionPreset::WheelWithCoralBeads
+        );
+        assert_eq!(mixed.motion_take, 4);
         body["motion"] = serde_json::json!("unsupported");
         assert!(parse(body).is_err());
+    }
+    #[test]
+    fn current_export_preserves_both_source_positions_and_neutral_restarts_both() {
+        let at_replay = [12.5, 0.25];
+        assert_eq!(Baseline::Current.film_origins(at_replay), [12.5, 0.25]);
+        assert_eq!(Baseline::Neutral.film_origins(at_replay), [0.; 2]);
     }
     fn event(time: f64, slide: Slide, phase: Phase) -> Event {
         Event {

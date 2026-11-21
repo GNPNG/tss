@@ -12,11 +12,13 @@ test('scheduled takes use the neutral baseline and preserve explicit overrides',
 
 import { NativeWheelExport } from '../../WebAssets/native-wheel-export.js';
 test('a one-shot coral export starts at the beginning unless current pose was explicitly selected', () => {
-  const layer = {layerId: 2, wheel: 'violet-green', motion: 'coral-release', motionTake: 7};
-  assert.deepEqual(wheelMovieRequest(layer, 8, [], 'auto'), {
-    ...layer, duration: 8, events: [], baseline: 'neutral'
-  });
-  assert.equal(wheelMovieRequest(layer, 8, [], 'current').baseline, 'current');
+  for (const motion of ['coral-release', 'wheel-with-coral-beads']) {
+    const layer = {layerId: 2, wheel: 'violet-green', motion, motionTake: 7};
+    assert.deepEqual(wheelMovieRequest(layer, 8, [], 'auto'), {
+      ...layer, duration: 8, events: [], baseline: 'neutral'
+    });
+    assert.equal(wheelMovieRequest(layer, 8, [], 'current').baseline, 'current');
+  }
 });
 test('export flushes recorded points before capturing the schedule or presenting its dialog', async () => {
   const nodes = new Map();

@@ -1,6 +1,6 @@
 import { LiquidRenderer, LIQUID_PALETTES } from './liquid-renderer.js';
 import { analyzeAudio, featuresAt } from './audio-features.js';
-import { NativeWheelSurface } from './native-wheel.js';
+import { NativeWheelSurface, hasRelease } from './native-wheel.js';
 import { NativeWheelExport } from './native-wheel-export.js';
 import { VideoFeedbackControls } from './video-feedback.js';
 import { installPerformerDeck } from './performer-host.js';
@@ -447,7 +447,9 @@ function renderControls() {
   byId('live-wheel').disabled = !wheel || !!layer?.customColors || !layer?.visible;
   byId('wheel-motion').value = layer?.motion ?? 'wheel-flow';
   byId('wheel-motion').disabled = !live;
-  byId('replay-release').hidden = layer?.motion !== 'coral-release';
+  byId('replay-release').hidden = !hasRelease(layer?.motion);
+  byId('replay-release').textContent = layer?.motion === 'wheel-with-coral-beads'
+    ? 'Replay front beads' : 'Replay release live';
   byId('replay-release').disabled = !live;
   byId('wheel-slide').value = layer?.slide ?? 'rear';
   byId('wheel-width').value = String(layer?.renderWidth ?? 640);
@@ -664,12 +666,12 @@ byId('wheel-motion').addEventListener('change', (event) => {
   const layer = selectedLayer();
   if (!layer || layer.motion === event.target.value) return;
   layer.motion = event.target.value;
-  if (layer.motion === 'coral-release') layer.motionTake++;
+  if (hasRelease(layer.motion)) layer.motionTake++;
   renderControls();
 });
 byId('replay-release').addEventListener('click', () => {
   const layer = selectedLayer();
-  if (!layer || layer.motion !== 'coral-release') return;
+  if (!layer || !hasRelease(layer.motion)) return;
   layer.motionTake++;
   nativeSurface?.sync();
 });

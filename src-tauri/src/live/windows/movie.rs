@@ -65,7 +65,7 @@ fn write_rgb(path: &std::path::Path, pixels: &[u8]) -> Result<(), String> {
 pub(super) fn render(
     r: &mut LiveWheel,
     job: Job,
-    last_field_time: f64,
+    last_film_times: [f64; 2],
     app: &tauri::AppHandle,
     parent: HWND,
 ) -> Result<(), String> {
@@ -77,7 +77,7 @@ pub(super) fn render(
     let count = request.validate()?;
     let proof = proof_target()?;
     let current_pose = request.baseline == Baseline::Current;
-    let initial_phase = if current_pose { last_field_time } else { 0. };
+    let [rear_origin, front_origin] = request.baseline.film_origins(last_film_times);
     let mut target = pollster::block_on(r.begin_movie(SIZE, current_pose))?;
     let manager = app.state::<ExportManager>();
     manager.start_rgba(audio, output, SIZE[0], SIZE[1], FPS)?;
@@ -121,7 +121,7 @@ pub(super) fn render(
                     }
                 }
             }
-            target.frame(initial_phase + pts, pts, |bytes| {
+            target.frame_films(rear_origin + pts, front_origin + pts, pts, |bytes| {
                 if let Some((_, path)) = proof.as_ref().filter(|(n, _)| *n == index) {
                     write_rgb(path, bytes)?;
                 }

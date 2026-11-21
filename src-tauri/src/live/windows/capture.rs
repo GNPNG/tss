@@ -9,7 +9,7 @@ pub(super) struct Capture {
     path: PathBuf,
     duration: Duration,
     origin: Option<Duration>,
-    source_start: Option<f64>,
+    source_start: Option<[f64; 2]>,
     sample: u64,
     last: Duration,
     manifest: Option<fs::File>,
@@ -52,7 +52,13 @@ impl Capture {
         frame_time: Duration,
         applied_strokes: u64,
     ) -> Result<bool, String> {
-        self.frame_at(r, c, frame_time, frame_time.as_secs_f64(), applied_strokes)
+        self.frame_at(
+            r,
+            c,
+            frame_time,
+            [frame_time.as_secs_f64(); 2],
+            applied_strokes,
+        )
     }
 
     pub fn frame_at(
@@ -60,11 +66,12 @@ impl Capture {
         r: &LiveWheel,
         c: &Config,
         frame_time: Duration,
-        field_time: f64,
+        film_times: [f64; 2],
         applied_strokes: u64,
     ) -> Result<bool, String> {
         let elapsed = frame_time - *self.origin.get_or_insert(frame_time);
-        let source_start = *self.source_start.get_or_insert(field_time);
+        let [rear_start, front_start] = *self.source_start.get_or_insert(film_times);
+        let [rear_time, front_time] = film_times;
         let key = (
             c.wheel.clone(),
             c.motion,
@@ -79,7 +86,8 @@ impl Capture {
         if self.last_config.as_ref() != Some(&key) {
             self.configurations.push(
                 json!({"t":elapsed.as_secs_f64(), "wheel":c.wheel, "motion":c.motion,
-                "motionTake":c.motion_take, "fieldTime":field_time,
+                "motionTake":c.motion_take, "fieldTime":front_time,
+                "rearFieldTime":rear_time, "frontFieldTime":front_time,
                 "focus":c.focus, "track":c.layer_id, "slide":c.slide, "gesture":c.gesture,
                 "tugResponse":c.tug_response, "renderWidth":c.render_width}),
             );
@@ -100,7 +108,8 @@ impl Capture {
                 "frames": self.sample, "successfulPresentsInWindow":self.sample,
                 "gesture":c.gesture,"tugResponse":c.tug_response,
                 "retention":"every successful present before the requested endpoint",
-                "sourceStartSeconds":source_start, "motion":c.motion, "motionTake":c.motion_take,
+                "sourceStartSeconds":front_start, "rearSourceStartSeconds":rear_start,
+                "frontSourceStartSeconds":front_start, "motion":c.motion, "motionTake":c.motion_take,
                 "elapsedSeconds": elapsed.as_secs_f64(), "configurations":self.configurations,
                 "appliedMouseStrokes":applied_strokes,
                 "source": "active editor optical target immediately following successful presentation",

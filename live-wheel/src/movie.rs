@@ -132,12 +132,21 @@ impl WheelMovie<'_> {
         song_time: f64,
         sink: impl FnOnce(&[u8]) -> Result<(), String>,
     ) -> Result<(), String> {
-        if !field_time.is_finite() || !song_time.is_finite() {
+        self.frame_films(field_time, field_time, song_time, sink)
+    }
+    pub fn frame_films(
+        &mut self,
+        rear: f64,
+        front: f64,
+        song_time: f64,
+        sink: impl FnOnce(&[u8]) -> Result<(), String>,
+    ) -> Result<(), String> {
+        if !rear.is_finite() || !front.is_finite() || !song_time.is_finite() {
             return Err("Invalid movie sample time".into());
         }
         let r = &mut self.renderer;
         let [w, h] = r.preview_size();
-        r.render_program_to(None, field_time, song_time);
+        r.render_films_to(None, rear, front, song_time);
         let mut encoder = r.device.create_command_encoder(&Default::default());
         encoder.copy_texture_to_buffer(
             r.optics.texture.as_image_copy(),

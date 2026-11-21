@@ -6,11 +6,12 @@ layout(set=0,binding=5,std140) uniform SourcePair {
     uint firstFrame;
     uint secondFrame;
     float timeFraction;
-    uint padding;
+    float frontFraction;
     vec4 rotation;
     vec4 centers;
     vec4 cacheRect;
     vec4 pressure[2];
+    uvec4 frontFrames;
 } source;
 layout(set=0,binding=6) uniform texture2D filmMaterial;
 const vec2 filmAspect = vec2(16.0/9.0, 1.0);
@@ -64,9 +65,11 @@ float sourceDistance(vec2 uv, bool front) {
     vec2 p = filmSourceUV(uv,front);
     vec2 size = vec2(textureSize(sampler2DArray(sourceFrames,fieldSampler),0).xy);
     vec2 edge = clamp(min(p,1.0-p)*size+0.5,vec2(0.0),vec2(1.0));
-    vec2 a = textureLod(sampler2DArray(sourceFrames,fieldSampler),vec3(p,float(source.firstFrame)),0.0).rg;
-    vec2 b = textureLod(sampler2DArray(sourceFrames,fieldSampler),vec3(p,float(source.secondFrame)),0.0).rg;
-    float d = front ? mix(a.g,b.g,source.timeFraction) : mix(a.r,b.r,source.timeFraction);
+    uint first = front ? source.frontFrames.x : source.firstFrame;
+    uint second = front ? source.frontFrames.y : source.secondFrame;
+    vec2 a = textureLod(sampler2DArray(sourceFrames,fieldSampler),vec3(p,float(first)),0.0).rg;
+    vec2 b = textureLod(sampler2DArray(sourceFrames,fieldSampler),vec3(p,float(second)),0.0).rg;
+    float d = front ? mix(a.g,b.g,source.frontFraction) : mix(a.r,b.r,source.timeFraction);
     return d*edge.x*edge.y;
 }
 vec2 changedFootprint(vec2 sigma, vec2 uv) {

@@ -74,6 +74,12 @@ fn parse(b: &[u8]) -> Result<Layout, String> {
     })
 }
 impl Fields {
+    pub fn matches_small_front(&self) -> bool {
+        self.size == [704, 704]
+            && self.view == [96, 208, 512, 288]
+            && self.count == 96
+            && self.rate == 24
+    }
     pub fn coral_release() -> Result<Self, String> {
         let mut bytes = unpack(include_bytes!("../assets/coral-release.rg8.gz"))?;
         let layout = parse(&bytes)?;
@@ -135,7 +141,9 @@ impl Fields {
     }
     pub fn sample_motion(&self, motion: crate::MotionPreset, seconds: f64) -> (u32, u32, f32) {
         match motion {
-            crate::MotionPreset::WheelFlow => self.sample(seconds),
+            crate::MotionPreset::WheelFlow | crate::MotionPreset::WheelWithCoralBeads => {
+                self.sample(seconds)
+            }
             crate::MotionPreset::CoralRelease => {
                 let end = self.count - 1;
                 let pos = (seconds * f64::from(self.rate)).clamp(0., f64::from(end));
