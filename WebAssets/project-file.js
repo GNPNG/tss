@@ -39,7 +39,7 @@ function validLayer(l, palettes) {
 }
 
 function validMacro(m) {
-  if (!(record(m) && named(m.id) && named(m.name) && num(m.duration, .001) &&
+  if (!(record(m) && named(m.id) && named(m.name) && num(m.duration, 0) && m.duration>0 &&
         (m.songStart === null || num(m.songStart, 0)) && flag(m.enabled) && flag(m.fit) &&
         num(m.amount, 0, 3) && num(m.step, 0, 3) && num(m.cap, 0, 4) && string(m.cue) &&
         Array.isArray(m.muted) && m.muted.every(index) && unique(m.muted) && Array.isArray(m.events) && m.events.length)) return false;

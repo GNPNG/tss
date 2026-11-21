@@ -12,6 +12,7 @@ import { initMacroDeck, songFingerprint } from './gesture-macros.js';
 import { PROJECT_FORMAT, layerSettings, validateProject, emptyGestures, EditHistory } from './project-file.js';
 import { audioCueGroups } from './phrase-cues.js';
 import { advisorIntervals, defaultBindings, glyphs, opacityAt, planIntervals, replaceRegion, validRange } from './timeline.js';
+import { transferRegion, removeRegionGestures } from './region-tracks.js';
 
 const byId = (id) => document.getElementById(id);
 const preview = byId('preview');
@@ -875,7 +876,10 @@ wheelStudy.addEventListener('close', () => {
 byId('play').addEventListener('click', () => { if (state.playing) pause(); else play().catch((error) => status(`Playback failed: ${error.message}`)); });
 byId('restart').addEventListener('click', () => seek(0).catch((error) => status(error.message)));
 byId('stop').addEventListener('click', () => { pause(); state.position = 0; updateTransport(); status('Stopped'); });
-byId('add-layer').addEventListener('click', addLayer);
+byId('add-layer').addEventListener('click', () => {
+  if(byId('track-source').value==='blank')addLayer();
+  else projectOperation('Add saved or template track', addTrackFromSource);
+});
 const seekArea=byId('seek-area');
 let drag=null, dragged=false, selectedGlyph=glyphs[0];
 const selectionOverlay=document.createElement('div');
@@ -903,6 +907,7 @@ function refreshTimelineTools() {
     button.addEventListener('click',()=>{selectedGlyph=g;refreshTimelineTools();});return button;
   }));
   byId('wand-mode').value=state.bindings[selectedGlyph];
+  refreshTrackSources();
 }
 const field=id=>byId('wand-'+id);
 const numeric=id=>field(id).valueAsNumber;
@@ -957,7 +962,12 @@ byId('set-range').addEventListener('click',()=>timelineAction('Select time range
 }));
 byId('select-all-time').addEventListener('click',()=>timelineAction('Select entire song',()=>setTimeRange(0,timelineDuration(),false)));
 byId('apply-wand').addEventListener('click',()=>timelineAction('Apply boundary to selected layer',()=>replaceSelected(wandRule())));
-byId('clear-region').addEventListener('click',()=>timelineAction('Clear selected layer in range',()=>replaceSelected(null)));
+byId('clear-region').addEventListener('click',()=>projectOperation('Clear selected layer in range',async()=>{
+  const range=selectedEditRange(), layer=selectedLayer();
+  await macroDeck?.stopForEdit();
+  setGestureData(removeRegionGestures(gestureData(),layer.id,range,timelineDuration(),newPrefix()));
+  replaceSelected(null);checkpoint('Clear selected layer in range');status('Cleared selected layer in range');
+}));
 function atWave(event) {
   const rect=seekArea.getBoundingClientRect();
   return Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width))*timelineDuration();
@@ -1060,13 +1070,127 @@ function chooseReplacement() {
   });
 }
 const palettes = () => new Set([...Object.keys(LIQUID_PALETTES), ...mathmosWheels.keys()]);
-async function openProject(file) {
+const shippedTracks = new Map([
+  ['wheel',{name:'Violet / Blue wheel',palette:'violet-blue',motion:'wheel-flow'}],
+  ['beads',{name:'Coral bead release',palette:'violet-blue',motion:'wheel-with-coral-beads'}],
+  ['lagoon',{name:'Lagoon liquid',palette:'lagoon',motion:'wheel-flow'}],
+]);
+const libraryCache=new Map();
+let copySequence=0;
+function newPrefix(){return (globalThis.crypto?.randomUUID?.()??Date.now()+'-'+(++copySequence))+'/';}
+function libraryKey(kind){return 'tss.track-library.v1.'+(kind==='user'?'user':'song.'+(state.audioRef?.sha256??''));}
+function library(kind) {
+  if(kind==='song'&&!state.audioRef?.sha256)return [];
+  const key=libraryKey(kind);
+  if(!libraryCache.has(key)){
+    const entries=JSON.parse(localStorage.getItem(key)||'[]');
+    if(!Array.isArray(entries))throw Error('Invalid saved track library.');
+    libraryCache.set(key,entries);
+  }
+  return libraryCache.get(key);
+}
+function refreshTrackSources() {
+  const menu=byId('track-source'), selected=menu.value;
+  const options=[new Option('Blank liquid layer','blank')];
+  for(const [key,s] of shippedTracks)options.push(new Option('Shipped · '+s.name,'shipped:'+key));
+  try {
+    for(const kind of ['song','user'])for(const entry of library(kind))options.push(new Option((kind==='song'?'Song · ':'Template · ')+entry.name,kind+':'+entry.id));
+  }catch(error){status('Track library unavailable: '+error.message);}
+  menu.replaceChildren(...options);
+  if(options.some(o=>o.value===selected))menu.value=selected;
+}
+function gestureData(){return macroDeck?.projectState()??detachedGestures;}
+function setGestureData(data){if(macroDeck)macroDeck.restoreProject(data);else detachedGestures=data;}
+function regionProject(selectedOnly=false) {
+  const doc=projectDocument(), range=selectedEditRange();
+  const ids=new Set(selectedOnly?[state.selected]:doc.layers.map(l=>l.id));
+  const region=transferRegion(doc,range,range,ids,id=>id,'region/');
+  return validateProject({...doc,...region,position:range.start},palettes());
+}
+async function saveLibraryTrack(kind) {
+  const name=byId('template-name').value.trim()||selectedLayer()?.name;
+  if(kind==='song'&&!state.audioRef?.sha256)throw Error('Open the song to save a song-specific track.');
+  await macroDeck?.finishPendingRecording();
+  const doc=regionProject(true), key=libraryKey(kind);
+  const entries=[...library(kind),{id:newPrefix(),name,doc}];
+  localStorage.setItem(key,JSON.stringify(entries));
+  libraryCache.set(key,entries);refreshTrackSources();
+  byId('track-source').value=kind+':'+entries.at(-1).id;
+  status('Saved '+name);
+}
+function mergeClips(doc,source,placements,label,applyRule=false) {
+  const existing=authoredState();
+  let next=Math.max(highestId+1,state.nextId);
+  const ids=new Map(doc.layers.map(l=>[l.id,next++]));
+  const created=new Map(), imported={macros:[],audioGroups:[],lyricGroups:[]};
+  for(const placement of placements){
+    const region=transferRegion(doc,source,placement,new Set(ids.keys()),id=>ids.get(id),newPrefix());
+    for(const l of region.layers){
+      if(applyRule)for(const interval of l.envelope){
+        const span=interval.sourceEnd-interval.sourceStart;
+        interval.level*=placement.level;
+        interval.fadeIn=Math.max(interval.fadeIn, Math.min(span,placement.fadeIn));
+        interval.fadeOut=Math.max(interval.fadeOut, Math.min(span,placement.fadeOut));
+      }
+      if(!created.has(l.id))created.set(l.id,l);
+      else created.get(l.id).envelope.push(...l.envelope);
+    }
+    for(const k of Object.keys(imported))imported[k].push(...region.gestures[k]);
+  }
+  if(!created.size)throw Error('The project contains no tracks in the chosen source.');
+  const gestures={...existing.gestures};
+  for(const key of Object.keys(imported))gestures[key]=[...gestures[key],...imported[key]];
+  gestures.selected=imported.macros[0]?.id??gestures.selected;
+  const added=[...created.values()];
+  const combined={...existing,layers:[...added,...existing.layers],nextId:next,selected:added[0].id,gestures};
+  validateProject({...projectDocument(),...combined},palettes());
+  restoreEdits(combined,false);highestId=next-1;
+  checkpoint(label);status(label);
+}
+async function addTrackFromSource() {
+  const sourceValue=byId('track-source').value, colon=sourceValue.indexOf(':');
+  const kind=sourceValue.slice(0,colon), id=sourceValue.slice(colon+1);
+  const rule=wandRule();
+  await macroDeck?.stopForEdit();
+  let range=selectedTimeRange();
+  if(kind==='shipped'){
+    if(!range)throw Error('Select a waveform interval or choose Select all.');
+    const s=shippedTracks.get(id), layer=makeLayer();
+    layer.name=s.name;layer.motion=s.motion;layer.palette=s.palette;
+    layer.colors=[...(mathmosWheels.get(s.palette)?.colors??LIQUID_PALETTES[s.palette])];
+    layer.nativeLive=mathmosWheels.has(s.palette);
+    layer.envelope=planIntervals(rule,range,{groups:selectedCues(),analysis:state.analysis});
+    if(!layer.envelope.length)throw Error('The boundary found no matches in this selection.');
+    state.layers.unshift(layer);selectLayer(layer.id);checkpoint('Add '+s.name);status('Added '+s.name);return;
+  }
+  const entry=library(kind).find(e=>e.id===id);
+  if(!entry)throw Error('Choose a saved track or template.');
+  const doc=validateProject(entry.doc,palettes()), source=doc.timeline.range;
+  if(kind==='song'&&!range){mergeClips(doc,source,[source],'Restore song track '+entry.name);return;}
+  if(!range)throw Error('Select a waveform interval or choose Select all.');
+  const placements=planIntervals(rule,range,{groups:selectedCues(),analysis:state.analysis});
+  if(!placements.length)throw Error('The boundary found no matches in this selection.');
+  mergeClips(doc,source,placements,'Add '+entry.name,true);
+}
+for(const [button,kind] of [['save-song-track','song'],['save-user-template','user']]){
+  byId(button).addEventListener('click',()=>projectOperation('Save track',()=>saveLibraryTrack(kind)));
+}
+async function openProject(file,merge=false) {
   if (file && file.size > 64 * 1024 * 1024) throw Error('Project exceeds 64 MiB.');
   const choice = file ? [file.name, await file.text(), null] : await desktopInvoke('open_project');
   if (!choice) return;
   const [name, text, selection] = choice;
   const doc = validateProject(JSON.parse(text), palettes());
   await macroDeck?.stopForEdit();
+  if(merge) {
+    const target=selectedTimeRange();
+    if(!target)throw Error('Select the destination time range.');
+    const duration=doc.timeline?.duration || (state.audioRef && state.audioRef.sha256===doc.audio?.sha256 ? timelineDuration() : numeric('length'));
+    const source=doc.timeline?.range??{start:0,end:duration};
+    if(!validRange(source))throw Error('Set the source clip length for this project.');
+    mergeClips(doc,source,[target],'Merge '+name+' into selection');
+    return;
+  }
   if (!await chooseReplacement()) return;
   const token = ++state.fileToken;
   let audio = null;
@@ -1095,12 +1219,13 @@ async function openProject(file) {
   resetHistory('Open project'); savedEdits = editSignature();
   status(doc.audio && !audio ? 'Project opened. Relink ' + doc.audio.name + ' to play.' : 'Opened ' + name);
 }
-async function saveProject() {
+async function saveProject(regionOnly=false) {
   await macroDeck?.finishPendingRecording();
   if (state.audioRef && !state.audioRef.sha256) throw Error('This browser could not fingerprint the song. Open the project in the desktop editor or over HTTPS to link audio.');
-  const data = validateProject(projectDocument(), palettes());
+  const data = regionOnly ? regionProject() : validateProject(projectDocument(), palettes());
   const documentText = JSON.stringify(data);
-  const suggested = projectName || (state.audioName.replace(/\.[^.]+$/, '') || 'session') + '.tss';
+  const base=projectName?.replace(/\.tss$/i,'') || state.audioName.replace(/\.[^.]+$/, '') || 'session';
+  const suggested=base+(regionOnly?'-region':'')+'.tss';
   let name;
   if (desktopInvoke) name = await desktopInvoke('save_project', {document:documentText, suggestedName:suggested});
   else {
@@ -1112,17 +1237,23 @@ async function saveProject() {
     name = suggested;
   }
   if (!name) return;
+  if(regionOnly){status('Saved selected region to '+name);return;}
   projectName = name; byId('track-title').textContent = name;
   savedEdits = editSignature(); status('Saved ' + name);
 }
 byId('project-operation').addEventListener('cancel', event => event.preventDefault());
-byId('open-project').addEventListener('click', () => {
-  if (desktopInvoke) projectOperation('Open project', () => openProject());
-  else byId('project-file').click();
-});
+function pickProject(merge) {
+  if(merge && !selectedTimeRange()){status('Select the destination time range.');return;}
+  if(desktopInvoke)projectOperation(merge?'Merge project':'Open project',()=>openProject(null,merge));
+  else {byId('project-file').dataset.merge=String(merge);byId('project-file').click();}
+}
+byId('open-project').addEventListener('click',()=>pickProject(false));
+byId('merge-region-project').addEventListener('click',()=>pickProject(true));
+byId('save-region-project').addEventListener('click',()=>projectOperation('Save region project',()=>saveProject(true)));
 byId('project-file').addEventListener('change', event => {
   const file = event.target.files[0]; event.target.value = '';
-  if (file) projectOperation('Open project', () => openProject(file));
+  const merge=event.target.dataset.merge==='true';
+  if (file) projectOperation(merge?'Merge project':'Open project', () => openProject(file,merge));
 });
 byId('save-project').addEventListener('click', () => projectOperation('Save project', saveProject));
 byId('undo-edit').addEventListener('click', () => restoreHistory(editHistory.cursor - 1));

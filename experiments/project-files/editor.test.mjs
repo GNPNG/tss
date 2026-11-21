@@ -70,6 +70,24 @@ async function exerciseControls(windows) {
   lastSelection=2;await window.tssImportAudio(undefined,true);check(!$('play').disabled && $('relink-audio').hidden,'relink');
   linked=[2,'/other/two-slide-cues.m4a'];click('open-project');await idle();click('save-project');await idle();
   check(JSON.stringify(saved)===documentText,'save-open-save identity');
+  set('range-start','0.25');set('range-end','1.25');click('set-range');
+  set('wand-mode','stretch');set('wand-in','.2');set('wand-out','.35');set('wand-level','.6');click('apply-wand');
+  click('save-region-project');await idle();
+  const region=JSON.parse(documentText);
+  check(region.timeline.range.start===.25 && region.timeline.range.end===1.25 &&
+    region.layers[0].envelope.length===1 && region.layers[0].envelope[0].fadeOut===.35,'saved region preserves independent fades');
+  incoming=documentText;
+  set('template-name','Verse fold');click('save-song-track');await idle();click('save-user-template');await idle();
+  check([...$('track-source').options].some(o=>o.text==='Song · Verse fold') &&
+    [...$('track-source').options].some(o=>o.text==='Template · Verse fold'),'song and reusable libraries');
+  click('add-layer');await idle();check($('layer-count').textContent.startsWith('3'),'add template track');
+  click('clear-region');await idle();click('save-project');await idle();
+  check(JSON.parse(documentText).layers[0].envelope.length===0,'regional clear');
+  click('undo-edit');await idle();
+  click('merge-region-project');await idle();click('save-project');await idle();
+  const merged=JSON.parse(documentText);
+  check(merged.layers.length===5 && new Set(merged.layers.map(l=>l.id)).size===5 && merged.layers[0].envelope[0].start===.25,'regional merge');
+  if(windows)check(merged.gestures.macros.length===2 && merged.gestures.macros[1].events[0].layerId===merged.layers[1].id,'regional gesture remap');
 }
 const chrome=process.env.CHROME_BIN;
 for (const windows of [false,true]) test((windows?'Native wheel':'Procedural')+' editor save, undo, redo, cancel, offline open, relink and reopen through its controls',

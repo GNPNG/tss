@@ -117,7 +117,7 @@
     </div>
 
     <section class="timeline card" aria-label="Timeline">
-      <div class="timeline-header"><div><span class="eyebrow">ARRANGEMENT</span><h2>Timeline</h2></div><div class="timeline-actions"><label>History <select id="edit-history" aria-label="Edit history"></select></label><button class="button quiet" type="button" id="undo-edit" disabled>Undo</button><button class="button quiet" type="button" id="redo-edit" disabled>Redo</button><span id="layer-count">1 visual layer</span><button id="add-layer" class="button add-layer">＋ &nbsp;Add visual layer</button></div></div>
+      <div class="timeline-header"><div><span class="eyebrow">ARRANGEMENT</span><h2>Timeline</h2></div><div class="timeline-actions"><label>History <select id="edit-history" aria-label="Edit history"></select></label><button class="button quiet" type="button" id="undo-edit" disabled>Undo</button><button class="button quiet" type="button" id="redo-edit" disabled>Redo</button><span id="layer-count">1 visual layer</span><label>New track <select id="track-source" aria-label="New track source"><option value="blank">Blank liquid layer</option></select></label><button id="add-layer" class="button add-layer">＋ &nbsp;Add visual layer</button></div></div>
       <div class="timeline-content">
         <div class="track-labels"><div class="ruler-label">TRACKS</div><div class="audio-label"><span class="track-symbol">♫</span><div><strong>AUDIO</strong><small>Master track</small></div></div><div id="layer-list"></div></div>
         <div class="timeline-scroll"><div class="timeline-lanes"><div id="ruler" class="ruler" aria-hidden="true"></div><div class="wave-lane" id="seek-area" title="Click to seek"><canvas id="waveform"></canvas><div class="empty-wave" id="empty-wave">YOUR AUDIO WAVEFORM WILL APPEAR HERE</div></div><div id="visual-lanes"></div><div id="playhead" class="playhead" aria-hidden="true"></div></div></div>
@@ -145,6 +145,13 @@
           <label><input id="wand-autoscale" type="checkbox" checked> Fit to matched duration</label>
           <label>Stretch tolerance (%) <input id="wand-tolerance" type="number" step="1" min="0" value="100"></label>
           <button id="apply-wand" class="button primary">Apply to selected layer in range</button>
+        </div>
+        <div class="timeline-tools">
+          <label>Track or template name <input id="template-name" maxlength="80"></label>
+          <button class="button quiet" id="save-song-track">Save selected track for song</button>
+          <button class="button quiet" id="save-user-template">Save selected track as template</button>
+          <button class="button quiet" id="save-region-project">Save region project</button>
+          <button class="button quiet" id="merge-region-project">Merge project into range</button>
         </div>
       </details>
       <div class="timeline-footer"><span>Click the waveform to seek</span><span id="app-status" role="status" aria-live="polite">Ready</span></div>
