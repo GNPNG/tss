@@ -480,7 +480,10 @@ fn run(
         if presented {
             let now = Instant::now();
             stats.presents += 1;
-            stats.simulation_tick = r.live_solver_status(c.layer_id).map(|s| s.tick);
+            c.read_solver_status(&mut stats, |id| r.live_solver_status(id));
+            if output.is_some() {
+                if let Some(error) = &stats.error { return Err(error.clone()); }
+            }
             if let Some(last) = last_present.replace(now) {
                 periods.push_back(now.duration_since(last).as_secs_f64() * 1000.);
                 if periods.len() > 60 {

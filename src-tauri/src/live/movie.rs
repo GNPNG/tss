@@ -238,6 +238,7 @@ mod tests {
     }
     fn request(events: Vec<Event>) -> Request {
         Request {
+            detail_scale: None,
             stack: Vec::new(),
             visible_films: super::super::VisibleFilms::Both,
             layer_id: 2,

@@ -334,6 +334,33 @@ impl Config {
     }
 
     #[cfg(any(windows, target_os = "macos"))]
+    fn read_solver_status(&self, stats: &mut Stats, mut status: impl FnMut(u64) -> Option<tss_live_wheel::LiveSolverStatus>) {
+        stats.simulation_tick = None;
+        let mut read = |id| {
+            if let Some(worker) = status(id) {
+                if id == self.layer_id && worker.state == "ready" {
+                    stats.simulation_tick = Some(worker.tick);
+                }
+                if let Some(error) = worker.error {
+                    // Preserve an existing media decode error when a mixed program loses both sources.
+                    let message = format!("Fluid solver on track {id}: {error}");
+                    match &mut stats.error {
+                        Some(previous) => { previous.push_str(". "); previous.push_str(&message); }
+                        None => stats.error = Some(message),
+                    }
+                }
+            }
+        };
+        if self.stack.is_empty() {
+            if self.simulation.is_some() { read(self.layer_id); }
+        } else {
+            for track in &self.stack {
+                if track.simulation.is_some() { read(track.layer_id); }
+            }
+        }
+    }
+
+    #[cfg(any(windows, target_os = "macos"))]
     fn configure_simulation(&self, renderer: &mut tss_live_wheel::LiveWheel) -> Result<(), String> {
         for track in &self.stack {
             if track.layer_id != self.layer_id && track.media.is_none() {
@@ -607,6 +634,31 @@ pub fn live_wheel_benchmark_config() -> Option<BenchmarkConfig> {
 mod benchmark_tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    #[cfg(any(windows, target_os = "macos"))]
+    fn solver_status_reports_failed_background_matte_and_selected_tick() {
+        let mut config: Config = serde_json::from_value(json!({
+            "layerId":1,"wheel":"violet-blue","slide":"rear","gesture":"tug","renderWidth":640,
+            "rect":{"x":0,"y":0,"width":640,"height":360},
+            "simulation":{"seed":17,"rate":1},
+            "stack":[{"layerId":1,"opacity":1,"simulation":{"seed":17,"rate":1}},
+                     {"layerId":2,"opacity":1,"matteOnly":true,"simulation":{"seed":85,"rate":1}}]
+        })).unwrap();
+        let mut stats = Stats { error: Some("Missing artwork".into()), ..Default::default() };
+        config.read_solver_status(&mut stats, |id| Some(tss_live_wheel::LiveSolverStatus {
+            state: if id == 1 { "ready" } else { "failed" }, tick: 47, flow_rate: 1.,
+            error: (id == 2).then(|| "Worker exited".into()),
+        }));
+        assert_eq!(stats.simulation_tick, Some(47));
+        assert_eq!(stats.error.as_deref(), Some("Missing artwork. Fluid solver on track 2: Worker exited"));
+        config.stack.clear();
+        stats.error = None;
+        config.read_solver_status(&mut stats, |_| Some(tss_live_wheel::LiveSolverStatus {
+            state: "starting", tick: 0, flow_rate: 1., error: None,
+        }));
+        assert!(stats.simulation_tick.is_none() && stats.error.is_none());
+    }
 
     #[test]
     fn benchmark_selects_the_named_motion_and_actual_preview() {

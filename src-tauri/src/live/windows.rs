@@ -1105,12 +1105,12 @@ fn run(
             }
         }
         let now = Instant::now();
+        c.read_solver_status(&mut stats, |id| r.live_solver_status(id));
         if did_present || editor_hidden {
             last_presented_film_times = Some(film_times);
         }
         if did_present {
             stats.presents += 1;
-            stats.simulation_tick = r.live_solver_status(c.layer_id).map(|s| s.tick);
             if let Some(record) = capture.as_mut() {
                 if record.frame_at(r, c, frame_time, film_times, stats.drags)? {
                     capture = None;
