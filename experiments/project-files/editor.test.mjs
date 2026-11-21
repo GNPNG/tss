@@ -23,6 +23,8 @@ async function exerciseControls(windows) {
   };
   const audio = new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
   let documentText, incoming, linked=null, lastSelection=1;
+  const advisorRequests=[],reviewedLyrics=[];
+  let finishInference;
   if (windows) {
     Object.defineProperty(navigator,'userAgent',{value:'Windows project controls'});
     const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',audio)), b=>b.toString(16).padStart(2,'0')).join('');
@@ -39,6 +41,15 @@ async function exerciseControls(windows) {
     case 'live_wheel_stats': return {running:false};
     case 'read_timed_lyrics': return ['song.vtt','WEBVTT\n\n00:00.000 --> 00:00.500\nGo\n\n00:01.000 --> 00:01.500\nGo'];
     case 'save_project': documentText=args.document;return 'Headliner.tss';
+    case 'transcribe_song':return [
+      {start:0,end:.25,text:'Before the selection'},
+      {start:.3,end:.75,text:'Machine draft'},
+      {start:1.25,end:1.75,text:'After the selection'},
+    ];
+    case 'save_reviewed_lyrics':reviewedLyrics.push(args.text);return true;
+    case 'suggest_visual_layer':
+      advisorRequests.push(args);
+      return new Promise(resolve=>{finishInference=()=>resolve({visual:'video',signal:'onset',fit:'repeat'});});
     case 'resolve_visual_media': return args.name==='Plate.gif'?{id:42,name:args.name,sha256:args.sha256,width:400,height:240,durationUs:800000,still:false}:null;
     case 'open_project': return ['Headliner.tss',incoming,linked];
     default: throw Error('Unexpected command '+command);
@@ -49,6 +60,38 @@ async function exerciseControls(windows) {
   await import('/app.js');
   await until(()=>$('edit-history').options.length>0);
   await window.tssImportAudio();
+  $('advice-panel').open=true;
+  set('advice-direction','Violet at the downbeat');click('advice-suggest');
+  check(!advisorRequests.length && $('advice-status').textContent.includes('Select a timeline region'),'advisor requires an operator selection');
+  $('lyrics-deck').open=true;click('lyrics-run');await until(()=>!$('lyrics-review').hidden);
+  set('lyrics-draft',$('lyrics-draft').value.replace('Machine draft','Reviewed lyric'));
+  click('lyrics-save');await until(()=>reviewedLyrics.length===1);
+  check(reviewedLyrics[0].includes('Reviewed lyric'),'approved lyrics');
+  set('range-start','.25');set('range-end','1.25');click('set-range');
+  check(!$('advice-lyrics').checked,'lyric excerpts default off');
+  click('advice-suggest');await until(()=>advisorRequests.length===1);
+  check(advisorRequests[0].direction==='Violet at the downbeat','no lyric or transcript text without consent');
+  set('range-end','1.1');click('set-range');finishInference();
+  await until(()=>!$('advice-suggest').disabled);
+  check($('advice-review').hidden && $('advice-status').textContent.includes('selection changed') &&
+    $('layer-count').textContent.startsWith('1'),'pending inference on a stale range cannot alter the arrangement');
+  set('range-end','1.25');click('set-range');click('advice-lyrics');click('advice-suggest');
+  await until(()=>advisorRequests.length===2);
+  check(advisorRequests[1].direction==='Violet at the downbeat\nLyric excerpt: Reviewed lyric' && advisorRequests[1].port===18081,
+    'only opted-in reviewed cue text overlapping this range reaches inference');
+  finishInference();await until(()=>!$('advice-review').hidden);
+  check($('advice-apply').disabled && $('advice-visual').value==='video' && $('advice-fit').value==='repeat' &&
+    $('advice-range').textContent==='0.25–1.25 s','review precedes any track change');
+  set('advice-visual','oil');set('advice-signal','time');set('advice-fit','elastic');set('advice-cue','Reviewed blue oil');
+  click('advice-apply');await until(()=>$('advice-status').textContent.includes('Added the reviewed oil layer'));
+  check($('layer-count').textContent.startsWith('2') && $('selected-name').textContent==='Reviewed blue oil','edited suggestion adds a real selected track');
+  click('save-project');await idle();
+  const applied=JSON.parse(documentText).layers[0];
+  check(applied.name==='Reviewed blue oil' && applied.envelope.length===1 && applied.envelope[0].start===.25 &&
+    applied.envelope[0].end===1.25 && applied.envelope[0].rule.mode==='stretch','granted range and edited fit persisted');
+  click('undo-edit');await idle();
+  check($('layer-count').textContent.startsWith('1') && $('selected-name').textContent!=='Reviewed blue oil','advisor track is undoable');
+  click('deselect-time');click('advice-lyrics');
   if (windows) {
     set('wheel-motion','wheel-with-coral-beads');set('wheel-films','front');set('wheel-focus','71');
     set('wheel-slide','front');set('wheel-gesture','pressure');set('mouse-pressure','81');
@@ -102,7 +145,7 @@ async function exerciseControls(windows) {
     !restored.layers.some(l=>l.media?.assetId!==undefined),'portable media link, offline metadata and refreshed grant');
 }
 const chrome=process.env.CHROME_BIN;
-for (const windows of [false,true]) test((windows?'Native wheel':'Procedural')+' editor save, undo, redo, cancel, offline open, relink and reopen through its controls',
+for (const windows of [false,true]) test((windows?'Native wheel':'Procedural')+' editor project and region controls, reviewed advisor cues, lyric consent and undo',
   {skip:!chrome && 'Set CHROME_BIN to a Chrome executable', timeout:30000}, async()=>{
     const web=new URL('../../WebAssets/',import.meta.url);
     const media=new URL('../slide-look-study/approval/windows-live/gesture-controls/export/two-slide-cues.m4a',import.meta.url);
@@ -118,7 +161,7 @@ for (const windows of [false,true]) test((windows?'Native wheel':'Procedural')+'
           res.writeHead(200,{'Content-Type':'text/html'});res.end(html);return;
         }
         if(req.url==='/sample.m4a'){res.writeHead(200,{'Content-Type':'audio/mp4'});res.end(await readFile(media));return;}
-        const allowed=/^\/(?:[a-z-]+\.js|styles\.css|assets\/(?:mathmos-wheels\.json|tss-project-logo\.jpeg))$/;
+        const allowed=/^\/(?:[a-z-]+\.js|styles\.css|assets\/(?:mathmos-wheels\.json|visual-advice\.json|tss-project-logo\.jpeg))$/;
         if(!allowed.test(req.url)){res.writeHead(404);res.end();return;}
         const type=req.url.endsWith('.js')?'text/javascript':req.url.endsWith('.css')?'text/css':req.url.endsWith('.json')?'application/json':'image/jpeg';
         res.writeHead(200,{'Content-Type':type});res.end(await readFile(new URL(req.url.slice(1),web)));
