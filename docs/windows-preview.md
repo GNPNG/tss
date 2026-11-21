@@ -13,6 +13,8 @@ Extract the Windows x64 portable ZIP and run `the-sacred-swirls.exe`. The native
 
 For smaller droplets with the original wheel behind them, select **Wheel with coral beads**. Watch the buds on the edge of the front film. **Replay front beads** restarts their release while the rear oil continues moving.
 
+Use **Projected films** to see **Rear only**, **Front only**, **Both films** or **Clear glass** on the selected wheel. The hidden film keeps moving and retains its gestures. Changing the selection clears earlier video-feedback echoes. The audience sees the change at the configured projector delay. A native wheel export uses the film selection active when the export begins.
+
 **Use a performance surface.** Keep `tss-performer.exe` beside the editor. Start the listener from the deck, pair the controller, then assign its visual track, slide and action. Two separate devices can perform together. The guide covers the TLS certificate, pairing link, sensor signals and tested configurations. [Performance surfaces](performance-surfaces.md)
 
 **Control availability.** Select a visible live Mathmos wheel to show native controls. **Material response** becomes available in **Material tug** mode. Native export enables after the song has decoded and the preceding export has finished. Tick **Video feedback** to edit its return settings. **Choose audience device** appears when the WebView2 runtime supports the output picker. The route menus list the endpoints Windows exposes.

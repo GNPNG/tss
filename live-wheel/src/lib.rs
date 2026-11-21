@@ -101,7 +101,7 @@ fn pipeline(
     fragment: &gpu::ShaderModule,
     entry: &str,
     label: &str,
-    fmt: gpu::TextureFormat,
+    target: impl Into<gpu::ColorTargetState>,
     bindings: &[Binding],
 ) -> Pass {
     let entries: Vec<_> = bindings
@@ -149,11 +149,7 @@ fn pipeline(
         fragment: Some(gpu::FragmentState {
             module: fragment,
             entry_point: entry,
-            targets: &[Some(gpu::ColorTargetState {
-                format: fmt,
-                blend: None,
-                write_mask: gpu::ColorWrites::ALL,
-            })],
+            targets: &[Some(target.into())],
         }),
         multiview: None,
     });
@@ -251,7 +247,8 @@ pub struct LiveWheel {
     materials: HashMap<String, Material>,
     wheel: String,
     focus: Option<f32>,
-    field_pass: Pass,
+    slide_visibility: [bool; 2],
+    field_passes: [Pass; 4],
     warp_pass: Pass,
     baseline_pass: Pass,
     palette_pass: Pass,
@@ -381,20 +378,35 @@ impl LiveWheel {
             UV_FORMAT,
             &[Buffer],
         );
-        let field_pass = pipeline(
-            &device,
-            &v,
-            &interp,
-            "main",
-            "Buffered slide states",
-            FIELD_FORMAT,
-            &[
-                Image(gpu::TextureViewDimension::D2Array),
-                image,
-                Sampler,
-                Buffer,
-            ],
-        );
+        // RG hold rear/front distance codes (zero = clear carrier), BA their
+        // respective footprints. Unwritten channels retain the pass clear value.
+        use gpu::ColorWrites;
+        let field_passes = [
+            ("Clear carrier", ColorWrites::empty()),
+            ("Rear film", ColorWrites::RED | ColorWrites::BLUE),
+            ("Front film", ColorWrites::GREEN | ColorWrites::ALPHA),
+            ("Buffered slide states", ColorWrites::ALL),
+        ]
+        .map(|(label, write_mask)| {
+            pipeline(
+                &device,
+                &v,
+                &interp,
+                "main",
+                label,
+                gpu::ColorTargetState {
+                    format: FIELD_FORMAT,
+                    blend: None,
+                    write_mask,
+                },
+                &[
+                    Image(gpu::TextureViewDimension::D2Array),
+                    image,
+                    Sampler,
+                    Buffer,
+                ],
+            )
+        });
         let baseline_pass = pipeline(
             &device,
             &v,
@@ -531,7 +543,8 @@ impl LiveWheel {
             materials,
             wheel: "violet-blue".into(),
             focus: None,
-            field_pass,
+            slide_visibility: [true; 2],
+            field_passes,
             warp_pass,
             baseline_pass,
             palette_pass,
@@ -599,6 +612,13 @@ impl LiveWheel {
     /// Enable the finite-pixel optical path on deformed tracks for validation.
     pub fn set_footprint_sampling(&mut self, enabled: bool) {
         self.footprint_sampling = enabled;
+    }
+    /// Expose either film to the projector while both clocks and poses keep advancing.
+    pub fn set_slide_visibility(&mut self, rear: bool, front: bool) {
+        if self.slide_visibility != [rear, front] {
+            self.slide_visibility = [rear, front];
+            self.reset_feedback_history();
+        }
     }
     pub fn forget_track(&mut self, id: u64) {
         self.tracks.remove(&id);
@@ -907,11 +927,18 @@ impl LiveWheel {
         } else {
             ([first, second], fraction)
         };
-        let poses = self
+        let mut poses = self
             .tracks
             .get(&self.active)
             .map(|t| t.slides)
             .unwrap_or_default();
+        // The finite-pixel pass uses rotation and pressure to choose the pupil
+        // footprint. Keep a hidden film's deformation out of that decision.
+        for (pose, visible) in poses.iter_mut().zip(self.slide_visibility) {
+            if !visible {
+                *pose = SlidePose::default();
+            }
+        }
         let [r, f] = poses.map(|p| p.inverse_rotation());
         let [rc, fc] = poses.map(|p| p.center.map(|v| v as f32));
         self.queue.write_buffer(
@@ -941,9 +968,11 @@ impl LiveWheel {
             .get(&self.active)
             .and_then(|t| t.warp.as_ref())
             .unwrap_or(&self.zero);
+        let [rear, front] = self.slide_visibility;
+        let field_pass = &self.field_passes[usize::from(rear) + 2 * usize::from(front)];
         let fields = bind(
             &self.device,
-            &self.field_pass,
+            field_pass,
             &[
                 TextureView(&self.cache_view),
                 TextureView(&mapping.view),
@@ -955,7 +984,7 @@ impl LiveWheel {
             &mut enc,
             "Reconstruct moving independent slides",
             &self.interpolated.view,
-            &self.field_pass,
+            field_pass,
             &fields,
         );
         // Keep the selected optical model continuous through first movement.

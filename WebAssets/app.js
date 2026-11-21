@@ -35,7 +35,7 @@ function liveSelection() {
   if (!windowsDesktop || !layer?.visible || !layer.nativeLive || state.exporting ||
       layer.customColors || !mathmosWheels.has(layer.palette)) return null;
   return { layerId: layer.id, wheel: layer.palette, slide: layer.slide, gesture: layer.gesture,
-    motion: layer.motion, motionTake: layer.motionTake,
+    motion: layer.motion, motionTake: layer.motionTake, visibleFilms: layer.visibleFilms ?? 'both',
     mousePressure: layer.mousePressure?.[layer.slide] ?? 0.5,
     tugResponse: layer.tugResponse[layer.slide], renderWidth: layer.renderWidth, focus: projectorFocus,
     ...feedbackDeck.config(projectorDeck?.enabled), keepPresenting:!!projectorDeck?.enabled };
@@ -362,7 +362,7 @@ function makeLayer() {
   canvas.height = preview.height;
   const id = state.nextId++;
   return { id, name: `Liquid ${id}`, visible: true, palette: 'orchid', colors: [...LIQUID_PALETTES.orchid], customColors: false, hue: 0, speed: 1, scale: 1, opacity: state.layers.length ? 0.7 : 1, canvas, renderer: null, nativeLive: windowsDesktop,
-    motion: 'wheel-flow', motionTake: 0,
+    motion: 'wheel-flow', motionTake: 0, visibleFilms: 'both',
     slide: 'rear', gesture: 'tug', tugResponse: { rear: 0.4, front: 0.4 }, mousePressure: { rear: 0.5, front: 0.5 }, renderWidth: 640 };
 }
 function selectLayer(id) {
@@ -452,6 +452,8 @@ function renderControls() {
   byId('live-wheel').disabled = !wheel || !!layer?.customColors || !layer?.visible;
   byId('wheel-motion').value = layer?.motion ?? 'wheel-flow';
   byId('wheel-motion').disabled = !live;
+  byId('wheel-films').value = layer?.visibleFilms ?? 'both';
+  byId('wheel-films').disabled = !live;
   byId('replay-release').hidden = !hasRelease(layer?.motion);
   byId('replay-release').textContent = layer?.motion === 'wheel-with-coral-beads'
     ? 'Replay front beads' : 'Replay release live';
@@ -666,6 +668,10 @@ byId('live-wheel').addEventListener('change', (event) => {
 byId('wheel-slide').addEventListener('change', (event) => {
   const layer = selectedLayer();
   if (layer) { layer.slide = event.target.value; renderControls(); }
+});
+byId('wheel-films').addEventListener('change', (event) => {
+  const layer = selectedLayer();
+  if (layer) { layer.visibleFilms = event.target.value; nativeSurface?.sync(); }
 });
 byId('wheel-motion').addEventListener('change', (event) => {
   const layer = selectedLayer();

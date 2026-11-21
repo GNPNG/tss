@@ -6,6 +6,9 @@ use std::{
     time::Instant,
 };
 
+#[path = "coral_solo.rs"]
+mod solo;
+
 fn discrete_renderer(size: [u32; 2]) -> Result<(LiveWheel, gpu::AdapterInfo), String> {
     let adapter_match =
         std::env::var("TSS_LIVE_ADAPTER").map_err(|_| "Missing hardware adapter name")?;

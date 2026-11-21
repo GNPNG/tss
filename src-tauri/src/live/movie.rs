@@ -41,6 +41,8 @@ pub struct Event {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Request {
+    #[serde(default)]
+    pub(super) visible_films: super::VisibleFilms,
     pub layer_id: u64,
     pub wheel: String,
     #[serde(default)]
@@ -144,6 +146,13 @@ mod tests {
         let legacy = parse(body.clone()).unwrap();
         assert_eq!(legacy.motion, super::super::MotionPreset::WheelFlow);
         assert_eq!(legacy.motion_take, 0);
+        assert_eq!(legacy.visible_films.slides(), [true, true]);
+        for (mode, shown) in [
+            ("rear", [true, false]), ("front", [false, true]), ("clear", [false, false]),
+        ] {
+            body["visibleFilms"] = serde_json::json!(mode);
+            assert_eq!(parse(body.clone()).unwrap().visible_films.slides(), shown);
+        }
         body["motion"] = serde_json::json!("coral-release");
         body["motionTake"] = serde_json::json!(4);
         let coral = parse(body.clone()).unwrap();
@@ -179,6 +188,7 @@ mod tests {
     }
     fn request(events: Vec<Event>) -> Request {
         Request {
+            visible_films: super::super::VisibleFilms::Both,
             layer_id: 2,
             wheel: "violet-blue".into(),
             motion: Default::default(),

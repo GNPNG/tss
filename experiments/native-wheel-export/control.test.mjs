@@ -11,6 +11,14 @@ test('scheduled takes use the neutral baseline and preserve explicit overrides',
 });
 
 import { NativeWheelExport } from '../../WebAssets/native-wheel-export.js';
+test('native export retains the selected optical films with either pose baseline', () => {
+  for (const visibleFilms of ['both', 'rear', 'front', 'clear']) {
+    const selected = {layerId: 3, wheel: 'violet-blue', visibleFilms};
+    for (const baseline of ['current', 'neutral']) {
+      assert.equal(wheelMovieRequest(selected, 2, [], baseline).visibleFilms, visibleFilms);
+    }
+  }
+});
 test('a one-shot coral export starts at the beginning unless current pose was explicitly selected', () => {
   for (const motion of ['coral-release', 'wheel-with-coral-beads']) {
     const layer = {layerId: 2, wheel: 'violet-green', motion, motionTake: 7};

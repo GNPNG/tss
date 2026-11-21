@@ -17,6 +17,7 @@ pub(super) struct Capture {
     last_config: Option<(
         String,
         MotionPreset,
+        crate::live::VisibleFilms,
         u64,
         Option<f32>,
         u64,
@@ -75,6 +76,7 @@ impl Capture {
         let key = (
             c.wheel.clone(),
             c.motion,
+            c.visible_films,
             c.motion_take,
             c.focus,
             c.layer_id,
@@ -86,7 +88,7 @@ impl Capture {
         if self.last_config.as_ref() != Some(&key) {
             self.configurations.push(
                 json!({"t":elapsed.as_secs_f64(), "wheel":c.wheel, "motion":c.motion,
-                "motionTake":c.motion_take, "fieldTime":front_time,
+                "motionTake":c.motion_take, "visibleFilms":c.visible_films, "fieldTime":front_time,
                 "rearFieldTime":rear_time, "frontFieldTime":front_time,
                 "focus":c.focus, "track":c.layer_id, "slide":c.slide, "gesture":c.gesture,
                 "tugResponse":c.tug_response, "renderWidth":c.render_width}),
@@ -104,6 +106,7 @@ impl Capture {
                 .map_err(|e| e.to_string())?;
             }
             let data = json!({"wheel": c.wheel, "focus": c.focus, "mouseTarget": c.slide,
+                "visibleFilms":c.visible_films,
                 "track": c.layer_id, "adapter": r.adapter_name(), "size": r.preview_size(),
                 "frames": self.sample, "successfulPresentsInWindow":self.sample,
                 "gesture":c.gesture,"tugResponse":c.tug_response,

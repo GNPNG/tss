@@ -36,6 +36,25 @@ pub enum Slide {
     Front,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum VisibleFilms {
+    #[default]
+    Both,
+    Rear,
+    Front,
+    Clear,
+}
+impl VisibleFilms {
+    #[cfg(any(windows, test))]
+    fn slides(self) -> [bool; 2] {
+        [
+            matches!(self, Self::Both | Self::Rear),
+            matches!(self, Self::Both | Self::Front),
+        ]
+    }
+}
+
 #[derive(Clone, Copy, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Gesture {
@@ -204,6 +223,8 @@ pub struct FeedbackAnchor {
 #[derive(Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
+    #[serde(default)]
+    visible_films: VisibleFilms,
     layer_id: u64,
     wheel: String,
     #[serde(default)]

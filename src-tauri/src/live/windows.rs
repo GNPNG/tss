@@ -547,6 +547,7 @@ fn run(
                             if c.layer_id == job.request.layer_id
                                 && c.wheel == job.request.wheel
                                 && c.motion == job.request.motion
+                                && c.visible_films == job.request.visible_films
                                 && c.motion_take == job.request.motion_take =>
                         {
                             // Snapshot the operator's current pressure, including a held
@@ -781,6 +782,12 @@ fn run(
                     }
                     if config.as_ref().map(|c| c.focus) != Some(next.focus) {
                         r.set_focus(next.focus)?;
+                    }
+                    if config.as_ref().map(|c| (c.layer_id, c.visible_films))
+                        != Some((next.layer_id, next.visible_films))
+                    {
+                        let [rear, front] = next.visible_films.slides();
+                        r.set_slide_visibility(rear, front);
                     }
                     if config.as_ref().map(|c| &c.wheel) != Some(&next.wheel) {
                         r.set_wheel(&next.wheel)?;

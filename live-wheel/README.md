@@ -21,6 +21,8 @@ The native viewport shows the two sealed slides on the selected track. Its fluid
 
 ## Coral release
 
+**Projected films** controls which dyes reach the screen for this wheel track. Select **Front only** to inspect a pinching neck, **Rear only** to inspect the moving fold, or **Clear glass** to see the carrier and lamp. **Both films** restores the overlap at the current time with each slide's pose intact. The same selection applies to the delayed projector and to the full duration of a native export.
+
 **Wheel with coral beads** pairs the original wheel's rear film with a separate front film containing smaller oil buds. Pick **Violet / Blue** for the violet rear and cyan front shown in the review. **Replay front beads** restarts the front film while the rear stays at its current phase. Once the last front droplet has detached, the rear keeps moving behind it. **Current pose and film position** preserves both film times for export. **Neutral pose and film start** takes both back to zero.
 
 **Slide motion → Coral release** selects a second pair of independently solved films. Use any of the seven color wheels. The foreground starts with buds attached to a bank of oil. The rear carries broad folds that remain visible through the intervening glass. Move **Projector focus** toward the front to follow a neck as it thins, then toward the rear to see the folds through the newly detached drops.
