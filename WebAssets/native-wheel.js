@@ -31,11 +31,12 @@ export class NativeWheelSurface {
     const selected = this.selection();
     if (!selected) return null;
     const covered = document.hidden || !!document.querySelector('dialog[open]:not(#native-wheel-export-progress)');
-    if (covered && !selected.keepPresenting) return null;
+    const retain = selected.keepPresenting || this.exporting;
+    if (covered && !retain) return null;
     const b = this.element.getBoundingClientRect();
     if (b.width <= 1 || b.height <= 1) return null;
     const outside = b.right <= 0 || b.bottom <= 0 || b.left >= innerWidth || b.top >= innerHeight;
-    if(!selected.keepPresenting && outside) return null;
+    if(!retain && outside) return null;
     // Rounding both edges keeps the native child flush with the webview
     // content at fractional display scales or webview zoom.
     const px = (value) => Math.round(value * devicePixelRatio);

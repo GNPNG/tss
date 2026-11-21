@@ -1,5 +1,7 @@
+use super::{movie::Request as MovieRequest, movie_render};
 use super::{release_clock::ReleaseClock, Config, FeedbackAnchor, Gesture, Phase, Stats};
 use objc2_app_kit::NSView;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     path::{Path, PathBuf},
     sync::{mpsc, Arc, Mutex},
@@ -15,6 +17,10 @@ enum Command {
     Set(Option<Config>),
     Forget(u64),
     Pointer(Phase, [f32; 2]),
+    Movie(
+        movie_render::Job,
+        tauri::async_runtime::Sender<Result<(), String>>,
+    ),
     Quit,
 }
 type SharedSender = Arc<Mutex<Option<mpsc::Sender<Command>>>>;
@@ -52,6 +58,29 @@ pub(crate) fn watch_verification() {
 }
 
 impl Host {
+    pub async fn export_movie(
+        &self,
+        paths: (PathBuf, PathBuf),
+        request: MovieRequest,
+        cancel: Arc<AtomicBool>,
+    ) -> Result<(), String> {
+        let (tx, mut rx) = tauri::async_runtime::channel(1);
+        self.sender
+            .lock()
+            .map_err(|e| e.to_string())?
+            .as_ref()
+            .ok_or("Select and show a native wheel before exporting")?
+            .send(Command::Movie(
+                movie_render::Job {
+                    paths,
+                    request,
+                    cancel,
+                },
+                tx,
+            ))
+            .map_err(|_| "The Metal preview worker stopped")?;
+        rx.recv().await.ok_or("The Metal preview worker stopped")?
+    }
     pub fn stats(&self) -> Stats {
         self.stats.lock().unwrap_or_else(|p| p.into_inner()).clone()
     }
@@ -94,11 +123,14 @@ impl Host {
                 let parent = unsafe { &*webview.inner().cast::<NSView>() };
                 let result = (|| {
                     let mut tx = sender.lock().map_err(|e| e.to_string())?;
-                    let visible = config.filter(|c| !c.preview_hidden);
-                    if let Some(c) = &visible {
-                        if let Some((instance, surface)) =
-                            view::place(parent, c.rect, sender.clone(), tx.is_none())?
-                        {
+                    if let Some(c) = &config {
+                        if let Some((instance, surface)) = view::place(
+                            parent,
+                            c.rect,
+                            sender.clone(),
+                            tx.is_none(),
+                            c.preview_hidden,
+                        )? {
                             *tx = Some(start_worker(
                                 instance,
                                 surface,
@@ -112,7 +144,7 @@ impl Host {
                     }
                     if tx
                         .as_ref()
-                        .is_some_and(|s| s.send(Command::Set(visible)).is_err())
+                        .is_some_and(|s| s.send(Command::Set(config)).is_err())
                     {
                         *tx = None;
                         view::visibility(parent, true);
@@ -138,8 +170,11 @@ fn start_worker(
 ) -> Result<mpsc::Sender<Command>, String> {
     let (commands, rx) = mpsc::channel();
     let close = commands.clone();
+    let destroyed = Arc::new(AtomicBool::new(false));
+    let closed = destroyed.clone();
     window.on_window_event(move |e| {
         if matches!(e, tauri::WindowEvent::Destroyed) {
+            closed.store(true, Ordering::Release);
             let _ = close.send(Command::Quit);
         }
     });
@@ -154,6 +189,7 @@ fn start_worker(
                     &window,
                     &rx,
                     &shared,
+                    &destroyed,
                     output.as_deref(),
                 )
             }))
@@ -187,6 +223,16 @@ fn start_worker(
     Ok(commands)
 }
 
+fn export_visibility(window: &WebviewWindow, hidden: bool) -> Result<(), String> {
+    window
+        .with_webview(move |webview| {
+            // Tauri borrows the WKWebView on its AppKit thread.
+            let parent = unsafe { &*webview.inner().cast::<NSView>() };
+            view::cover_for_export(parent, hidden);
+        })
+        .map_err(|e| e.to_string())
+}
+
 // The AppKit view stays on the UI thread. Only the independently retained
 // Metal surface and the renderer enter this worker.
 fn run(
@@ -195,6 +241,7 @@ fn run(
     window: &WebviewWindow,
     rx: &mpsc::Receiver<Command>,
     shared: &SharedStats,
+    destroyed: &AtomicBool,
     output: Option<&Path>,
 ) -> Result<(), String> {
     let mut proof_window = None;
@@ -209,6 +256,8 @@ fn run(
         ..Default::default()
     };
     let start = Instant::now();
+    let mut export_pause = Duration::ZERO;
+    let mut last_film_times = None;
     let mut next_frame = start;
     let mut window_check = start;
     let mut window_visible = true;
@@ -219,7 +268,7 @@ fn run(
             .map_err(|e| format!("Cannot create verification directory: {e}"))?;
     }
     loop {
-        let cmd = if active.is_none() {
+        let cmd = if active.as_ref().is_none_or(|c| c.preview_hidden) {
             match rx.recv() {
                 Ok(c) => Some(c),
                 Err(_) => break,
@@ -234,6 +283,40 @@ fn run(
         if let Some(command) = cmd {
             match command {
                 Command::Quit => break,
+                Command::Movie(job, reply) => {
+                    let result = match (engine.as_mut(), active.as_ref()) {
+                        (Some(r), Some(c))
+                            if c.layer_id == job.request.layer_id
+                                && c.wheel == job.request.wheel
+                                && c.motion == job.request.motion
+                                && c.stack == job.request.stack
+                                && c.motion_take == job.request.motion_take
+                                && c.visible_films == job.request.visible_films =>
+                        {
+                            let began = Instant::now();
+                            let at = start.elapsed().saturating_sub(export_pause);
+                            let times = last_film_times.unwrap_or_else(|| {
+                                clock.film_times(c.layer_id, c.motion, c.motion_take, at)
+                            });
+                            let result = export_visibility(window, true).and_then(|_| {
+                                let rendered = objc2::rc::autoreleasepool(|_| {
+                                    movie_render::render(r, job, times, window.app_handle(), || {
+                                        destroyed.load(Ordering::Acquire)
+                                    })
+                                });
+                                let restored = export_visibility(window, false);
+                                rendered.and(restored)
+                            });
+                            export_pause += began.elapsed();
+                            periods.clear();
+                            last_present = None;
+                            next_frame = Instant::now();
+                            result
+                        }
+                        _ => Err("Wheel or films changed before movie export".into()),
+                    };
+                    let _ = reply.try_send(result);
+                }
                 Command::Forget(id) => {
                     if let Some(r) = &mut engine {
                         LiveWheel::forget_track(r, id);
@@ -242,8 +325,13 @@ fn run(
                 }
                 Command::Pointer(phase, p) => {
                     if let (Some(c), Some(r)) = (&active, &mut engine) {
-                        stats.drags +=
-                            mouse.input(r, c, phase, p, start.elapsed().as_millis() as u64)? as u64;
+                        stats.drags += mouse.input(
+                            r,
+                            c,
+                            phase,
+                            p,
+                            start.elapsed().saturating_sub(export_pause).as_millis() as u64,
+                        )? as u64;
                     }
                 }
                 Command::Set(config) => {
@@ -257,10 +345,23 @@ fn run(
                                 || n.gesture != old.gesture
                                 || n.rect != old.rect
                         }) {
-                            mouse.release(r, old, start.elapsed().as_millis() as u64)?;
+                            mouse.release(
+                                r,
+                                old,
+                                start.elapsed().saturating_sub(export_pause).as_millis() as u64,
+                            )?;
                         }
                     }
                     if let Some(c) = &config {
+                        if active.as_ref().is_none_or(|old| {
+                            old.layer_id != c.layer_id
+                                || old.wheel != c.wheel
+                                || old.stack != c.stack
+                                || old.motion != c.motion
+                                || old.motion_take != c.motion_take
+                        }) {
+                            last_film_times = None;
+                        }
                         if engine.is_none() {
                             let fields = tss_live_wheel::bundled_fields()?;
                             let preferred = std::env::var("TSS_LIVE_ADAPTER").ok();
@@ -304,9 +405,15 @@ fn run(
                             .unwrap_or_default()
                             .as_secs_f64()
                             * 1000.;
-                        anchor = next_clock.map(|c| ProgramClock::new(c, wall_ms, start.elapsed()));
+                        anchor = next_clock.map(|c| {
+                            ProgramClock::new(
+                                c,
+                                wall_ms,
+                                start.elapsed().saturating_sub(export_pause),
+                            )
+                        });
                     }
-                    stats.running = config.is_some();
+                    stats.running = config.as_ref().is_some_and(|c| !c.preview_hidden);
                     active = config;
                     *shared.lock().map_err(|e| e.to_string())? = stats.clone();
                     next_frame = Instant::now();
@@ -327,7 +434,7 @@ fn run(
         }
         let c = active.as_ref().unwrap();
         let r = engine.as_mut().unwrap();
-        let now = start.elapsed();
+        let now = start.elapsed().saturating_sub(export_pause);
         mouse.advance(r, c, now.as_millis() as u64)?;
         let program_time = anchor
             .as_ref()
@@ -360,7 +467,11 @@ fn run(
             } else {
                 None
             };
-            r.render_film_times(surface, rear, front, program_time)
+            let presented = r.render_film_times(surface, rear, front, program_time)?;
+            if presented {
+                last_film_times = Some([rear, front]);
+            }
+            Ok(presented)
         })?;
         if presented {
             let now = Instant::now();

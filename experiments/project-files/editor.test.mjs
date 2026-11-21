@@ -27,7 +27,7 @@ async function exerciseControls(platform) {
   };
   const audio = coral || oils ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
   let documentText, incoming, linked=null, lastSelection=1;
-  const advisorRequests=[],reviewedLyrics=[],previewRequests=[];
+  const advisorRequests=[],reviewedLyrics=[],previewRequests=[],movieRequests=[];
   let finishInference;
   let mediaChecks=0,mediaInstalls=0,mediaReady=false;
   if (windows) {
@@ -48,6 +48,8 @@ async function exerciseControls(platform) {
       mediaInstalls++;
       throw Error('Package download failed.');
     case 'choose_audio': return [lastSelection,'/music/two-slide-cues.m4a'];
+    case 'choose_export_path': return '/movies/two-slide-cues.mp4';
+    case 'export_native_wheel': movieRequests.push(args);return;
     case 'confirm_audio': case 'clear_project_audio': case 'remember_project_audio': return;
     case 'set_visual_audio_features':
       check(args.fps>0 && args.frames.every(f=>f.length===4 && f.every(x=>Number.isFinite(x) && x>=0 && x<=1)), 'native audio modulation envelope');
@@ -148,6 +150,14 @@ async function exerciseControls(platform) {
     set('wheel-focus','68');await until(()=>previewRequests.at(-1)?.focus===.68);
     click('show-logo');await until(()=>previewRequests.at(-1)===null);
     $('logo-dialog').close();await until(()=>previewRequests.at(-1)?.wheel==='violet-blue');
+    await window.tssImportAudio();
+    await until(()=>!$('export-native-wheel').disabled);
+    click('export-native-wheel');
+    await until(()=>movieRequests.length===1 && !$('native-wheel-export-progress').open);
+    const movie=movieRequests[0];
+    check(movie.request.visibleFilms==='front' && movie.request.wheel==='violet-blue' &&
+      movie.request.duration>1.9 && movie.audioPath.endsWith('two-slide-cues.m4a') &&
+      movie.outputPath.endsWith('.mp4'),'Mac movie command carries selected film, decoded duration and chosen paths');
     return;
   }
   await window.tssImportAudio();

@@ -685,7 +685,10 @@ fn run(
                                     start.elapsed().saturating_sub(export_pause),
                                 )
                             });
-                            let result = movie::render(r, job, film_times, app, parent);
+                            let result = movie::render(r, job, film_times, app, || {
+                                pump();
+                                unsafe { IsWindow(parent) == 0 }
+                            });
                             export_pause += pause_started.elapsed();
                             if !c.preview_hidden && unsafe { IsWindow(parent) != 0 } {
                                 child.place(c.rect)?;

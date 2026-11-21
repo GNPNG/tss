@@ -12,7 +12,7 @@ import { NativeWheelExport } from './native-wheel-export.js';
 import { VideoFeedbackControls } from './video-feedback.js';
 import { installPerformerDeck } from './performer-host.js';
 import { ProjectorDeck } from './projector-output.js';
-import { initMacroDeck, songFingerprint } from './gesture-macros.js';
+import { initMacroDeck, songFingerprint, songGestureEvents } from './gesture-macros.js';
 import { PROJECT_FORMAT, layerSettings, validateProject, emptyGestures, EditHistory } from './project-file.js';
 import { audioCueGroups } from './phrase-cues.js';
 import { advisorIntervals, defaultBindings, glyphs, opacityAt, planIntervals, replaceRegion, validRange } from './timeline.js';
@@ -121,12 +121,14 @@ if (window.__TAURI__?.core) installVisualAdvisor({
   selectedLyrics:range=>localLyrics?.excerpt(range) ?? '',
 });
 
-const wheelExporter = windowsDesktop ? new NativeWheelExport({
+const wheelExporter = nativeDesktop ? new NativeWheelExport({
   invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: liveSelection,
   source: () => ({audioPath: state.audioPath, duration: state.audioBuffer?.duration, proceduralBusy: state.exporting || !!plateExporter?.busy}),
-  getEvents: (id, duration) => macroDeck?.exportEvents(id, duration) ?? [],
+  getEvents: (id, duration) => macroDeck?.exportEvents(id, duration) ?? songGestureEvents(
+    detachedGestures.macros, [...detachedGestures.audioGroups, ...detachedGestures.lyricGroups], id, duration),
   finishRecording: async () => { await macroDeck?.finishPendingRecording(); },
-  pause, prepare: prepareWheel, sync: () => nativeSurface.sync(), status,
+  pause, prepare: async () => { nativeSurface.exporting = true; await prepareWheel(); },
+  sync: () => { nativeSurface.exporting = false; return nativeSurface.sync(); }, status,
 }) : null;
 
 const plateFormat = windowsDesktop ? new PlateFormatControls(byId('plate-formats'), async () => {

@@ -4,15 +4,22 @@ use objc2::{define_class, msg_send, rc::Retained, DefinedClass, MainThreadOnly};
 use objc2_app_kit::{NSEvent, NSResponder, NSView};
 use objc2_foundation::{MainThreadMarker, NSObject, NSPoint, NSRect, NSSize};
 use objc2_quartz_core::CAMetalLayer;
+use std::cell::Cell;
 use std::ffi::c_void;
 use tss_live_wheel::wgpu;
 
 const TAG: isize = 0x5453_5357;
 
+struct WheelViewState {
+    sender: SharedSender,
+    preview_hidden: Cell<bool>,
+    export_hidden: Cell<bool>,
+}
+
 define_class!(
     #[unsafe(super(NSView, NSResponder, NSObject))]
     #[thread_kind = MainThreadOnly]
-    #[ivars = SharedSender]
+    #[ivars = WheelViewState]
     #[name = "TSSWheelPreviewView"]
     struct WheelView;
 
@@ -40,7 +47,7 @@ impl WheelView {
             (p.x / bounds.width).clamp(0., 1.) as f32,
             (1. - p.y / bounds.height).clamp(0., 1.) as f32,
         ];
-        if let Ok(sender) = self.ivars().lock() {
+        if let Ok(sender) = self.ivars().sender.lock() {
             if let Some(tx) = &*sender {
                 let _ = tx.send(Command::Pointer(phase, point));
             }
@@ -65,8 +72,16 @@ pub(super) fn child(parent: &NSView) -> Option<Retained<NSView>> {
 }
 
 pub(super) fn visibility(parent: &NSView, hidden: bool) {
-    if let Some(child) = parent.viewWithTag(TAG) {
-        child.setHidden(hidden);
+    if let Some(view) = child(parent).and_then(|v| v.downcast::<WheelView>().ok()) {
+        view.ivars().preview_hidden.set(hidden);
+        view.setHidden(hidden || view.ivars().export_hidden.get());
+    }
+}
+
+pub(super) fn cover_for_export(parent: &NSView, hidden: bool) {
+    if let Some(view) = child(parent).and_then(|v| v.downcast::<WheelView>().ok()) {
+        view.ivars().export_hidden.set(hidden);
+        view.setHidden(hidden || view.ivars().preview_hidden.get());
     }
 }
 
@@ -76,6 +91,7 @@ pub(super) fn place(
     rect: Rect,
     sender: SharedSender,
     create_surface: bool,
+    hidden: bool,
 ) -> Result<Option<(wgpu::Instance, wgpu::Surface<'static>)>, String> {
     let mtm = MainThreadMarker::new().ok_or("AppKit preview requires the main thread")?;
     let scale = parent
@@ -86,7 +102,11 @@ pub(super) fn place(
     let child = if let Some(existing) = parent.viewWithTag(TAG) {
         existing
     } else {
-        let allocated = WheelView::alloc(mtm).set_ivars(sender);
+        let allocated = WheelView::alloc(mtm).set_ivars(WheelViewState {
+            sender,
+            preview_hidden: Cell::new(false),
+            export_hidden: Cell::new(false),
+        });
         // WheelView inherits NSView's designated initializer.
         let child: Retained<WheelView> =
             unsafe { msg_send![super(allocated), initWithFrame:frame] };
@@ -97,7 +117,7 @@ pub(super) fn place(
         Retained::into_super(child)
     };
     child.setFrame(frame);
-    child.setHidden(false);
+    visibility(parent, hidden);
     let layer = child
         .layer()
         .ok_or("Preview view has no backing layer")?

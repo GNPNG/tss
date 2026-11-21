@@ -16,7 +16,7 @@ pub enum Baseline {
 }
 
 impl Baseline {
-    #[cfg(any(windows, test))]
+    #[cfg(any(windows, target_os = "macos", test))]
     pub(super) fn film_origins(self, last_presented: [f64; 2]) -> [f64; 2] {
         match self {
             Self::Current => last_presented,
@@ -129,7 +129,7 @@ pub async fn export_native_wheel(
 ) -> Result<(), String> {
     request.validate()?;
     let paths = selected_export_paths(&paths, &audio_path, &output_path)?;
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     {
         let cancel = Arc::new(AtomicBool::new(false));
         {
@@ -143,10 +143,10 @@ pub async fn export_native_wheel(
         *control.0.lock().map_err(|e| e.to_string())? = None;
         result
     }
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let _ = (control, host, paths);
-        Err("Native wheel export currently requires the Windows GPU editor".into())
+        Err("Native wheel export requires the Windows or macOS GPU editor".into())
     }
 }
 

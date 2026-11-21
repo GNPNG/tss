@@ -22,6 +22,8 @@ use preset::{MaterialMotion, MotionPreset};
 #[cfg(any(windows, target_os = "macos", test))]
 mod mouse_pressure;
 pub mod movie;
+#[cfg(any(windows, target_os = "macos"))]
+mod movie_render;
 pub mod plates;
 #[cfg(any(windows, target_os = "macos", test))]
 mod release_clock;
