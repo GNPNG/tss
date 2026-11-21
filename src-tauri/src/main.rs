@@ -257,9 +257,22 @@ async fn cancel_export(manager: State<'_, ExportManager>) -> Result<(), String> 
 }
 
 fn main() {
+    let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
-    live::watch_verification();
-    tauri::Builder::default()
+    let builder = if std::env::args_os().any(|a| a == "--verify-mac-preview") {
+        live::watch_verification();
+        builder.on_page_load(|view, page| {
+            if view.label() == "main" && matches!(page.event(), tauri::webview::PageLoadEvent::Finished) {
+                let window = view.window();
+                if let Err(error) = window.show().and_then(|_| window.set_focus()) {
+                    eprintln!("Could not show the Mac preview verification window: {error}");
+                }
+            }
+        })
+    } else {
+        builder
+    };
+    builder
         .plugin(tauri_plugin_dialog::init())
         .manage(lyrics::Transcriber::default())
         .on_window_event(|window, event| {
