@@ -38,8 +38,27 @@ fn unix_ms() -> Result<u64, String> {
         .map_err(|e| e.to_string())
 }
 
+#[derive(Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PresentedSource {
+    frame_changes: u64,
+    loop_wraps: u64,
+    #[serde(skip)]
+    last: Option<i64>,
+    distinct_sample_pts_us: std::collections::BTreeSet<i64>,
+}
+impl PresentedSource {
+    fn observe(&mut self, pts: i64) {
+        if let Some(previous) = self.last.replace(pts) {
+            self.frame_changes += u64::from(pts != previous);
+            self.loop_wraps += u64::from(pts < previous);
+        }
+        self.distinct_sample_pts_us.insert(pts);
+    }
+}
 pub(super) struct Benchmark {
     path: PathBuf,
+    presented_sources: std::collections::BTreeMap<u64, PresentedSource>,
     footprint_sampling: bool,
     index: usize,
     count: usize,
@@ -65,11 +84,13 @@ pub(super) struct Benchmark {
 impl Benchmark {
     pub fn new(path: PathBuf, footprint_sampling: bool) -> Self {
         let settings = BenchmarkConfig::current();
-        let single = settings.wheel_stack
+        let single = settings.media_trial
+            || settings.wheel_stack
             || settings.gesture == Gesture::Pressure
             || settings.motion != MotionPreset::WheelFlow;
         Self {
             path,
+            presented_sources: Default::default(),
             footprint_sampling,
             index: 0,
             settings,
@@ -326,15 +347,16 @@ impl Benchmark {
     pub fn before(&mut self, r: &mut LiveWheel, hwnd: HWND, c: &Config) -> Result<(), String> {
         let release = self.settings.motion != MotionPreset::WheelFlow;
         let pressure = self.settings.gesture == Gesture::Pressure;
-        let (wheel, slide, gesture) = if release || pressure || self.settings.wheel_stack {
-            (
-                self.settings.wheel,
-                self.settings.slide,
-                self.settings.gesture,
-            )
-        } else {
-            RUNS[self.index]
-        };
+        let (wheel, slide, gesture) =
+            if release || pressure || self.settings.media_trial || self.settings.wheel_stack {
+                (
+                    self.settings.wheel,
+                    self.settings.slide,
+                    self.settings.gesture,
+                )
+            } else {
+                RUNS[self.index]
+            };
         if c.wheel != wheel
             || c.slide != slide
             || c.gesture != gesture
@@ -353,7 +375,31 @@ impl Benchmark {
         }
         if self.began.is_none() {
             if self.index == 0 {
-                if self.settings.wheel_stack {
+                if self.settings.media_trial {
+                    let frozen = |r: &mut LiveWheel, source_time: f64| -> Result<Vec<u8>, String> {
+                        r.prepare_media(source_time, true, [0.; 4], |id, us| {
+                            crate::media::frame_for_preview(id, us).map(super::packet)
+                        })?;
+                        r.render_film_times_offscreen(0.65, 0.65, 0.65)?;
+                        Ok(r.capture_rgba8()?.2)
+                    };
+                    let a = frozen(r, 0.2)?;
+                    let b = frozen(r, 1.8)?;
+                    let changed = a
+                        .chunks_exact(4)
+                        .zip(b.chunks_exact(4))
+                        .filter(|(x, y)| {
+                            x[..3].iter().zip(&y[..3]).any(|(u, v)| u.abs_diff(*v) >= 3)
+                        })
+                        .count();
+                    if changed == 0 || frozen(r, 0.2)? != a {
+                        return Err(
+                            "Media seek did not change and then restore the frozen optical frame"
+                                .into(),
+                        );
+                    }
+                    self.proof = json!({"wheelAndEffectTime":0.65,"mediaTimes":[0.2,1.8],"changedPixelsAtLeast3Codes":changed,"seekBackIdentical":true});
+                } else if self.settings.wheel_stack {
                     let other = &c.stack[1];
                     let frozen = |r: &mut LiveWheel, time| -> Result<Vec<u8>, String> {
                         r.set_layer_times(other.layer_id, [time; 2])?;
@@ -545,6 +591,17 @@ impl Benchmark {
             }
         }
         if did_present {
+            if self.settings.media_trial {
+                for source in c.stack.iter().filter(|l| l.media.is_some()) {
+                    let pts = r
+                        .media_sample_pts(source.layer_id)
+                        .ok_or("No media source frame on successful presentation")?;
+                    self.presented_sources
+                        .entry(source.layer_id)
+                        .or_default()
+                        .observe(pts);
+                }
+            }
             self.presents += 1;
             if let Some(prev) = self.last.replace(now) {
                 self.intervals
@@ -559,6 +616,14 @@ impl Benchmark {
         }
         let failure = if self.intervals.is_empty() {
             Some("Fewer than two successful surface presentations")
+        } else if self.settings.media_trial
+            && (self.presented_sources.len() != 2
+                || self
+                    .presented_sources
+                    .values()
+                    .any(|s| s.frame_changes < 2 || s.loop_wraps == 0))
+        {
+            Some("A moving clip did not traverse its loop during live presentation")
         } else if self.drags == 0 {
             Some("No native mouse moves applied during the measurement")
         } else if release
@@ -598,6 +663,9 @@ impl Benchmark {
             "fps": n/seconds,"p50Ms":percentile(&mut self.intervals,0.5),
             "p95Ms":percentile(&mut self.intervals,0.95),"p99Ms":percentile(&mut self.intervals,0.99),
             "focus":c.focus,"surface":[c.rect.width,c.rect.height],"preview":r.preview_size()}));
+        if self.settings.media_trial {
+            self.results.last_mut().unwrap()["presentedSources"] = json!(self.presented_sources);
+        }
         self.index += 1;
         if self.index == self.count {
             let out = json!({"adapter":r.adapter_name(),"field":r.field_size(),"maxFrameLatency":2,

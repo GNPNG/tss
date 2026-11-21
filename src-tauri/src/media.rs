@@ -281,7 +281,9 @@ pub async fn choose_visual_media(app: tauri::AppHandle) -> MediaResult<Option<Gr
 
 #[tauri::command]
 pub async fn proof_visual_grants(app: tauri::AppHandle) -> MediaResult<Vec<Grant>> {
-    if !crate::export_smoke::enabled() {
+    let media_benchmark = std::env::args_os().any(|arg| arg == "--benchmark-live")
+        && std::env::args_os().any(|arg| arg == "--media-trial");
+    if !crate::export_smoke::enabled() && !media_benchmark {
         return Ok(Vec::new());
     }
     let Some(visual) = std::env::var_os("TSS_PROOF_MEDIA") else {

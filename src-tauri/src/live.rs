@@ -399,6 +399,7 @@ pub struct BenchmarkConfig {
     render_width: u32,
     verify_export: bool,
     wheel_stack: bool,
+    media_trial: bool,
     verify_plates: bool,
     coral_trial: bool,
     motion: MotionPreset,
@@ -436,6 +437,7 @@ impl BenchmarkConfig {
             render_width: if preview_960 { 960 } else { 640 },
             verify_export,
             wheel_stack: false,
+            media_trial: false,
             verify_plates: false,
             coral_trial: motion == MotionPreset::CoralRelease,
             motion,
@@ -454,6 +456,7 @@ impl BenchmarkConfig {
             crate::export_smoke::enabled(),
         );
         config.wheel_stack = flag("--wheel-stack-trial");
+        config.media_trial = flag("--media-trial") && windows::benchmark_output().is_some();
         config.verify_plates = windows::plate_verification().is_some();
         config
     }
@@ -463,6 +466,16 @@ impl BenchmarkConfig {
             || c.stack.len() == 2
                 && c.stack[0].wheel == "violet-blue"
                 && c.stack[1].wheel == "yellow-red")
+            && (!self.media_trial
+                || (c.stack.len() == 3
+                    && c.stack[0].layer_id == c.layer_id
+                    && c.stack[0].wheel == "violet-blue"
+                    && c.stack[1].media.is_some()
+                    && c.stack[1].matte_only
+                    && c.stack[2]
+                        .media
+                        .as_ref()
+                        .is_some_and(|m| m.key_enabled && m.mask_a == Some(c.stack[1].layer_id))))
             && c.motion == self.motion
             && c.focus == self.focus
             && c.render_width == self.render_width

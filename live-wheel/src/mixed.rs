@@ -146,6 +146,11 @@ impl LiveWheel {
         Ok(())
     }
 
+    /// Timestamp on the decoder packet currently uploaded for this timeline track.
+    pub fn media_sample_pts(&self, layer_id: u64) -> Option<i64> {
+        self.mixed.images.get(&layer_id).map(|image| image.pts_us)
+    }
+
     /// Audio values are bass, midrange, treble, and the accumulated bass amplitude in seconds.
     pub fn prepare_media(
         &mut self,

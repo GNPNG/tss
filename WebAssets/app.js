@@ -410,7 +410,7 @@ async function loadWheelPresets() {
           selectLayer(layer.id);
         }
         if (benchmark?.verifyPlates) await plateExporter.start();
-        if (benchmark?.verifyExport) {
+        if (benchmark?.verifyExport || benchmark?.mediaTrial) {
           const grants = await desktopInvoke('proof_visual_grants');
           if (grants.length) {
             const [source, matte] = grants.map(newMedia);
@@ -421,6 +421,8 @@ async function loadWheelPresets() {
             addArtwork(source);
             selectLayer(layer.id);
           }
+        }
+        if (benchmark?.verifyExport) {
           const { verifyWheelExport } = await import('./verify-wheel-export.js');
           await nativeSurface.sync();
           await verifyWheelExport(liveSelection(), () => state.audioBuffer?.duration, status, projectorDeck,performerDeck);
