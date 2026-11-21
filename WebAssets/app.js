@@ -1,4 +1,5 @@
 import { LiquidRenderer, LIQUID_PALETTES } from './liquid-renderer.js';
+import { installVisualAdvisor } from './visual-advisor.js';
 import { installLocalLyrics } from './local-lyrics.js';
 import { analyzeAudio, featuresAt } from './audio-features.js';
 import { NativeWheelSurface, hasRelease } from './native-wheel.js';
@@ -105,6 +106,12 @@ const localLyrics = window.__TAURI__?.core ? installLocalLyrics({
   invoke: window.__TAURI__.core.invoke,
   apply: macroDeck ? groups => macroDeck.applyLyricGroups(groups) : null,
 }) : null;
+
+if (window.__TAURI__?.core) installVisualAdvisor({
+  invoke:window.__TAURI__.core.invoke, source:()=>state.audioBuffer,
+  selection:()=>selectedTimeRange(), apply:value=>applyTimelineSuggestion(value),
+  selectedLyrics:range=>localLyrics?.excerpt(range) ?? '',
+});
 
 const wheelExporter = windowsDesktop ? new NativeWheelExport({
   invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: liveSelection,

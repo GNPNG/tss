@@ -28,6 +28,7 @@ export function reviewTranscript(draft, duration) {
     const m = stamp.exec(s);
     return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] + +m[4] / 1000 : NaN;
   }
+  const segments = [];
   for (let i = 0; i < blocks.length; i++) {
     const [timing, ...lines] = blocks[i].split('\n');
     const [from, to, ...extra] = timing.trim().split(/\s+-->\s+/);
@@ -36,8 +37,14 @@ export function reviewTranscript(draft, duration) {
         !lines.join(' ').trim() || lines.some(line => line.includes('-->'))) {
       throw new Error('Check the time range and text of cue ' + (i + 1) + '.');
     }
+    segments.push({start, end, text:lines.join(' ')});
   }
-  return { text: text + '\n', groups: lyricCueGroups(text, 'lyrics.vtt'), count: blocks.length };
+  return { segments, text: text + '\n', groups: lyricCueGroups(text, 'lyrics.vtt'), count: blocks.length };
+}
+
+export function lyricExcerpt(draft, duration, {start,end}) {
+  return reviewTranscript(draft,duration).segments.filter(c=>c.start < end && c.end > start)
+    .map(c=>c.text.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')).join(' ');
 }
 
 export function installLocalLyrics({ invoke, apply }) {
@@ -91,6 +98,9 @@ export function installLocalLyrics({ invoke, apply }) {
     } catch (e) { if (id === generation) status.textContent = String(e); }
   });
   return {
+    excerpt(range) {
+      return buffer && draft.value ? lyricExcerpt(draft.value, buffer.duration, range) : '';
+    },
     source(nextPath, nextBuffer) {
       if (nextPath === path && nextBuffer === buffer) return;
       generation++;

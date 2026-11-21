@@ -1,0 +1,87 @@
+[
+  {
+    "expected": {
+      "direction": "Stretch an amber oil slide to follow each crescendo.",
+      "visual": "oil",
+      "signal": "energy_rise",
+      "fit": "elastic"
+    },
+    "received": {
+      "visual": "oil",
+      "signal": "energy_rise",
+      "fit": "elastic"
+    },
+    "correct": [
+      "visual",
+      "signal",
+      "fit"
+    ]
+  },
+  {
+    "expected": {
+      "direction": "Loop paper triangles in a spiral to the kick drum beat.",
+      "visual": "geometric",
+      "signal": "beat",
+      "fit": "repeat"
+    },
+    "received": {
+      "visual": "silhouette",
+      "signal": "time",
+      "fit": "repeat"
+    },
+    "correct": [
+      "fit"
+    ]
+  },
+  {
+    "expected": {
+      "direction": "Bring the keyed silhouettes of birds back each time the singer repeats the line about wings.",
+      "visual": "silhouette",
+      "signal": "lyric",
+      "fit": "recurrence"
+    },
+    "received": {
+      "visual": "silhouette",
+      "signal": "time",
+      "fit": "fixed"
+    },
+    "correct": [
+      "visual"
+    ]
+  },
+  {
+    "expected": {
+      "direction": "At a specific time play my full-colour animated film clip for exactly five seconds.",
+      "visual": "video",
+      "signal": "time",
+      "fit": "fixed"
+    },
+    "received": {
+      "visual": "video",
+      "signal": "time",
+      "fit": "fixed"
+    },
+    "correct": [
+      "visual",
+      "signal",
+      "fit"
+    ]
+  },
+  {
+    "expected": {
+      "direction": "On each sharp snare onset bring the shadow dancer back again.",
+      "visual": "silhouette",
+      "signal": "onset",
+      "fit": "recurrence"
+    },
+    "received": {
+      "visual": "silhouette",
+      "signal": "onset",
+      "fit": "fixed"
+    },
+    "correct": [
+      "visual",
+      "signal"
+    ]
+  }
+]

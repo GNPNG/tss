@@ -27,6 +27,8 @@ Open a song, expand **Gesture macros** and select **Record gesture**. You can re
 
 Generate and review timed lyrics from the open recording with **Local lyric transcription**. [Transcription and trigger controls](docs/local-lyrics.md)
 
+**Local visual advisor** proposes a layer, trigger and fit for the selected time range. Review and edit all three before adding an oil track. [Setup and measured model behavior](experiments/visual-advisor/README.md)
+
 **Save project** writes a `.tss` file. **Open project** restores the playhead, ordered layers, palettes and swatches, native wheel and film controls, shared focus, feedback settings, export starting pose, gesture recordings and cue timings. Keep the song beside the project when transferring it to another machine. The desktop editor also remembers audio locations chosen on this machine. If the recording moves, **Relink audio** verifies the chosen file against the saved SHA-256. You can continue editing the visuals with the audio offline. Live gestures that you want to replay should be recorded in **Gesture macros**.
 
 Choose **Undo**, **Redo**, or a named edit in the timeline’s **History** menu to revisit layer, focus, feedback and gesture edits. Opening a project or another song starts a new history. The editor retains up to 128 steps within its in-memory snapshot budget.
