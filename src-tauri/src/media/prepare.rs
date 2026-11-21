@@ -28,19 +28,14 @@ pub(super) struct Index {
     pub rec709_transfer: bool,
 }
 
-fn program(name: &str) -> MediaResult<Command> {
-    let dirs = crate::lyrics::tool_dirs();
-    let name = format!("{name}{}", std::env::consts::EXE_SUFFIX);
-    let path = crate::lyrics::tool(&dirs, &name).map_err(|_| {
-        format!("Install FFmpeg with FFprobe to prepare visual media. Could not find {name}.")
-    })?;
-    let mut c = Command::new(path);
+fn program(binary: crate::media_tools::Binary) -> MediaResult<Command> {
+    let mut c = crate::media_tools::command(binary)?;
     c.stdin(Stdio::null());
     Ok(c)
 }
 
 fn probe_args() -> MediaResult<Command> {
-    let mut c = program("ffprobe")?;
+    let mut c = program(crate::media_tools::Binary::Ffprobe)?;
     c.args([
         "-v",
         "error",
@@ -130,7 +125,7 @@ fn rec709_transfer(source: &Value) -> MediaResult<bool> {
 }
 
 fn encode(source: &Path, info: &Value, dest: &Path, proxy: bool) -> MediaResult<()> {
-    let mut c = program("ffmpeg")?;
+    let mut c = program(crate::media_tools::Binary::Ffmpeg)?;
     c.args([
         "-nostdin",
         "-hide_banner",

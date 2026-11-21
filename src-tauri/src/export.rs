@@ -2,7 +2,9 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
+#[cfg(test)]
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -108,8 +110,8 @@ impl ExportManager {
         }
         self.cancelled.store(false, Ordering::SeqCst);
 
+        let mut command = crate::media_tools::command(crate::media_tools::Binary::Ffmpeg)?;
         let temporary = create_temporary_file(parent)?;
-        let mut command = Command::new("ffmpeg");
         command.args(["-hide_banner", "-loglevel", "error", "-y"]);
         match input {
             Input::Png => {
@@ -164,7 +166,7 @@ impl ExportManager {
             Err(err) => {
                 let _ = fs::remove_file(&temporary);
                 return Err(format!(
-                    "Could not start FFmpeg: {err}. Install FFmpeg and ensure it is on PATH."
+                    "Could not start FFmpeg: {err}. Open FFmpeg media tools in the editor and recheck."
                 ));
             }
         };

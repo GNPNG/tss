@@ -73,8 +73,16 @@ pub(crate) fn tool_dirs() -> Vec<PathBuf> {
     #[cfg(target_os = "macos")]
     dirs.extend(["/usr/local/bin", "/opt/homebrew/bin", "/usr/bin", "/bin"].map(PathBuf::from));
     #[cfg(windows)]
+    if let Some(local) = env::var_os("LOCALAPPDATA") {
+        let local = PathBuf::from(local);
+        dirs.push(local.join("Microsoft/WinGet/Links"));
+        dirs.push(local.join("Microsoft/WindowsApps"));
+    }
+    #[cfg(windows)]
     if let Some(programs) = env::var_os("ProgramFiles") {
-        dirs.push(PathBuf::from(programs).join("PowerShell/7"));
+        let programs = PathBuf::from(programs);
+        dirs.push(programs.join("WinGet/Links"));
+        dirs.push(programs.join("PowerShell/7"));
     }
     dirs
 }

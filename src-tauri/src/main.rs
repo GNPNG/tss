@@ -8,6 +8,7 @@ mod media;
 mod live;
 mod performer;
 mod media_audio;
+mod media_tools;
 mod project;
 
 use export::ExportManager;
@@ -277,6 +278,8 @@ fn main() {
             export_smoke::finish_wheel_export_verification,
             live::set_live_wheel,
             media_audio::set_visual_audio_features,
+            media_tools::check_media_tools,
+            media_tools::install_media_tools,
             performer::choose_performer_tls,
             performer::start_performer,
             performer::start_performer_verification,
