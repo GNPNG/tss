@@ -22,8 +22,8 @@ export async function verifyWheelExport(selection, duration, status, projector,p
     facts.audioDuration=seconds;
     facts.sourceName=el('source-name').textContent;
     if (facts.sourceName !== audioPath.split(/[\\/]/).pop()) throw Error('The granted song was not imported');
-    facts.wheelOptions=el('mathmos-wheel').options.length-1;
-    facts.wheel=el('mathmos-wheel').value;
+    facts.wheelOptions=el('slide-preset').options.length-1;
+    facts.wheel=el('slide-preset').value;
     facts.motion=el('wheel-motion').value;
     facts.gesture=el('wheel-gesture').value;
     facts.macroDeckReady=!el('macro-deck').hidden;

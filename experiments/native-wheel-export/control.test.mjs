@@ -117,3 +117,26 @@ test('the selected-wheel export sends print stock and finishing options to the n
     invoke:async(name,request)=>{ assert.equal(name,'export_native_wheel_plates');assert.deepEqual(request,{selection:{...selection,print}});return 'mechanical'; }});
   assert.equal(await ui.start(),'mechanical');
 });
+
+import {isNativePalette, paletteFields} from '../../WebAssets/film-palette.js';
+import {LIQUID_PALETTES} from '../../WebAssets/liquid-renderer.js';
+test('all six pigment themes and edited photographic slides reach native stack and solo exports', () => {
+  const slides = new Map([['violet-blue', {}]]);
+  for (const [id, colors] of Object.entries(LIQUID_PALETTES)) {
+    const layer = {id: 1, visible: true, opacity: 1, nativeLive: true, palette: id, hue: 0, colors};
+    assert.ok(isNativePalette(layer, slides), id);
+    const expected = colors.map(color => Number.parseInt(color.slice(1),16));
+    assert.deepEqual(paletteFields(layer).swatches, expected);
+    const [item] = programLayers([layer], l => isNativePalette(l,slides));
+    assert.deepEqual([item.wheel, item.swatches], [id, expected]);
+    const solo = wheelMovieRequest({layerId:1, wheel:id, ...paletteFields(layer)}, 1, [], 'neutral');
+    assert.deepEqual(solo.swatches, expected);
+    assert.deepEqual(layer.colors, colors);
+    assert.equal(isNativePalette({...layer, nativeLive:false},slides),false);
+    assert.equal(isNativePalette({...layer, media:{}},slides),false);
+  }
+  const slide = {palette:'violet-blue', nativeLive:true, colors:['#ffffff','#ff0000','#010203','#0000ff'], hue:0};
+  assert.deepEqual(paletteFields(slide), {});
+  assert.deepEqual(paletteFields({...slide, customColors:true}).swatches,[0xffffff,0xff0000,0x010203,0x0000ff]);
+  assert.equal(paletteFields({...slide,hue:120}).swatches[1],0x00ff00);
+});

@@ -293,6 +293,7 @@ fn main() {
             live::set_live_wheel_pressure,
             live::forget_live_wheel_layer,
             live::live_wheel_stats,
+            live::live_simulation_available,
             live::live_wheel_benchmark_config,
             live::plates::export_native_wheel_plates,
             live::plates::preview_wheel_plates,

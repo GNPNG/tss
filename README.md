@@ -2,13 +2,15 @@
 
 ![The Sacred Swirls project logo](WebAssets/assets/tss-project-logo.jpeg)
 
-The Sacred Swirls (TSS), EPNI-018, is a desktop liquid-light instrument. Two independently simulated films sit between parallel glass plates. Each has its own dye, carrier, in-plane motion and optical depth. The Windows and Intel Mac editors project light through both films with a shared adjustable focus.
+The Sacred Swirls (TSS), EPNI-018, models light projected through individually dyed films between parallel glass plates. The RC.1 Windows and Intel Mac editors calculate the transmitted light, focus and gesture deformations on the GPU. The oil boundaries in that build come from offline Basilisk calculations. The default wheel traverses 96 stored states forward and backward every 7.92 seconds. A drag deforms the projected contours while the underlying oil follows the recorded trajectory. The coral study plays through its stored release and holds the last state. The frame rates reported below measure presentation of those fields. [Field sampling](live-wheel/src/fields.rs) · [Film selection](live-wheel/src/film_sources.rs)
 
 ## Current development build
 
+The source build with the `live-solver` feature and the packaged Basilisk helper opens **Live fluid simulation**. Each visual track has two independent sealed cells. The simulator generates their initial oil volumes from the track seed. A mouse tug imparts tangential motion to the selected cell. The same oil continues to evolve after release. **Flow Speed** sets the rate of simulation time, **Detail Scale** controls the view, and **Track opacity** controls how much of that track contributes to the stack. Changing the dye palette retains the liquid state. Physical pressure-driven gap flow and reconstruction of a live performance for 4K export are still in development. [Solver and measurement](experiments/live-slide-solver/) · [Captured focus pull](experiments/live-slide-solver/evidence/focus-pull.mp4)
+
 [Published Windows preview 0.1.0-preview.2](https://github.com/GNPNG/tss/releases/tag/v0.1.0-preview.2) · [Start performing](docs/windows-preview.md)
 
-In the source build, open the coral wheel project or choose **Violet / Blue → Slide motion → Wheel with coral beads**. Small cyan drops pinch off the front slide while the original violet oil wheel moves behind the glass. **Replay front beads** starts the release again at the current rear-wheel position. [Editable project](experiments/slide-look-study/approval/coral-wheel/coral-wheel.tss) · [Full projection](experiments/slide-look-study/approval/coral-wheel/coral-wheel.mp4) · [Half-speed close-up](experiments/slide-look-study/approval/coral-wheel/coral-wheel-detail-half-speed.mp4)
+In the source build, open the coral wheel project or choose **Violet / Blue → Slide motion → Recorded slide with coral beads**. Small cyan drops pinch off the front slide while the violet slide moves behind the glass. **Replay front beads** starts the release again at the current rear-wheel position. [Editable project](experiments/slide-look-study/approval/coral-wheel/coral-wheel.tss) · [Full projection](experiments/slide-look-study/approval/coral-wheel/coral-wheel.mp4) · [Half-speed close-up](experiments/slide-look-study/approval/coral-wheel/coral-wheel-detail-half-speed.mp4)
 
 **Projected films** lets you inspect either film in isolation and return to the moving overlap. [Watch the rear film, front film and combined projection side by side](experiments/slide-look-study/approval/coral-solo/coral-solo.mp4)
 
@@ -19,9 +21,9 @@ The coral wheel sustained 40.00 FPS on the Windows GTX 1650 Ti Max-Q at both 640
 The source build adds **Slide motion → Coral release**. Watch the front film shed two drops, then pull focus through them onto the violet film behind. [Radeon capture](experiments/slide-look-study/approval/coral-release/coral-release.mp4) · [Full-size frame](experiments/slide-look-study/approval/coral-release/coral-release.png) · [How the films were solved and measured](experiments/coral-release/README.md)
 
 - Open MP3 or M4A audio and preview a waveform with synchronized liquid-light motion.
-- Add, select, hide, reorder and remove liquid layers. Adjust each layer's palette, hue, flow speed, scale and opacity.
+- Add, select, hide, reorder and remove tracks. Track opacity sets the contribution of the entire track. In RC.1 the procedural preview has hue, animation speed and detail scale controls. The native wheel has its own film, focus and gesture controls.
 - Export an 8-bit development preview of the current liquid composition and audio as 3840×2160 H.264/AAC MP4 at 30 fps. Rendering runs frame by frame and can be cancelled.
-- On Windows and Intel Mac, export the selected Mathmos wheel and scheduled slide gestures in 4K on the same GPU used for live preview. [Starting poses and native MP4 output](live-wheel/README.md#export-the-selected-wheel) · [Packaged Intel Mac movie and mouse test](experiments/desktop-rc1/macos/README.md)
+- On Windows and Intel Mac, export the selected slide and scheduled slide gestures in 4K on the same GPU used for live preview. [Starting poses and native MP4 output](live-wheel/README.md#export-the-selected-wheel) · [Packaged Intel Mac movie and mouse test](experiments/desktop-rc1/macos/README.md)
 
 Windows opens on the Violet / Blue wheel. Choose a wheel and select **Rear slide** or **Front slide**. **Material tug** draws the liquid toward a drag, **Rotate slide** turns the glass and **Press slide** squeezes the selected film at the contact point. The glass extends beyond the visible gate. Move **Projector focus** to bring either film into focus. [Live controls](live-wheel/README.md) · [Seven wheel studies](experiments/slide-look-study/approval/wheels/README.md) · [Focus pull](experiments/slide-look-study/approval/focus/violet-blue-rack-focus.mp4) · [Press and release, rear then front](experiments/slide-look-study/approval/pressure/slide-compression.mp4)
 

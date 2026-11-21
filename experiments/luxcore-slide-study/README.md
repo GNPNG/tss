@@ -1,6 +1,6 @@
 # Static LuxCore optics experiment — failed visual target
 
-This isolated scene tests LuxCore's glass, clear absorbing media, and overlapping geometry. **It is not a fluid simulation, a TSS renderer, an animation, or an approved visual.** The scene uses four manually positioned, shallow ellipsoids at two separated depths between static glass slabs. Their geometry does not match the Mathmos references; increasing samples alone will not fix that failure. The study was stopped after visual review, and no GPU job was run for this scene.
+This isolated scene tests LuxCore's glass, clear absorbing media, and overlapping geometry. **It is not a fluid simulation, a TSS renderer, an animation, or an approved visual.** The scene uses four manually positioned, shallow ellipsoids at two separated depths between static glass slabs. Their geometry does not match the projected slide references; increasing samples alone will not fix that failure. The study was stopped after visual review, and no GPU job was run for this scene.
 
 `Mirror.ply` is the sphere mesh from [LuxCore source commit b872186](https://github.com/LuxCoreRender/LuxCore/blob/b872186/scenes/sky/Mirror.ply), under the upstream project license. `plate.ply` is a static rectangular slab. `slide.scn` configures LuxCore's existing `glass` materials and `clear` absorbing volumes; no renderer or fluid physics algorithm was implemented in this experiment.
 

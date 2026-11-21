@@ -14,8 +14,12 @@ use production::{DigitalFormat, PrintFormat, PrintLayout};
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(not(windows), allow(dead_code))]
 pub struct Selection {
+    #[serde(default)]
+    detail_scale: Option<f32>,
     pub(super) layer_id: u64,
     pub(super) wheel: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) swatches: Option<[u32; 4]>,
     #[serde(default)]
     pub(super) motion: MotionPreset,
     #[serde(default)]
@@ -58,8 +62,9 @@ pub async fn preview_wheel_plates(
 #[cfg(any(windows, test))]
 impl Selection {
     pub(super) fn matches(&self, c: &super::Config) -> bool {
-        c.layer_id == self.layer_id
+        !c.uses_simulation() && c.layer_id == self.layer_id && c.detail_scale == self.detail_scale
             && c.wheel == self.wheel
+            && c.swatches == self.swatches
             && c.motion == self.motion
             && c.material_motion == self.material_motion
             && c.motion_take == self.motion_take

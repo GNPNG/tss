@@ -245,11 +245,17 @@ pub struct FeedbackAnchor {
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     #[serde(default)]
+    detail_scale: Option<f32>,
+    #[serde(default)]
+    simulation: Option<Simulation>,
+    #[serde(default)]
     stack: Vec<StackLayer>,
     #[serde(default)]
     visible_films: VisibleFilms,
     layer_id: u64,
     wheel: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    swatches: Option<[u32; 4]>,
     #[serde(default)]
     motion: MotionPreset,
     #[serde(default)]
@@ -275,13 +281,19 @@ pub struct Config {
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct StackLayer {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    detail_scale: Option<f32>,
     layer_id: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    simulation: Option<Simulation>,
     #[serde(default)]
     media: Option<MediaSettings>,
     #[serde(default)]
     matte_only: bool,
     #[serde(default)]
     wheel: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    swatches: Option<[u32; 4]>,
     #[serde(default)]
     motion: MotionPreset,
     #[serde(default)]
@@ -295,6 +307,72 @@ pub(super) struct StackLayer {
     envelope: Option<OpacityEnvelope>,
 }
 
+#[derive(Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct Simulation {
+    seed: u32,
+    rate: f64,
+}
+
+// Locate the sidecar in the signed application bundle or portable app directory.
+// The webview cannot provide a process name or executable path.
+fn solver_executable() -> Option<std::path::PathBuf> {
+    let executable = std::env::current_exe().ok()?;
+    let name = if cfg!(windows) { "tss-slide-solver.exe" } else { "tss-slide-solver" };
+    let path = executable.parent()?.join(name);
+    (cfg!(feature = "live-solver") && path.is_file()).then_some(path)
+}
+
+#[tauri::command]
+pub fn live_simulation_available() -> bool {
+    solver_executable().is_some()
+}
+
+impl Config {
+    fn uses_simulation(&self) -> bool {
+        self.simulation.is_some() || self.stack.iter().any(|track| track.simulation.is_some())
+    }
+
+    #[cfg(any(windows, target_os = "macos"))]
+    fn configure_simulation(&self, renderer: &mut tss_live_wheel::LiveWheel) -> Result<(), String> {
+        for track in &self.stack {
+            if track.layer_id != self.layer_id && track.media.is_none() {
+                renderer.set_detail_scale(track.layer_id, track.detail_scale.unwrap_or(1.0))?;
+            }
+        }
+        renderer.set_detail_scale(self.layer_id, self.detail_scale.unwrap_or(1.0))?;
+        #[cfg(feature = "live-solver")]
+        {
+            let mut apply = |id, sim: Option<Simulation>| -> Result<(), String> {
+                if let Some(sim) = sim {
+                    if !(0.0..=2.0).contains(&sim.rate) {
+                        return Err("Simulation speed must be between 0 and 2".into());
+                    }
+                    let exe = solver_executable().ok_or("The live fluid solver is missing from this app")?;
+                    renderer.set_live_solver(id, &exe, sim.seed, sim.rate)?;
+                } else {
+                    renderer.clear_live_solver(id);
+                }
+                Ok(())
+            };
+            for track in &self.stack {
+                if track.layer_id != self.layer_id && track.media.is_none() {
+                    apply(track.layer_id, track.simulation)?;
+                }
+            }
+            apply(self.layer_id, self.simulation)
+        }
+        #[cfg(not(feature = "live-solver"))]
+        {
+            let _ = renderer;
+            if self.uses_simulation() {
+                return Err("This build lacks the live fluid solver required by this track".into());
+            }
+            Ok(())
+        }
+    }
+}
+
 fn default_pressure() -> f32 {
     0.5
 }
@@ -302,6 +380,8 @@ fn default_pressure() -> f32 {
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Stats {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    simulation_tick: Option<u64>,
     available: bool,
     running: bool,
     adapter: String,

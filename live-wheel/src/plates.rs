@@ -49,7 +49,7 @@ impl PlateTarget {
         let target = Target::new(&r.device, "32-bit linear wheel projection", size, FORMAT);
         let vertex = shader(&r.device, "Plate quad", include_str!("plates/vertex.wgsl"));
         let optics = feedback::linear_optics(&r.device, &vertex, FORMAT);
-        let mut material = r.materials[&r.wheel];
+        let mut material = r.active_material;
         material.lens[0] = r.focus.unwrap_or(-1.);
         material.lens[1] = 1.; // Shared optics return linear radiance.
         let material = uniform(
@@ -392,7 +392,7 @@ impl LiveWheel {
             "schemaVersion": 1, "profile": "DIGITAL_4K", "size": format.size(),
             "layout": format.layout, "horizonY": format.horizon_y,
             "scope": "Selected wheel projected alone at full optical density, before stack propagation and electronic feedback.",
-            "wheel": self.wheel, "layerId": self.active, "motion": self.motion, "materialMotion": self.material_motion, "focus": self.focus,
+            "wheel": self.wheel, "swatches": self.swatches, "layerId": self.active, "motion": self.motion, "materialMotion": self.material_motion, "focus": self.focus,
             "rearSeconds": times[0], "frontSeconds": times[1], "visibleFilms": {"rear": rear, "front": front},
             "gpu": self.adapter_name(), "source": "RGBA32Float linear optical radiance before video feedback",
             "encoding":format.encoding, "cICP":format.encoding.cicp(), "iccEmbedded":true, "alpha":"16-bit, straight linear",

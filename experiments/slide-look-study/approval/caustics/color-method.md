@@ -2,7 +2,7 @@
 
 ![Left column shows the base color frame and right the measured curved-to-planar gain at full strength, with matching native 4K detail below](color-comparison.png)
 
-The measured receiver change produces dark, nearly continuous outlines on both slides. This is a geometric and sampling diagnostic. The comparison exposes an unresolved lighting error for the Mathmos look. [Full 16-bit sRGB base](../composite-srgb.png) · [Full 16-bit sRGB result](frame-048-relief-srgb.png)
+The measured receiver change produces dark, nearly continuous outlines on both slides. This is a geometric and sampling diagnostic. The comparison exposes an unresolved lighting error for the projected slide look. [Full 16-bit sRGB base](../composite-srgb.png) · [Full 16-bit sRGB result](frame-048-relief-srgb.png)
 
 The base is the full-resolution Violet / Blue wheel at frame 048. The lighting change comes from a pair of neutral Cycles exposures of the diffuse screen. The curved exposure uses the two independent slide meshes with relief. The planar exposure uses their matched flat controls. Both use the same lamp, camera and receiver. [Base exposure](../composite-srgb.png) · [Receiver scene and controls](README.md) · [Film geometry](../../lighting-geometry.md)
 

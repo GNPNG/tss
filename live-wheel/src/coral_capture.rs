@@ -12,7 +12,7 @@ mod solo;
 #[path = "coral_capture/oil_comparison.rs"]
 mod oil_comparison;
 
-fn discrete_renderer(size: [u32; 2]) -> Result<(LiveWheel, gpu::AdapterInfo), String> {
+pub(super) fn discrete_renderer(size: [u32; 2]) -> Result<(LiveWheel, gpu::AdapterInfo), String> {
     let adapter_match =
         std::env::var("TSS_LIVE_ADAPTER").map_err(|_| "Missing hardware adapter name")?;
     if adapter_match.trim().is_empty() {

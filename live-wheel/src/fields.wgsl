@@ -1,14 +1,16 @@
 @group(0) @binding(0) var frames: texture_2d_array<f32>;
 @group(0) @binding(1) var offsets: texture_2d<f32>;
 @group(0) @binding(2) var smp: sampler;
-struct FramePair { first:u32, second:u32, fraction:f32, frontFraction:f32, rigid:vec4<f32>, centers:vec4<f32>, cacheRect:vec4<f32>, pressure:array<vec4<f32>,2>, frontFrames:vec4<u32> };
+struct FramePair { first:u32, second:u32, fraction:f32, frontFraction:f32, rigid:vec4<f32>, centers:vec4<f32>, cacheRect:vec4<f32>, pressure:array<vec4<f32>,2>, frontFrames:vec4<u32>, detail:vec4<f32> };
 @group(0) @binding(3) var<uniform> pair: FramePair;
 const aspect=vec2<f32>(1.77777778,1.0);
 fn sourceUV(uv:vec2<f32>,rotation:vec2<f32>,origin:vec2<f32>,front:bool)->vec2<f32>{
     let press=pair.pressure[select(0u,1u,front)];
-    var release=uv;
+    var gate=uv;
+    if (pair.detail.x != 1.0) { gate=0.5+(uv-0.5)*pair.detail.x; }
+    var release=gate;
     if press.w > 0.0 {
-        let delta=uv-press.xy;
+        let delta=gate-press.xy;
         let q=delta*aspect;
         let s=dot(q,q)*press.z;
         if s < 1.0 {

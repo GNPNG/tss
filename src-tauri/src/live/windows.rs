@@ -661,9 +661,11 @@ fn run(
                 Command::Movie(job, reply) => {
                     let result = match (engine.as_mut(), config.as_ref()) {
                         (Some(r), Some(c))
-                            if c.layer_id == job.request.layer_id
+                            if !c.uses_simulation() && c.layer_id == job.request.layer_id
                                 && c.stack == job.request.stack
                                 && c.wheel == job.request.wheel
+                                && c.detail_scale == job.request.detail_scale
+                                && c.swatches == job.request.swatches
                                 && c.motion == job.request.motion
                                 && c.material_motion == job.request.material_motion
                                 && c.visible_films == job.request.visible_films
@@ -831,6 +833,7 @@ fn run(
                             .set_footprint_sampling(footprint_sampling);
                     }
                     let r = engine.as_mut().unwrap();
+                    next.configure_simulation(r)?;
                     if config.as_ref().and_then(|c| c.feedback.as_ref()) != next.feedback.as_ref() {
                         r.set_feedback(next.feedback.as_ref().map(|f| f.native()))?;
                     }
@@ -842,6 +845,7 @@ fn run(
                                 .map(|s| tss_live_wheel::WheelLayer {
                                     id: s.layer_id,
                                     wheel: s.wheel.clone(),
+                                    swatches: s.swatches,
                                     motion: s.motion,
                                     material_motion: s.material_motion,
                                     films: s.visible_films.slides(),
@@ -977,8 +981,10 @@ fn run(
                         let [rear, front] = next.visible_films.slides();
                         r.set_slide_visibility(rear, front);
                     }
-                    if config.as_ref().map(|c| &c.wheel) != Some(&next.wheel) {
-                        r.set_wheel(&next.wheel)?;
+                    if config.as_ref().map(|c| (&c.wheel, c.swatches))
+                        != Some((&next.wheel, next.swatches))
+                    {
+                        r.set_wheel_palette(&next.wheel, next.swatches)?;
                     }
                     if !config.as_ref().is_some_and(|old| {
                         old.render_width == next.render_width && old.rect == next.rect
@@ -1104,6 +1110,7 @@ fn run(
         }
         if did_present {
             stats.presents += 1;
+            stats.simulation_tick = r.live_solver_status(c.layer_id).map(|s| s.tick);
             if let Some(record) = capture.as_mut() {
                 if record.frame_at(r, c, frame_time, film_times, stats.drags)? {
                     capture = None;

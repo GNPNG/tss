@@ -17,7 +17,7 @@
     <div class="workspace">
       <section class="stage card" aria-label="Visual preview">
         <div class="section-heading"><div><span class="eyebrow">LIVE CANVAS</span><h1>Liquid light</h1></div><span class="live-indicator"><i></i><span id="preview-status">PROCEDURAL PREVIEW</span></span></div>
-        <div class="preview-shell"><canvas id="preview" width="1280" height="720" aria-label="Liquid light preview"></canvas><div id="render-error" class="render-error" hidden></div><div class="preview-bottom"><span id="preview-resolution">1280 × 720</span><span>PROJECTED LIGHT</span></div></div>
+        <div class="preview-shell"><canvas id="preview" width="1280" height="720" aria-label="Liquid light preview"></canvas><div id="render-error" class="render-error" hidden></div><div id="solver-unavailable" class="render-error" role="status" hidden>Live fluid simulation requires the Basilisk solver. Your saved slide settings are retained.</div><div class="preview-bottom"><span id="preview-resolution">1280 × 720</span><span>PROJECTED LIGHT</span></div></div>
         <div class="native-performance" id="native-performance" hidden>
           <span id="native-instruction">Drag to tug the material on the selected slide.</span>
           <output id="native-frame-rate" aria-label="Native presentation statistics"></output>
@@ -28,9 +28,9 @@
             <option value="current">Current pose and film position</option>
             <option value="neutral">Neutral pose and film start</option>
           </select></label>
-          <button class="button quiet" type="button" id="export-native-wheel" disabled>Export selected wheel in 4K</button>
+          <button class="button quiet" type="button" id="export-native-wheel" disabled>Export selected slide in 4K</button>
         </div>
-        <details class="plate-formats" id="plate-formats" hidden><summary>Selected wheel · production stills</summary>
+        <details class="plate-formats" id="plate-formats" hidden><summary>Selected slide · production stills</summary>
           <div class="native-choices"><label>Format<select id="plate-layout"><optgroup label="DIGITAL_4K">
             <option value="visualizer">4K visualizer · layered</option><option value="dsp-cover">DSP master cover</option>
             <option value="vertical">Vertical reel / promo story</option><option value="panorama">Five-gatefold cycle panorama</option>
@@ -53,7 +53,7 @@
             <label>Pixel row from top <input type="number" id="plate-horizon-y" min="0" max="2159" value="1339" step="1"></label></div>
           <figure><svg role="img" aria-label="Selected output framing and composition guides"></svg><figcaption></figcaption></figure>
           <button class="button quiet" type="button" id="plate-frame">Preview current framing</button>
-          <button class="button quiet" type="button" id="export-wheel-plates" title="Save the selected wheel alone at full density before stack projection and video feedback" disabled>Export selected wheel · 16-bit stills</button>
+          <button class="button quiet" type="button" id="export-wheel-plates" title="Save the selected slide alone at full density before stack projection and video feedback" disabled>Export selected slide · 16-bit stills</button>
         </details>
         <div class="stage-footer"><div class="source-info"><span class="disc">♫</span><div><strong id="source-name">No audio selected</strong><small id="source-meta">Open an MP3 or M4A to begin</small></div></div><button class="button quiet" type="button" id="relink-audio" hidden>Relink audio</button><div class="transport"><button class="icon-button" id="restart" title="Return to start" aria-label="Return to start" disabled>↤</button><button class="play-button" id="play" title="Play" aria-label="Play" disabled>▶</button><button class="icon-button" id="stop" title="Stop" aria-label="Stop" disabled>■</button></div><div class="clock"><span id="current-time">00:00</span><span class="clock-separator"> / </span><span id="total-time">00:00</span></div></div>
       </section>
@@ -63,10 +63,10 @@
         <div class="control-body">
           <div class="control-label"><span>COLOR THEME</span><span class="secondary">Select a palette</span></div>
           <div id="palette-grid" class="palettes" role="group" aria-label="Color theme"></div>
-          <label class="control-label wheel-heading" for="mathmos-wheel">MATHMOS OIL WHEELS</label>
+          <label class="control-label wheel-heading" for="slide-preset">SLIDE PRESETS</label>
           <div class="wheel-controls">
-            <select id="mathmos-wheel" disabled><option value="" disabled>Choose a wheel</option></select>
-            <button class="button quiet" type="button" id="show-wheel-study" aria-haspopup="dialog" disabled>View study</button>
+            <select id="slide-preset" disabled><option value="" disabled>Choose a slide</option></select>
+            <button class="button quiet" type="button" id="show-wheel-study" aria-haspopup="dialog" disabled>Play study video</button>
           </div>
           <details id="artwork-settings" open hidden>
             <summary>Artwork settings</summary><label><input type="checkbox" data-media="keyEnabled"> Apply chroma key</label><p id="artwork-source"></p><button type="button" id="artwork-relink" class="button quiet" hidden>Relink source</button>
@@ -84,14 +84,14 @@
             </div>
           </details>
           <div id="native-wheel-controls" hidden>
-            <label class="native-toggle"><input type="checkbox" id="live-wheel"> Live selected wheel</label>
+            <label class="native-toggle"><input type="checkbox" id="live-wheel"> Preview selected slide</label>
             <div class="native-choices">
-              <label>Slide motion<select id="wheel-motion"><option value="wheel-flow">Wheel flow</option><option value="coral-release">Coral release</option><option value="wheel-with-coral-beads">Wheel with coral beads</option></select></label>
+              <label>Slide motion<select id="wheel-motion"><option value="simulated" disabled>Live fluid simulation</option><option value="wheel-flow">Recorded slide motion</option><option value="coral-release">Recorded coral release</option><option value="wheel-with-coral-beads">Recorded slide with coral beads</option></select></label>
               <button type="button" id="replay-release" class="button quiet" hidden>Replay release live</button>
             </div>
             <div class="native-choices">
-              <label>Rear film oil<select id="rear-film-oil" aria-describedby="film-oil-note"><option value="wheel">Original wheel</option><option value="pdms-20">20 cSt PDMS</option><option value="pdms-1000">1,000 cSt PDMS</option></select></label>
-              <label>Front film oil<select id="front-film-oil" aria-describedby="film-oil-note"><option value="wheel">Original wheel</option><option value="pdms-20">20 cSt PDMS</option><option value="pdms-1000">1,000 cSt PDMS</option></select></label>
+              <label>Rear film oil<select id="rear-film-oil" aria-describedby="film-oil-note"><option value="wheel">Recorded oil motion</option><option value="pdms-20">20 cSt PDMS</option><option value="pdms-1000">1,000 cSt PDMS</option></select></label>
+              <label>Front film oil<select id="front-film-oil" aria-describedby="film-oil-note"><option value="wheel">Recorded oil motion</option><option value="pdms-20">20 cSt PDMS</option><option value="pdms-1000">1,000 cSt PDMS</option></select></label>
             </div>
             <p id="film-oil-note" hidden></p>
             <div class="native-choices">
@@ -112,10 +112,10 @@
             </div>
             <div class="focus-control">
               <label for="wheel-focus">Projector focus</label>
-              <output id="wheel-focus-value" for="wheel-focus">Wheel setting</output>
+              <output id="wheel-focus-value" for="wheel-focus">Slide setting</output>
               <input id="wheel-focus" type="range" min="0" max="100" step="1" value="50">
               <div class="range-ends"><span>Rear slide</span><span>Front slide</span></div>
-              <button class="button quiet" id="wheel-focus-reset" type="button">Restore wheel focus</button>
+              <button class="button quiet" id="wheel-focus-reset" type="button">Restore slide focus</button>
             </div>
             <details id="performer-deck" hidden>
               <summary>Performance surfaces</summary>
@@ -133,7 +133,7 @@
             </details>
             <details id="video-feedback">
               <summary>Video feedback</summary>
-              <label class="native-toggle"><input name="feedback-enabled" type="checkbox"> Feed the prior program image back into the wheel</label>
+              <label class="native-toggle"><input name="feedback-enabled" type="checkbox"> Feed the prior program image back into the slide</label>
               <fieldset class="feedback-settings" disabled>
                 <legend>Loop controls</legend>
                 <label for="feedback-delay">Delay <output for="feedback-delay">100 ms</output></label>
@@ -154,7 +154,11 @@
           <label class="slider-label" for="hue">Hue offset</label><input type="range" id="hue" min="0" max="360" value="0" class="hue-slider">
           <div class="range-ends"><span>0°</span><span>360°</span></div>
           <div class="control-divider"></div>
-          <div class="knobs"><label>FLOW SPEED <output id="speed-output">1.0×</output><input type="range" id="speed" min="0" max="2" step="0.05" value="1"></label><label>DETAIL SCALE <output id="scale-output">1.0×</output><input type="range" id="scale" min="0.4" max="2" step="0.05" value="1"></label><label>OPACITY <output id="opacity-output">100%</output><input type="range" id="opacity" min="0" max="1" step="0.01" value="1"></label></div>
+          <div class="knobs">
+            <label>FLOW SPEED <output id="speed-output">1.0×</output><input type="range" id="speed" min="0" max="2" step="0.05" value="1"></label>
+            <label>DETAIL SCALE <output id="scale-output">1.00×</output><input type="range" id="scale" min="0.4" max="2" step="0.01" value="1"></label>
+            <label>TRACK OPACITY <output id="opacity-output">100%</output><input type="range" id="opacity" min="0" max="1" step="0.01" value="1"></label>
+          </div>
           <div class="audio-note" id="audio-note"><span class="note-icon">≈</span><div><strong>Music responsive</strong><p>Liquid movement responds to the audio as it plays.</p></div></div>
         </div>
       </aside>
@@ -293,12 +297,12 @@
   <dialog id="wheel-study" class="wheel-study" aria-labelledby="wheel-study-name" aria-describedby="wheel-study-description">
     <header><h2 id="wheel-study-name"></h2><button type="button" class="button quiet" id="close-wheel-study">Close</button></header>
     <p id="wheel-study-description">Recorded native render of two independently simulated liquid slides.</p>
-    <video id="wheel-study-video" controls loop muted playsinline preload="none" aria-label="Oil wheel motion study"></video>
-    <p id="wheel-study-error" role="status" hidden>Could not play this wheel’s motion study.</p>
+    <video id="wheel-study-video" controls loop muted playsinline preload="none" aria-label="Slide motion study"></video>
+    <p id="wheel-study-error" role="status" hidden>Could not play this slide’s motion study.</p>
   </dialog>
   <script type="module" src="app.js"></script>
   <dialog id="native-wheel-export-progress" aria-labelledby="native-export-title">
-    <h2 id="native-export-title">Exporting selected wheel</h2>
+    <h2 id="native-export-title">Exporting selected slide</h2>
     <output id="native-export-count" aria-live="polite">Preparing 4K render…</output>
     <progress id="native-export-progress-bar" aria-label="Rendered frames"></progress>
     <button class="button quiet" id="cancel-native-export" type="button">Cancel export</button>

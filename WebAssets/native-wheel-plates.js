@@ -1,4 +1,4 @@
-import { materialMotionFields } from './material-motion.js';
+import { detailScaleFields, materialMotionFields } from './material-motion.js';
 
 export class NativeWheelPlates {
   constructor({button, format, invoke, listen, selection, busy, prepare, pause, status, refresh}) {
@@ -12,7 +12,7 @@ export class NativeWheelPlates {
 
   async start() {
     if (this.busy || this.otherExportBusy()) return;
-    if (!this.selection()) throw Error('Select a visible native wheel first.');
+    if (!this.selection()) throw Error('Select a visible native slide first.');
     this.busy = true;
     this.refreshExports();
     const label = this.button.textContent;
@@ -29,9 +29,9 @@ export class NativeWheelPlates {
         this.status('Production stills · ' + payload);
       });
       const folder = await this.invoke('export_native_wheel_plates', {
-        selection: {layerId, wheel, motion, motionTake, visibleFilms, focus, ...materialMotionFields(selected), ...(format?.print ? {print:format.print} : format ? {format} : {})},
+        selection: {layerId, wheel, motion, motionTake, visibleFilms, focus, ...(selected.swatches ? {swatches:selected.swatches} : {}), ...detailScaleFields(selected), ...materialMotionFields(selected), ...(format?.print ? {print:format.print} : format ? {format} : {})},
       });
-      this.status(folder ? 'Wheel stills saved to ' + folder : 'Plate export cancelled');
+      this.status(folder ? 'Slide stills saved to ' + folder : 'Plate export cancelled');
       return folder;
     } finally {
       unlisten?.();

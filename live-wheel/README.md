@@ -1,4 +1,4 @@
-# Live Mathmos wheels
+# Native slide preview
 
 From the repository root, build and launch the desktop editor in PowerShell. Building requires the project's Rust 1.88 toolchain, the Windows Tauri prerequisites and `glslc` from the Vulkan SDK (`VULKAN_SDK`, `PATH`, or the compiler path in `GLSLC`). The executable uses the installed Vulkan graphics driver. CUDA is unnecessary. [Windows Tauri prerequisites](https://v2.tauri.app/start/prerequisites/#windows)
 
@@ -10,7 +10,7 @@ The Windows host enumerates hardware adapters that can present to the editor and
 
 ## macOS editor preview
 
-Build the desktop editor with Rust 1.88, the Xcode command line tools and `glslc` on the compiler search path. The Mac preview opens Violet / Blue in a Metal-backed AppKit view. The **Live selected wheel** checkbox switches the selected track between its live wheel and the existing study controls. The width control starts at 640 pixels. The native readout identifies the active adapter, render size and measured frame cadence.
+Build the desktop editor with Rust 1.88, the Xcode command line tools and `glslc` on the compiler search path. The Mac preview opens Violet / Blue in a Metal-backed AppKit view. The **Preview selected slide** checkbox switches the selected track between its live wheel and the existing study controls. The width control starts at 640 pixels. The native readout identifies the active adapter, render size and measured frame cadence.
 
 ```sh
 cargo +1.88.0 run --locked --manifest-path src-tauri/Cargo.toml --features tauri/custom-protocol
@@ -20,13 +20,13 @@ The host prefers a discrete presenting adapter. To select the Radeon on a dual-G
 
 ## Physical oil selection
 
-With **Wheel flow** selected, choose **Rear film oil** and **Front film oil** independently. Each film offers **Original wheel**, **20 cSt PDMS** and **1,000 cSt PDMS**. The PDMS grades refer to silicone oil in water. The wheel preset supplies the dyes, track opacity sets the contribution to the composite, and **Material response** sets the response to a manual tug.
+With **Recorded slide motion** selected, choose **Rear film oil** and **Front film oil** independently. Each film offers **Recorded oil motion**, **20 cSt PDMS** and **1,000 cSt PDMS**. The PDMS grades refer to silicone oil in water. The wheel preset supplies the dyes, track opacity sets the contribution to the composite, and **Material response** sets the response to a manual tug.
 
-**Wheel with coral beads** uses the selected rear oil and the prescribed front bead release. **Coral release** supplies both trajectories. Returning to **Wheel flow** restores the saved selections. Projects created before these controls use **Original wheel** on both films.
+**Recorded slide with coral beads** uses the selected rear oil and the prescribed front bead release. **Coral release** supplies both trajectories. Returning to **Recorded slide motion** restores the saved selections. Projects created before these controls use **Recorded oil motion** on both films.
 
 ## Performance controls
 
-1. Select a visible liquid track and choose a preset under **Mathmos oil wheels**. **Live selected wheel** opens that track in the native preview. Windows and macOS start with Violet / Blue.
+1. Select a visible liquid track and choose a preset under **Slide presets**. **Preview selected slide** opens that track in the native preview. Windows and macOS start with Violet / Blue.
 2. Choose **Rear slide** or **Front slide** under **Mouse target**. Choose **Material tug** or **Rotate slide** under **Mouse action**, then hold the left button and drag on the native image. A tug pulls the selected liquid locally. **Material response** sets **Heavy**, **Medium**, or **Light** for that slide. Rotation turns the whole selected slide about the optical center. Releasing the button holds the pose. Each track keeps two independent slide poses.
 3. Select **640 × 360** or **960 × 540** under **Live resolution**. These cap the optical render width. A smaller viewport renders at its own width. The last pass scales the optical image to the stage.
 4. Move **Projector focus** between the rear and front planes. It overrides the default fitted focus across both slides and tracks. **Restore wheel focus** returns to the spatially varying focus used in the wheel study. **View study** opens the recorded reference. The live readout under the stage shows adapter, optical resolution, FPS and p95 frame interval.
@@ -49,7 +49,7 @@ On Windows, **Add artwork** imports an image, animated GIF or video as its own t
 
 **Projected films** controls which dyes reach the screen for this wheel track. Select **Front only** to inspect a pinching neck, **Rear only** to inspect the moving fold, or **Clear glass** to see the carrier and lamp. **Both films** restores the overlap at the current time with each slide's pose intact. The same selection applies to the delayed projector and to the full duration of a native export.
 
-**Wheel with coral beads** pairs the original wheel's rear film with a separate front film containing smaller oil buds. Pick **Violet / Blue** for the violet rear and cyan front shown in the review. **Replay front beads** restarts the front film while the rear stays at its current phase. Once the last front droplet has detached, the rear keeps moving behind it. **Current pose and film position** preserves both film times for export. **Neutral pose and film start** takes both back to zero.
+**Recorded slide with coral beads** pairs the original slide's rear film with a separate front film containing smaller oil buds. Pick **Violet / Blue** for the violet rear and cyan front shown in the review. **Replay front beads** restarts the front film while the rear stays at its current phase. Once the last front droplet has detached, the rear keeps moving behind it. **Current pose and film position** preserves both film times for export. **Neutral pose and film start** takes both back to zero.
 
 **Slide motion → Coral release** selects a second pair of independently solved films. Use any of the seven color wheels. The foreground starts with buds attached to a bank of oil. The rear carries broad folds that remain visible through the intervening glass. Move **Projector focus** toward the front to follow a neck as it thins, then toward the rear to see the folds through the newly detached drops.
 
@@ -61,9 +61,9 @@ To measure this preset on a Windows GPU, use the existing editor benchmark with 
 
 ## Stack native wheels
 
-On Windows, select a Mathmos wheel, add a visual layer and choose another wheel for it. The upper timeline row sits nearest the audience. Select either wheel to tug, rotate or press one of its films while the other wheel continues. Use the layer visibility button, opacity slider, reorder arrows and **Projected films** to change what reaches the screen. Preview, the delayed audience window and **Export wheel stack in 4K** use the same ordered light path. Scheduled gestures retain their target wheel in the movie.
+On Windows, select a slide, add a visual layer and choose another wheel for it. The upper timeline row sits nearest the audience. Select either wheel to tug, rotate or press one of its films while the other wheel continues. Use the layer visibility button, opacity slider, reorder arrows and **Projected films** to change what reaches the screen. Preview, the delayed audience window and **Export wheel stack in 4K** use the same ordered light path. Scheduled gestures retain their target wheel in the movie.
 
-Each wheel samples its own pair of film clocks and poses. Its existing optical shader attenuates the incident linear RGB image and adds that wheel’s fitted veiling light. A single lamp illuminates the stack. With manual focus, the ordered film planes span the existing focus travel. Each wheel integrates its own pupil footprint before transmitting the result to the next wheel. This screen-space approximation does not trace refracted rays across wheels. A single opaque wheel keeps its original optical path. The native stack accepts Mathmos wheel tracks.
+Each wheel samples its own pair of film clocks and poses. Its existing optical shader attenuates the incident linear RGB image and adds that wheel’s fitted veiling light. A single lamp illuminates the stack. With manual focus, the ordered film planes span the existing focus travel. Each wheel integrates its own pupil footprint before transmitting the result to the next wheel. This screen-space approximation does not trace refracted rays across wheels. A single opaque wheel keeps its original optical path. The native stack accepts slide tracks.
 
 ## Export still plates
 
@@ -83,7 +83,7 @@ BG contains the lamp and clear carrier. MID introduces the visible rear film. FG
 
 Open a local song, choose the live wheel, then select **Export selected wheel in 4K**. Choose a new MP4 filename. Export finishes an open gesture recording before reading the schedule. A take recorded while the song was paused can be assigned a trigger in the gesture deck. The current wheel material and focus apply throughout. Enabled gestures scheduled at a recording position, audio motif or lyric phrase replay in song order at 30 fps. **Export starting pose** offers three choices.
 
-- **Automatic** starts both films at zero with neutral slide poses for **Coral release**, **Wheel with coral beads**, and any track with scheduled gestures. Unscheduled **Wheel flow** starts from its current poses and visible film position.
+- **Automatic** starts both films at zero with neutral slide poses for **Coral release**, **Recorded slide with coral beads**, and any track with scheduled gestures. Unscheduled **Recorded slide motion** starts from its current poses and visible film position.
 - **Current pose and film position** copies the two live slides, then applies the scheduled events to that copy.
 - **Neutral pose and film start** starts at cache time zero with both slide rotations and tugs cleared.
 
@@ -93,7 +93,7 @@ The native thread suspends presentation and uses the same GPU for one 3840 × 21
 
 The bundled [complete-slide cache](assets/slide-world.rg8.gz) holds 96 Basilisk states at 24 Hz in a 704 × 704 world, with one unsigned 8-bit distance channel per slide. Its 512 × 288 projection gate starts at (96, 208). Rotating the slide brings previously hidden material into view. [Full-slide rotation proof](../experiments/slide-look-study/approval/windows-live/slide-motion.md#complete-slide-behind-the-aperture) Two adjacent states occupy a GPU texture array. Each tugged track has a 320 × 180 RGBA16F texture holding the two compact material displacements. The GPU evaluates rigid pose, interpolates the two signed distances, estimates the local source footprint and renders the shared aperture optics into an 8-bit RGBA preview. The FIFO surface requests a maximum frame latency of two. [In-plane motion model and measured liquid/carrier areas](../experiments/slide-look-study/approval/windows-live/slide-motion.md) Playback follows the sampled trajectory forward and backward, repeating every 190/24 seconds. Dragging changes how the selected slide is sampled. The cached fluid solution remains the basis for each new frame.
 
-To reproduce the complete-slide cache, use the geometry exporter and Basilisk solver in their `--world` modes on both slides. Compile the [native cache packer](../experiments/slide-look-study/pack-world-cache.cpp) with CImg and zlib, then run `pack-world-cache SOLVER-OUT NEW-CACHE.gz` on their 96-state directories. For the original cropped [TSSDF001 regression fixture](assets/slide-fields.rg8.gz), use the optical study's lossless FFV1 sequence and the Node.js, FFmpeg and ffprobe converter below. The optics shader comes from the same source as the still and clip proofs. The six additional wheel profiles use the photographic fits in the editor registry. [Geometry](../experiments/slide-look-study/geometry.md) · [Solver](../experiments/slide-look-study/solver.md) · [Field packing](../experiments/slide-look-study/README.md) · [Shared optics](../experiments/slide-look-study/optics.hook) · [Wheel registry](../WebAssets/assets/mathmos-wheels.json)
+To reproduce the complete-slide cache, use the geometry exporter and Basilisk solver in their `--world` modes on both slides. Compile the [native cache packer](../experiments/slide-look-study/pack-world-cache.cpp) with CImg and zlib, then run `pack-world-cache SOLVER-OUT NEW-CACHE.gz` on their 96-state directories. For the original cropped [TSSDF001 regression fixture](assets/slide-fields.rg8.gz), use the optical study's lossless FFV1 sequence and the Node.js, FFmpeg and ffprobe converter below. The optics shader comes from the same source as the still and clip proofs. The six additional wheel profiles use the photographic fits in the editor registry. [Geometry](../experiments/slide-look-study/geometry.md) · [Solver](../experiments/slide-look-study/solver.md) · [Field packing](../experiments/slide-look-study/README.md) · [Shared optics](../experiments/slide-look-study/optics.hook) · [Wheel registry](../WebAssets/assets/slide-presets.json)
 
 ```sh
 node live-wheel/tools/make-field-cache.mjs performance.mkv regenerated-fields.rg8.gz

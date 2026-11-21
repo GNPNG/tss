@@ -2,6 +2,8 @@
 mod feedback;
 mod projector;
 pub use projector::{ProjectorOutput, ProjectorTiming};
+#[cfg(feature = "live-solver")]
+mod evolving;
 mod fields;
 pub use feedback::FeedbackSettings;
 mod movie;
@@ -60,6 +62,7 @@ struct FramePair {
     cache_rect: [f32; 4],
     pressure: [[f32; 4]; 2],
     front_frames: [u32; 4],
+    detail: [f32; 4],
 }
 
 struct Target {
@@ -97,6 +100,15 @@ struct Track {
     slides: [SlidePose; 2],
     dirty: bool,
 }
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct LiveSolverStatus {
+    pub state: &'static str,
+    pub tick: u64,
+    pub flow_rate: f64,
+    pub error: Option<String>,
+}
+
 struct Pass {
     pipeline: gpu::RenderPipeline,
     layout: gpu::BindGroupLayout,
@@ -261,6 +273,11 @@ pub struct LiveWheel {
     cache_view: gpu::TextureView,
     slots: [[Option<FilmFrame>; 2]; 2],
     tracks: HashMap<u64, Track>,
+    detail_scales: HashMap<u64, f32>,
+    #[cfg(feature = "live-solver")]
+    evolving: HashMap<u64, evolving::Source>,
+    #[cfg(feature = "live-solver")]
+    presentation: u64,
     active: u64,
     stack: Vec<WheelLayer>,
     stack_times: HashMap<u64, [f64; 2]>,
@@ -273,6 +290,9 @@ pub struct LiveWheel {
     pair_uniform: gpu::Buffer,
     material_uniform: gpu::Buffer,
     materials: HashMap<String, Material>,
+    swatches: Option<[u32; 4]>,
+    active_material: Material,
+    stack_materials: HashMap<u64, Material>,
     wheel: String,
     focus: Option<f32>,
     slide_visibility: [bool; 2],
@@ -449,7 +469,7 @@ impl LiveWheel {
             &v,
             &optics_palette,
             "main",
-            "Mathmos wheel",
+            "Slide optics",
             COLOR_FORMAT,
             &[image, Sampler, Buffer],
         );
@@ -563,6 +583,11 @@ impl LiveWheel {
             cache_view,
             slots: [[None; 2]; 2],
             tracks: HashMap::new(),
+            detail_scales: HashMap::new(),
+            #[cfg(feature = "live-solver")]
+            evolving: HashMap::new(),
+            #[cfg(feature = "live-solver")]
+            presentation: 0,
             active: 0,
             stack: Vec::new(),
             stack_times: HashMap::new(),
@@ -574,6 +599,9 @@ impl LiveWheel {
             brush_uniform,
             pair_uniform,
             material_uniform,
+            swatches: None,
+            active_material: materials["violet-blue"],
+            stack_materials: HashMap::new(),
             materials,
             wheel: "violet-blue".into(),
             focus: None,
@@ -657,12 +685,105 @@ impl LiveWheel {
         }
     }
     pub fn forget_track(&mut self, id: u64) {
+        self.clear_live_solver(id);
         self.tracks.remove(&id);
+        self.detail_scales.remove(&id);
+    }
+    /// Fraction of the original field of view sampled along each axis.
+    /// A scale of 0.5 doubles apparent linear size about the center of the gate.
+    pub fn set_detail_scale(&mut self, id: u64, scale: f32) -> Result<(), String> {
+        if !(0.4..=2.0).contains(&scale) {
+            return Err("Detail scale must be between 0.4 and 2.0".into());
+        }
+        if scale == 1. {
+            self.detail_scales.remove(&id);
+        } else {
+            self.detail_scales.insert(id, scale);
+        }
+        Ok(())
+    }
+
+    fn detail_point(&self, point: [f32; 2]) -> [f32; 2] {
+        match self.detail_scales.get(&self.active) {
+            Some(&scale) => point.map(|v| 0.5 + (v - 0.5) * scale),
+            None => point,
+        }
+    }
+    /// Start an evolving pair of sealed cells for this track. Changing only
+    /// the simulation rate retains both cells and their velocity fields.
+    pub fn set_live_solver(
+        &mut self,
+        id: u64,
+        executable: &std::path::Path,
+        seed: u32,
+        flow_rate: f64,
+    ) -> Result<(), String> {
+        if !flow_rate.is_finite() || flow_rate < 0. {
+            return Err("Live solver requires a finite, nonnegative rate".into());
+        }
+        #[cfg(feature = "live-solver")]
+        {
+            if let Some(s) = self.evolving.get_mut(&id) {
+                if s.executable == executable && s.seed == seed {
+                    if let Some(err) = s.status().error {
+                        return Err(err);
+                    }
+                    s.rate = flow_rate;
+                    return Ok(());
+                }
+            }
+            let source = evolving::Source::new(&self.device, executable, seed, flow_rate)?;
+            self.evolving.insert(id, source);
+            self.reset_feedback_history();
+            Ok(())
+        }
+        #[cfg(not(feature = "live-solver"))]
+        {
+            let _ = (id, executable, seed);
+            Err("Live Basilisk support is disabled in this build".into())
+        }
+    }
+
+    pub fn live_solver_status(&self, id: u64) -> Option<LiveSolverStatus> {
+        #[cfg(feature = "live-solver")]
+        {
+            self.evolving.get(&id).map(evolving::Source::status)
+        }
+        #[cfg(not(feature = "live-solver"))]
+        {
+            let _ = id;
+            None
+        }
+    }
+
+    pub fn clear_live_solver(&mut self, id: u64) {
+        #[cfg(feature = "live-solver")]
+        if self.evolving.remove(&id).is_some() {
+            self.reset_feedback_history();
+        }
+        #[cfg(not(feature = "live-solver"))]
+        let _ = id;
+    }
+
+    fn verify_live_sources(&self) -> Result<(), String> {
+        #[cfg(feature = "live-solver")]
+        for (id, s) in &self.evolving {
+            if let Some(err) = s.status().error {
+                return Err(format!("Track {id} live solver: {err}"));
+            }
+        }
+        Ok(())
     }
     pub fn set_wheel(&mut self, id: &str) -> Result<(), String> {
-        if !self.materials.contains_key(id) {
-            return Err(format!("Unknown Mathmos wheel {id}"));
-        }
+        self.set_wheel_palette(id, None)
+    }
+    pub fn set_wheel_palette(
+        &mut self,
+        id: &str,
+        swatches: Option<[u32; 4]>,
+    ) -> Result<(), String> {
+        self.active_material = material::resolve(&self.materials, id, swatches)?;
+        self.swatches = swatches;
         self.wheel = id.into();
         self.upload_material();
         Ok(())
@@ -729,8 +850,11 @@ impl LiveWheel {
         self.material_motion = materials;
         Ok(())
     }
+    fn baseline_optics(&self) -> bool {
+        self.wheel == "violet-blue" && self.swatches.is_none()
+    }
     fn upload_material(&self) {
-        let mut material = self.materials[&self.wheel];
+        let mut material = self.active_material;
         material.lens[0] = self.focus.unwrap_or(-1.0);
         material.lens[1] = if self.feedback.is_some() { 1.0 } else { 0.0 };
         self.queue
@@ -774,9 +898,22 @@ impl LiveWheel {
         if slide > 1 || from == to || from.into_iter().chain(to).any(|v| !v.is_finite()) {
             return;
         }
-        let t = self.tracks.entry(self.active).or_default();
         let bounded = |v: f32| v.clamp(0., 1.);
-        t.dirty |= t.slides[slide as usize].gesture(mode, from.map(bounded), to.map(bounded));
+        let (from, to) = (
+            self.detail_point(from.map(bounded)),
+            self.detail_point(to.map(bounded)),
+        );
+        let t = self.tracks.entry(self.active).or_default();
+        #[cfg(feature = "live-solver")]
+        if mode == SlideGesture::Tug {
+            if let Some(source) = self.evolving.get_mut(&self.active) {
+                let pose = &t.slides[slide as usize];
+                let material = |p: [f32; 2]| pose.material_point(p.map(f64::from));
+                source.tug(slide as usize, material(from), material(to), pose.response);
+                return;
+            }
+        }
+        t.dirty |= t.slides[slide as usize].gesture(mode, from, to);
     }
     pub fn set_tug_response(&mut self, slide: u32, response: f32) -> Result<(), String> {
         if slide > 1 || !(0.0..=1.).contains(&response) {
@@ -799,12 +936,17 @@ impl LiveWheel {
         {
             return Err("Expected slide 0 or 1, pressure and gate coordinates in [0, 1]".into());
         }
+        let center = self.detail_point(center);
+        let cache = self.fields.view_to_cache();
+        #[cfg(feature = "live-solver")]
+        let cache = if self.evolving.contains_key(&self.active) {
+            evolving::VIEW
+        } else {
+            cache
+        };
         let pose = &mut self.tracks.entry(self.active).or_default().slides[slide as usize];
-        pose.pressure = pressure::Pressure::new(
-            pose.rigid_point(center.map(f64::from)),
-            amount,
-            self.fields.view_to_cache(),
-        );
+        pose.pressure =
+            pressure::Pressure::new(pose.rigid_point(center.map(f64::from)), amount, cache);
         Ok(())
     }
     pub fn end_gesture(&mut self, slide: u32) {
@@ -865,6 +1007,7 @@ impl LiveWheel {
         front: f64,
         program_time: f64,
     ) -> Result<bool, String> {
+        self.verify_live_sources()?;
         if self.actual_size.contains(&0) {
             return Ok(false);
         }
@@ -900,6 +1043,7 @@ impl LiveWheel {
         front: f64,
         program_time: f64,
     ) -> Result<(), String> {
+        self.verify_live_sources()?;
         if !rear.is_finite() || !front.is_finite() || !program_time.is_finite() {
             return Err("Invalid live frame time".into());
         }
@@ -907,6 +1051,7 @@ impl LiveWheel {
         Ok(())
     }
     pub fn render_offscreen(&mut self, time_seconds: f64) -> Result<(), String> {
+        self.verify_live_sources()?;
         if !time_seconds.is_finite() {
             return Err("Invalid live frame time".into());
         }
@@ -993,12 +1138,17 @@ impl LiveWheel {
         front_time: f64,
         program_time: f64,
     ) {
+        #[cfg(feature = "live-solver")]
+        {
+            self.presentation = self.presentation.wrapping_add(1);
+        }
         if !self.mixed.tracks.is_empty() {
             self.render_mixed(out, [rear_time, front_time], program_time);
         } else if self.stack.is_empty()
             || self.stack.len() == 1
                 && self.stack[0].opacity_at(program_time) == 1.
                 && self.stack[0].wheel == self.wheel
+                && self.stack[0].swatches == self.swatches
                 && self.stack[0].motion == self.motion
                 && self.stack[0].material_motion == self.material_motion
                 && self.stack[0].films == self.slide_visibility
@@ -1025,16 +1175,36 @@ impl LiveWheel {
         if let Some(f) = self.feedback.as_mut().filter(|_| plate.is_none()) {
             f.prepare(&self.device, size);
         }
-        let [rear, front] = FilmSource::for_slides(self.motion, self.material_motion);
-        let (rear_frames, fraction) = rear.sample(&self.fields, rear_time);
-        let (front_pair, front_fraction) = front.sample(&self.fields, front_time);
-        let [first, second] = self.cache_pair(0, rear, rear_frames);
-        // A matching RG8 frame pair already contains both independent physical films.
-        let front_frames = if (front, front_pair) == (rear, rear_frames) {
-            [first, second]
-        } else {
-            self.cache_pair(1, front, front_pair)
-        };
+        #[cfg(feature = "live-solver")]
+        let live = self.evolving.get_mut(&self.active).map(|source| {
+            (
+                source.present(&self.queue, self.presentation, rear_time),
+                evolving::VIEW,
+            )
+        });
+        #[cfg(not(feature = "live-solver"))]
+        let live: Option<(([u32; 2], f32), [f32; 4])> = None;
+        let ([first, second], fraction, front_frames, front_fraction, cache_rect) =
+            if let Some(((frames, fraction), view)) = live {
+                (frames, fraction, frames, fraction, view)
+            } else {
+                let [rear, front] = FilmSource::for_slides(self.motion, self.material_motion);
+                let (rear_frames, fraction) = rear.sample(&self.fields, rear_time);
+                let (front_pair, front_fraction) = front.sample(&self.fields, front_time);
+                let frames = self.cache_pair(0, rear, rear_frames);
+                let front_frames = if (front, front_pair) == (rear, rear_frames) {
+                    frames
+                } else {
+                    self.cache_pair(1, front, front_pair)
+                };
+                (
+                    frames,
+                    fraction,
+                    front_frames,
+                    front_fraction,
+                    self.fields.view_to_cache(),
+                )
+            };
         let mut poses = self
             .tracks
             .get(&self.active)
@@ -1058,9 +1228,15 @@ impl LiveWheel {
                 fraction,
                 front_fraction,
                 front_frames: [front_frames[0], front_frames[1], 0, 0],
+                detail: [
+                    self.detail_scales.get(&self.active).copied().unwrap_or(1.),
+                    0.,
+                    0.,
+                    0.,
+                ],
                 rotation: [r[0], r[1], f[0], f[1]],
                 centers: [rc[0], rc[1], fc[0], fc[1]],
-                cache_rect: self.fields.view_to_cache(),
+                cache_rect,
                 pressure: poses.map(|p| p.pressure.shader(p.angle)),
             }),
         );
@@ -1070,19 +1246,29 @@ impl LiveWheel {
                 label: Some("TSS live frame"),
             });
         use gpu::BindingResource::{Sampler, TextureView};
-        self.encode_pending_swirl(&mut enc);
+        if live.is_none() {
+            self.encode_pending_swirl(&mut enc);
+        }
         let mapping = self
             .tracks
             .get(&self.active)
+            .filter(|_| live.is_none())
             .and_then(|t| t.warp.as_ref())
             .unwrap_or(&self.zero);
+        #[cfg(feature = "live-solver")]
+        let cache_view = self
+            .evolving
+            .get(&self.active)
+            .map_or(&self.cache_view, |s| &s.view);
+        #[cfg(not(feature = "live-solver"))]
+        let cache_view = &self.cache_view;
         let [rear, front] = visibility;
         let field_pass = &self.field_passes[usize::from(rear) + 2 * usize::from(front)];
         let fields = bind(
             &self.device,
             field_pass,
             &[
-                TextureView(&self.cache_view),
+                TextureView(cache_view),
                 TextureView(&mapping.view),
                 Sampler(&self.sampler),
                 self.pair_uniform.as_entire_binding(),
@@ -1117,7 +1303,7 @@ impl LiveWheel {
         }
         // Keep the selected optical model continuous through first movement.
         let integrate = self.footprint_sampling || poses.iter().any(|p| p.pressure.active());
-        let optic_pipe = match (integrate, self.wheel == "violet-blue") {
+        let optic_pipe = match (integrate, self.baseline_optics()) {
             (true, true) => &self.footprint_baseline_pass,
             (true, false) => &self.footprint_palette_pass,
             (false, true) => &self.baseline_pass,
@@ -1140,7 +1326,7 @@ impl LiveWheel {
             plate
                 .map_or(&self.material_uniform, |p| &p.material)
                 .as_entire_binding(),
-            TextureView(&self.cache_view),
+            TextureView(cache_view),
             TextureView(&mapping.view),
             self.pair_uniform.as_entire_binding(),
             TextureView(&material_target.view),
@@ -1161,7 +1347,7 @@ impl LiveWheel {
         if let Some(OpticalExposure::Stack(layer)) = exposure {
             let mut resources = entries.to_vec();
             resources.push(TextureView(layer.incident));
-            let pass = layer.gpu.optics(integrate, self.wheel == "violet-blue");
+            let pass = layer.gpu.optics(integrate, self.baseline_optics());
             let optics = bind(&self.device, pass, &resources);
             draw(
                 &mut enc,
@@ -1175,11 +1361,11 @@ impl LiveWheel {
         }
         let (optic_pipe, destination) = if let Some(p) = plate {
             (
-                &p.optics[2 * usize::from(integrate) + usize::from(self.wheel != "violet-blue")],
+                &p.optics[2 * usize::from(integrate) + usize::from(!self.baseline_optics())],
                 &p.target.view,
             )
         } else if let Some(f) = &self.feedback {
-            f.optics(integrate, self.wheel == "violet-blue")
+            f.optics(integrate, self.baseline_optics())
         } else {
             (optic_pipe, &self.optics.view)
         };

@@ -8,7 +8,7 @@ import {songGestureEvents} from '../../WebAssets/gesture-macros.js';
 
 const [clips, dest] = process.argv.slice(2);
 if (!clips || !dest) throw Error('Usage: node project.mjs prepared-clips-directory new-project-directory');
-const {wheels} = JSON.parse(await readFile(new URL('../../WebAssets/assets/mathmos-wheels.json', import.meta.url)));
+const {wheels} = JSON.parse(await readFile(new URL('../../WebAssets/assets/slide-presets.json', import.meta.url)));
 const {swatches} = wheels.find(w=>w.id==='violet-blue');
 const palette = [swatches.carrier, swatches.rear, swatches.overlap, swatches.front];
 const audio = 'two-slide-cues.m4a';

@@ -1,0 +1,114 @@
+{
+  "sampling": "80 RGB pixels across row 360, synchronously after each draw",
+  "framesPerScale": 32,
+  "rows": [
+    {
+      "scale": 0.4,
+      "matchingShaderControls": true,
+      "submitted": {
+        "baseline": [
+          1,
+          0.62,
+          0.47
+        ],
+        "working": [
+          1,
+          0.6200000047683716,
+          0.4699999988079071
+        ],
+        "fixedTime": [
+          8,
+          8,
+          8
+        ]
+      },
+      "baseline": {
+        "fixedRepeatPeak": 0,
+        "seekBackPeak": 0,
+        "stepPeak": 0.338
+      },
+      "working": {
+        "fixedRepeatPeak": 0,
+        "seekBackPeak": 0,
+        "stepPeak": 0.308
+      },
+      "baselineCanvasVsReferenceBlendPeakMAE": 0.1,
+      "workingCanvasVsFinalFramebufferPeakMAE": 0,
+      "oldVsNewOpaqueBaseFramebufferPeakMAE": 0,
+      "oldReferenceBlendVsNewFramebufferPeakMAE": 0.225,
+      "oldVsNewCanvasPeakMAE": 0.238
+    },
+    {
+      "scale": 1,
+      "matchingShaderControls": true,
+      "submitted": {
+        "baseline": [
+          1,
+          0.62,
+          0.47
+        ],
+        "working": [
+          1,
+          0.6200000047683716,
+          0.4699999988079071
+        ],
+        "fixedTime": [
+          8,
+          8,
+          8
+        ]
+      },
+      "baseline": {
+        "fixedRepeatPeak": 0,
+        "seekBackPeak": 0,
+        "stepPeak": 0.4
+      },
+      "working": {
+        "fixedRepeatPeak": 0,
+        "seekBackPeak": 0,
+        "stepPeak": 0.408
+      },
+      "baselineCanvasVsReferenceBlendPeakMAE": 0.096,
+      "workingCanvasVsFinalFramebufferPeakMAE": 0,
+      "oldVsNewOpaqueBaseFramebufferPeakMAE": 0,
+      "oldReferenceBlendVsNewFramebufferPeakMAE": 0.183,
+      "oldVsNewCanvasPeakMAE": 0.221
+    },
+    {
+      "scale": 2,
+      "matchingShaderControls": true,
+      "submitted": {
+        "baseline": [
+          1,
+          0.62,
+          0.47
+        ],
+        "working": [
+          1,
+          0.6200000047683716,
+          0.4699999988079071
+        ],
+        "fixedTime": [
+          8,
+          8,
+          8
+        ]
+      },
+      "baseline": {
+        "fixedRepeatPeak": 0,
+        "seekBackPeak": 0,
+        "stepPeak": 0.35
+      },
+      "working": {
+        "fixedRepeatPeak": 0,
+        "seekBackPeak": 0,
+        "stepPeak": 0.321
+      },
+      "baselineCanvasVsReferenceBlendPeakMAE": 0.108,
+      "workingCanvasVsFinalFramebufferPeakMAE": 0,
+      "oldVsNewOpaqueBaseFramebufferPeakMAE": 0,
+      "oldReferenceBlendVsNewFramebufferPeakMAE": 0.208,
+      "oldVsNewCanvasPeakMAE": 0.213
+    }
+  ]
+}

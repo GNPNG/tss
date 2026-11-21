@@ -36,6 +36,7 @@ uniform float u_mid;
 uniform float u_treble;
 uniform float u_speed;
 uniform float u_scale;
+uniform float u_opacity;
 uniform vec3 u_color0;
 uniform vec3 u_color1;
 uniform vec3 u_color2;
@@ -165,7 +166,7 @@ void main() {
   light *= 1.0 - dropletEdge * 0.23;
 
   light *= 0.94 + activity * 0.08 + u_treble * 0.025;
-  gl_FragColor = vec4(clamp(light, 0.0, 1.0), 1.0);
+  gl_FragColor = vec4(clamp(light, 0.0, 1.0), u_opacity);
 }
 `;
 
@@ -199,21 +200,25 @@ function compileShader(gl, type, source) {
 
 /** A WebGL renderer with deterministic, caller-controlled frame timing. */
 export class LiquidRenderer {
-  constructor(canvas) {
+  constructor(canvas, {composite = false} = {}) {
     if (!canvas || typeof canvas.getContext !== 'function') {
       throw new TypeError('LiquidRenderer requires a canvas');
     }
     const gl = canvas.getContext('webgl', {
-      alpha: false,
+      alpha: composite,
       antialias: false,
       depth: false,
       stencil: false,
-      preserveDrawingBuffer: true,
+      preserveDrawingBuffer: !composite,
     });
     if (!gl) throw new Error('WebGL is unavailable');
 
     this.canvas = canvas;
     this.gl = gl;
+    if (composite) {
+      gl.enable(gl.BLEND);
+      gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    }
     const vertex = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
     let fragment;
     let program;
@@ -244,7 +249,7 @@ export class LiquidRenderer {
     this.buffer = buffer;
     this.position = gl.getAttribLocation(program, 'a_position');
     this.uniforms = Object.fromEntries([
-      'resolution', 'time', 'energy', 'bass', 'mid', 'treble', 'speed', 'scale',
+      'resolution', 'time', 'energy', 'bass', 'mid', 'treble', 'speed', 'scale', 'opacity',
       'color0', 'color1', 'color2', 'color3',
     ].map((name) => [name, gl.getUniformLocation(program, `u_${name}`)]));
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -259,7 +264,7 @@ export class LiquidRenderer {
     this.canvas.height = Math.floor(height);
   }
 
-  render({ time = 0, motionTime, energy = 0, bass = 0, mid = 0, treble = 0, palette = 'orchid', speed = 1, scale = 2.2 } = {}) {
+  render({ time = 0, motionTime, energy = 0, bass = 0, mid = 0, treble = 0, palette = 'orchid', speed = 1, scale = 2.2, opacity = 1 } = {}) {
     const gl = this.gl;
     if (!this.program) throw new Error('LiquidRenderer has been disposed');
     if (gl.isContextLost()) throw new Error('WebGL context is lost');
@@ -284,6 +289,7 @@ export class LiquidRenderer {
     gl.uniform1f(this.uniforms.treble, finite(treble, 0, 0, 1));
     gl.uniform1f(this.uniforms.speed, usesMotionTime ? 1 : finite(speed, 1, 0, 10));
     gl.uniform1f(this.uniforms.scale, finite(scale, 2.2, 0.3, 10));
+    gl.uniform1f(this.uniforms.opacity, finite(opacity, 1, 0, 1));
     components.forEach((color, index) => gl.uniform3fv(this.uniforms[`color${index}`], color));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }

@@ -49,35 +49,94 @@ struct Swatches {
 
 fn linear(s: &str) -> Result<[f32; 3], String> {
     if s.len() != 7 || !s.starts_with('#') || !s[1..].bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(format!("Invalid wheel swatch {s}"));
+        return Err(format!("Invalid slide swatch {s}"));
     }
-    let mut v = [0.0; 3];
-    for (i, out) in v.iter_mut().enumerate() {
-        let x = u8::from_str_radix(&s[1 + 2 * i..3 + 2 * i], 16).map_err(|e| e.to_string())? as f32
-            / 255.0;
-        *out = if x <= 0.04045 {
-            x / 12.92
-        } else {
-            ((x + 0.055) / 1.055).powf(2.4)
-        };
-    }
-    Ok(v)
+    srgb(u32::from_str_radix(&s[1..], 16).map_err(|e| e.to_string())?)
 }
+
+fn srgb(rgb: u32) -> Result<[f32; 3], String> {
+    if rgb > 0xffffff {
+        return Err("Film swatches must be 24-bit sRGB".into());
+    }
+    Ok([16, 8, 0].map(|shift| {
+        let v = ((rgb >> shift) & 255) as f32 / 255.;
+        if v <= 0.04045 {
+            v / 12.92
+        } else {
+            ((v + 0.055) / 1.055).powf(2.4)
+        }
+    }))
+}
+
+fn optical_density(light: f32, carrier: f32) -> f32 {
+    -(light / carrier.max(0.00001)).clamp(0.00001, 1.0).ln()
+}
+
+/// Resolve dye densities once when a track is selected or edited.
+pub fn resolve(
+    presets: &HashMap<String, Material>,
+    id: &str,
+    swatches: Option<[u32; 4]>,
+) -> Result<Material, String> {
+    let base = presets.get(id);
+    let Some(colors) = swatches else {
+        return base
+            .copied()
+            .ok_or_else(|| format!("Missing optical profile or swatches for {id}"));
+    };
+    let [a, b, c, d] = colors.map(srgb);
+    let [a, b, c, d] = [a?, b?, c?, d?];
+    if let Some(base) = base {
+        // Wheel editor order: clear carrier, rear, photographed overlap, front.
+        // Keep the calibrated meniscus shift and thickness variation of this wheel.
+        let mut m = *base;
+        for i in 0..3 {
+            m.carrier[i] = a[i];
+            let rear = optical_density(b[i], a[i]);
+            let front = optical_density(d[i], a[i]);
+            let both = optical_density(c[i], a[i]);
+            m.rear[i] = rear;
+            m.front[i] = front;
+            m.rim[i] = base.rim[i].max(-rear);
+            m.joint[i] = both.max(rear).max(front) - rear - front;
+        }
+        return Ok(m);
+    }
+    if !matches!(
+        id,
+        "orchid" | "lagoon" | "ember" | "twilight" | "sunrise" | "meadow"
+    ) {
+        return Err(format!("Unknown optical palette {id}"));
+    }
+    // Authored theme order: rear oil, front oil, rear meniscus, front meniscus.
+    // A clear carrier transmits the projector lamp and overlapping films multiply.
+    let mut m = Material::zeroed();
+    m.carrier = [1.; 4];
+    m.lens[0] = -1.;
+    for i in 0..3 {
+        m.rear[i] = optical_density(a[i], 1.);
+        m.front[i] = optical_density(b[i], 1.);
+        m.rim[i] = optical_density(c[i], 1.) - m.rear[i];
+    }
+    let front_rim: [f32; 3] = std::array::from_fn(|i| optical_density(d[i], 1.) - m.front[i]);
+    // The three unused std140 padding components keep existing material buffers compatible.
+    (m.rear[3], m.front[3], m.joint[3]) = (front_rim[0], front_rim[1], front_rim[2]);
+    Ok(m)
+}
+
 pub fn load() -> Result<HashMap<String, Material>, String> {
     let registry: Registry =
-        serde_json::from_str(include_str!("../../WebAssets/assets/mathmos-wheels.json"))
+        serde_json::from_str(include_str!("../../WebAssets/assets/slide-presets.json"))
             .map_err(|e| e.to_string())?;
     if registry.version != 1 {
-        return Err("Unsupported Mathmos wheel registry".into());
+        return Err("Unsupported slide preset registry".into());
     }
     let mut materials = HashMap::new();
     for w in registry.wheels {
         let c = linear(&w.swatches.carrier)?;
         let density = |s: &str| -> Result<[f32; 3], String> {
             let v = linear(s)?;
-            Ok(std::array::from_fn(|i| {
-                -(v[i] / c[i].max(0.00001)).clamp(0.00001, 1.0).ln()
-            }))
+            Ok(std::array::from_fn(|i| optical_density(v[i], c[i])))
         };
         let rear = density(&w.swatches.rear)?;
         let front = density(&w.swatches.front)?;
@@ -99,8 +158,57 @@ pub fn load() -> Result<HashMap<String, Material>, String> {
         }
         m.carrier[3] = w.depth_variation;
         if !(0.0..=1.0).contains(&w.depth_variation) || materials.insert(w.id, m).is_some() {
-            return Err("Invalid or duplicate wheel".into());
+            return Err("Invalid or duplicate slide".into());
         }
     }
     Ok(materials)
+}
+
+#[cfg(test)]
+mod authored_palette_tests {
+    use super::*;
+
+    #[test]
+    fn all_themes_have_independent_body_and_meniscus_density_per_film() {
+        let presets = load().unwrap();
+        let colors = [0xd72c95, 0x9cdb27, 0x048f95, 0x6931ac];
+        for id in ["orchid", "lagoon", "ember", "twilight", "sunrise", "meadow"] {
+            let m = resolve(&presets, id, Some(colors)).unwrap();
+            let front_rim = [m.rear[3], m.front[3], m.joint[3]];
+            for i in 0..3 {
+                for (density, color) in [
+                    (m.rear[i], colors[0]),
+                    (m.front[i], colors[1]),
+                    (m.rear[i] + m.rim[i], colors[2]),
+                    (m.front[i] + front_rim[i], colors[3]),
+                ] {
+                    assert!(((-density).exp() - srgb(color).unwrap()[i]).abs() < 1e-5);
+                }
+                assert_eq!(m.carrier[i], 1.);
+                assert_eq!(m.joint[i], 0.);
+            }
+        }
+        assert!(resolve(&presets, "unknown", Some(colors)).is_err());
+        assert!(resolve(&presets, "orchid", Some([0x1000000; 4])).is_err());
+    }
+
+    #[test]
+    fn photographed_slide_preserves_calibration_and_custom_clear_rear_overlap_front_order() {
+        let presets = load().unwrap();
+        for (id, expected) in &presets {
+            let actual = resolve(&presets, id, None).unwrap();
+            assert_eq!(bytemuck::bytes_of(&actual), bytemuck::bytes_of(expected));
+        }
+        let m = resolve(
+            &presets,
+            "blue-red",
+            Some([0xffffff, 0xdd8866, 0x100d10, 0x99ccee]),
+        )
+        .unwrap();
+        for i in 0..3 {
+            let expected = srgb(0x100d10).unwrap();
+            assert!(((-(m.rear[i] + m.front[i] + m.joint[i])).exp() - expected[i]).abs() < 1e-5);
+        }
+        assert_eq!(m.carrier[3], presets["blue-red"].carrier[3]);
+    }
 }

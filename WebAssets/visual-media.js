@@ -1,4 +1,5 @@
-import {materialMotionFields} from './material-motion.js';
+import {paletteFields} from './film-palette.js';
+import {materialMotionFields, simulationFields, detailScaleFields} from './material-motion.js';
 import { bindProjectMedia as bindVisualMedia } from './project-media.js';
 export { bindVisualMedia };
 export function newMedia(grant) {
@@ -19,7 +20,7 @@ export function programLayers(layers, isWheel) {
     const common={layerId:layer.id,opacity:layer.opacity,...(!layer.visible?{matteOnly:true}:{}),
       ...(layer.envelope!=null?{envelope:layer.envelope}:{})};
     if(!layer.media){
-      result.push({...common,wheel:layer.palette,motion:layer.motion,motionTake:layer.motionTake,...materialMotionFields(layer),visibleFilms:layer.visibleFilms??'both'});
+      result.push({...common,wheel:layer.palette,...paletteFields(layer),motion:layer.motion,motionTake:layer.motionTake,...materialMotionFields(layer),...simulationFields(layer),...detailScaleFields(layer),visibleFilms:layer.visibleFilms??'both'});
       continue;
     }
     const {sha256,name,width,height,...m}=layer.media;

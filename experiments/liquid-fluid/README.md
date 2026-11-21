@@ -1,6 +1,6 @@
 # Liquid-fluid experiment
 
-This isolated research prototype is **not integrated into TSS and has not been approved as a match to the reference imagery**. Its output currently looks too much like flat translucent spots; it lacks the nested interfaces, marbling, optical structure, and motion of the supplied Mathmos image and reference C. It is not a photorealistic or physically validated oil/water simulation.
+This isolated research prototype is **not integrated into TSS and has not been approved as a match to the reference imagery**. Its output currently looks too much like flat translucent spots; it lacks the nested interfaces, marbling, optical structure, and motion of the supplied projected slide image and reference C. It is not a photorealistic or physically validated oil/water simulation.
 
 ## Run the checks
 

@@ -1,4 +1,4 @@
-# Mathmos liquid wheel reference colours
+# Slide reference colours
 
 The seven 840 × 840 projection photographs supplied with this project define the reference set. The table gives approximate display RGB colours observed in the projected field. Each row describes a single photograph. The named wheel colours and the colours seen on the screen can differ substantially.
 

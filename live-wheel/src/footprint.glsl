@@ -12,9 +12,13 @@ layout(set=0,binding=5,std140) uniform SourcePair {
     vec4 cacheRect;
     vec4 pressure[2];
     uvec4 frontFrames;
+    vec4 detail;
 } source;
 layout(set=0,binding=6) uniform texture2D filmMaterial;
 const vec2 filmAspect = vec2(16.0/9.0, 1.0);
+vec2 detailPoint(vec2 uv) {
+    return source.detail.x == 1.0 ? uv : 0.5 + (uv - 0.5)*source.detail.x;
+}
 // The squared-radius inverse map s0=s[1-a(1-s)^3] conserves both phase
 // volumes when the physical gap is h0 ds0/ds. Same inverse as fields.wgsl.
 vec2 pressurePoint(vec2 uv,vec4 press) {
@@ -29,7 +33,7 @@ vec2 pressurePoint(vec2 uv,vec4 press) {
 float pressureGap(vec2 uv,bool front) {
     vec4 press=source.pressure[front ? 1 : 0];
     if (press.w == 0.0) return 1.0;
-    vec2 p=(uv-press.xy)*filmAspect;
+    vec2 p=(detailPoint(uv)-press.xy)*filmAspect;
     float s=dot(p,p)*press.z;
     float t=max(1.0-s,0.0);
     return 1.0-press.w*t*t*(1.0-4.0*s);
@@ -54,7 +58,7 @@ vec4 rayMaterial(vec2 uv, bool front) {
 vec2 filmSourceUV(vec2 uv, bool front) {
     vec2 cs = front ? source.rotation.zw : source.rotation.xy;
     vec2 centre = front ? source.centers.zw : source.centers.xy;
-    vec2 p = (pressurePoint(uv,source.pressure[front ? 1 : 0]) - 0.5) * filmAspect;
+    vec2 p = (pressurePoint(detailPoint(uv),source.pressure[front ? 1 : 0]) - 0.5) * filmAspect;
     vec2 q = 0.5 + vec2(cs.x*p.x - cs.y*p.y, cs.y*p.x + cs.x*p.y) / filmAspect;
     vec2 localUV = 0.5 + (q-centre)*filmAspect/0.64;
     vec4 offset = textureLod(sampler2D(localWarp, fieldSampler),localUV,0.0);
@@ -77,10 +81,11 @@ vec2 changedFootprint(vec2 sigma, vec2 uv) {
     // A rigid turn can also move a thin interface between intermediate texels.
     vec2 turn = vec2(length(source.rotation.xy-vec2(1,0)),
                      length(source.rotation.zw-vec2(1,0)));
+    turn=max(turn,vec2(abs(source.detail.x-1.0)));
     for (int k=0; k<2; ++k) {
         vec4 press=source.pressure[k];
         if(press.w>0.0) {
-            vec2 p=(uv-press.xy)*filmAspect;
+            vec2 p=(detailPoint(uv)-press.xy)*filmAspect;
             float t=max(1.0-dot(p,p)*press.z,0.0);
             turn[k]=max(turn[k],press.w*t*t*t);
         }

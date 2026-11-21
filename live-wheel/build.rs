@@ -70,6 +70,7 @@ fn main() {
 #define cyanAbsorption (mat.front.rgb)
 #define pairedDensityCorrection (mat.joint.rgb)
 #define rearRimDelta (mat.rim.rgb)
+#define TSS_FRONT_RIM_DELTA (vec3(mat.rear.w, mat.front.w, mat.joint.w))
 #define wheelCarrier (mat.carrier.rgb)
 #define depthVariation (mat.carrier.w)"#,
         ),

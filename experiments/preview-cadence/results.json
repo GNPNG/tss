@@ -1,0 +1,142 @@
+{
+  "baseline": "6ca9c32083b88423345c45d4f0ae2eb237cd17fa",
+  "preview": [
+    1280,
+    720
+  ],
+  "analysisImage": [
+    96,
+    54
+  ],
+  "simulatedSamples": 18,
+  "stepSeconds": 0.016666666666666666,
+  "startSeconds": 8,
+  "sourceOpacities": [
+    1,
+    0.62,
+    0.47
+  ],
+  "audio": "unloaded",
+  "mode": "procedural",
+  "runs": [
+    {
+      "variant": "baseline",
+      "fileSha256": {
+        "app.js": "215acd212c0d37664df15f36de2e3399b8ed4a5abffbeb37e2a02ac930a9a58d",
+        "liquid-renderer.js": "e4a358a3d9f6628875d8e7dafbe6ec34c35d07e4f8b7606346e968b04a5b14e2",
+        "audio-features.js": "967a480ff1894f80fb25c7f8364964f4ea3df9faa352d34cd3131a750bf70b12"
+      },
+      "webglRenderer": "Apple GPU",
+      "webglContexts": 3,
+      "rows": [
+        {
+          "scale": 0.4,
+          "intervalCount": 133,
+          "callbackFps": 60.099,
+          "medianMs": 17,
+          "p95Ms": 19,
+          "maxMs": 22,
+          "meanCallbackMs": 13.609,
+          "over25ms": 0,
+          "motionMedianMAE": 0.192,
+          "motionPeakMAE": 0.197,
+          "peakFractionChannelsOver16": 0
+        },
+        {
+          "scale": 1,
+          "intervalCount": 129,
+          "callbackFps": 58.292,
+          "medianMs": 17,
+          "p95Ms": 23,
+          "maxMs": 36,
+          "meanCallbackMs": 13.837,
+          "over25ms": 4,
+          "motionMedianMAE": 0.251,
+          "motionPeakMAE": 12.282,
+          "peakFractionChannelsOver16": 0.257
+        },
+        {
+          "scale": 2,
+          "intervalCount": 128,
+          "callbackFps": 58.076,
+          "medianMs": 17,
+          "p95Ms": 20,
+          "maxMs": 42,
+          "meanCallbackMs": 14.039,
+          "over25ms": 2,
+          "motionMedianMAE": 0.224,
+          "motionPeakMAE": 0.229,
+          "peakFractionChannelsOver16": 0
+        }
+      ]
+    },
+    {
+      "variant": "working",
+      "fileSha256": {
+        "app.js": "2506fc7a5c4eba57edc3528a642c542924739288631011af8409d086a457e5c5",
+        "liquid-renderer.js": "413c3f57d7d1f1ae6df03998816d4e5a795275dc947c4eb3367349499514b5d4",
+        "audio-features.js": "5c0f6949e1bba05f3fe238a91a9fb05ba1abe8e1ef0f1ff5098eb71129b11657"
+      },
+      "webglRenderer": "Apple GPU",
+      "webglContexts": 1,
+      "rows": [
+        {
+          "scale": 0.4,
+          "intervalCount": 132,
+          "callbackFps": 59.946,
+          "medianMs": 17,
+          "p95Ms": 18,
+          "maxMs": 18,
+          "meanCallbackMs": 0.129,
+          "over25ms": 0,
+          "motionMedianMAE": 0.197,
+          "motionPeakMAE": 0.202,
+          "peakFractionChannelsOver16": 0
+        },
+        {
+          "scale": 1,
+          "intervalCount": 130,
+          "callbackFps": 59.01,
+          "medianMs": 17,
+          "p95Ms": 18,
+          "maxMs": 64,
+          "meanCallbackMs": 0.131,
+          "over25ms": 1,
+          "motionMedianMAE": 0.211,
+          "motionPeakMAE": 3.36,
+          "peakFractionChannelsOver16": 0.034
+        },
+        {
+          "scale": 2,
+          "intervalCount": 132,
+          "callbackFps": 59.946,
+          "medianMs": 17,
+          "p95Ms": 18,
+          "maxMs": 20,
+          "meanCallbackMs": 0.098,
+          "over25ms": 0,
+          "motionMedianMAE": 0.171,
+          "motionPeakMAE": 0.179,
+          "peakFractionChannelsOver16": 0
+        }
+      ]
+    }
+  ],
+  "pixelComparison": [
+    {
+      "scale": 0.4,
+      "meanAbsoluteRGBError": 7.117,
+      "maximumChannelError": 31
+    },
+    {
+      "scale": 1,
+      "meanAbsoluteRGBError": 9.176,
+      "maximumChannelError": 42
+    },
+    {
+      "scale": 2,
+      "meanAbsoluteRGBError": 16.023,
+      "maximumChannelError": 42
+    }
+  ]
+}

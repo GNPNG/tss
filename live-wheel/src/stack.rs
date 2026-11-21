@@ -5,6 +5,7 @@ use super::*;
 pub struct WheelLayer {
     pub id: u64,
     pub wheel: String,
+    pub swatches: Option<[u32; 4]>,
     pub motion: MotionPreset,
     /// The two authored oil solves, retained across coral preset switches.
     pub material_motion: MaterialMotion,
@@ -109,13 +110,21 @@ impl LiveWheel {
             return Ok(());
         }
         let mut ids = std::collections::HashSet::new();
-        if layers.iter().any(|l| {
-            !ids.insert(l.id)
-                || !self.materials.contains_key(&l.wheel)
-                || !(0.0..=1.0).contains(&l.opacity)
-        }) {
+        if layers
+            .iter()
+            .any(|l| !ids.insert(l.id) || !(0.0..=1.0).contains(&l.opacity))
+        {
             return Err("Invalid wheel stack ID, wheel or opacity".into());
         }
+        let materials = layers
+            .iter()
+            .map(|l| {
+                Ok((
+                    l.id,
+                    material::resolve(&self.materials, &l.wheel, l.swatches)?,
+                ))
+            })
+            .collect::<Result<HashMap<_, _>, String>>()?;
         let saved = (self.motion, self.material_motion);
         let result = layers
             .iter()
@@ -123,6 +132,7 @@ impl LiveWheel {
         self.switch_film_sources(saved.0, saved.1)?;
         result?;
         self.stack = layers;
+        self.stack_materials = materials;
         self.stack_times.retain(|id, _| ids.contains(id));
         self.reset_feedback_history();
         Ok(())
@@ -155,6 +165,7 @@ impl LiveWheel {
         let layers = std::mem::take(&mut self.stack);
         let selected = self.active;
         let selected_wheel = std::mem::take(&mut self.wheel);
+        let selected_optics = (self.swatches, self.active_material);
         let selected_motion = (self.motion, self.material_motion);
         let selected_films = self.slide_visibility;
         // A transparent wheel neither attenuates light nor takes a focal plane.
@@ -171,10 +182,12 @@ impl LiveWheel {
         {
             self.active = layer.id;
             self.wheel.clone_from(&layer.wheel);
+            self.swatches = layer.swatches;
+            self.active_material = self.stack_materials[&layer.id];
             self.switch_film_sources(layer.motion, layer.material_motion)
                 .expect("stack geometry validated at selection");
             self.slide_visibility = layer.films;
-            let mut material = self.materials[&layer.wheel];
+            let mut material = self.active_material;
             material.lens = [
                 self.focus.unwrap_or(-1.),
                 layer.opacity_at(program_time),
@@ -210,6 +223,7 @@ impl LiveWheel {
         }
         self.active = selected;
         self.wheel = selected_wheel;
+        (self.swatches, self.active_material) = selected_optics;
         self.switch_film_sources(selected_motion.0, selected_motion.1)
             .expect("restore active wheel geometry");
         self.slide_visibility = selected_films;
@@ -281,6 +295,7 @@ mod tests {
         let layer = WheelLayer {
             id: 1,
             wheel: "violet-blue".into(),
+            swatches: None,
             motion: MotionPreset::WheelFlow,
             material_motion: MaterialMotion::default(),
             films: [true; 2],
@@ -325,6 +340,7 @@ mod tests {
         let base = WheelLayer {
             id: 1,
             wheel: "violet-blue".into(),
+            swatches: None,
             motion: MotionPreset::WheelFlow,
             material_motion: MaterialMotion::default(),
             films: [true, true],
@@ -334,6 +350,7 @@ mod tests {
         let overlay = WheelLayer {
             id: 2,
             wheel: "yellow-red".into(),
+            swatches: None,
             motion: MotionPreset::WheelWithCoralBeads,
             material_motion: MaterialMotion::default(),
             films: [true, true],

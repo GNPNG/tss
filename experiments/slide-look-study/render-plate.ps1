@@ -36,9 +36,9 @@ function Format-Vector([double[]] $Numbers) {
 $hook = 'optics.hook'
 if ($Wheel -ne 'violet-blue') {
     if (!$PresetFile) {
-        $PresetFile = Join-Path $PSScriptRoot '../../WebAssets/assets/mathmos-wheels.json'
+        $PresetFile = Join-Path $PSScriptRoot '../../WebAssets/assets/slide-presets.json'
         if (!(Test-Path -LiteralPath $PresetFile)) {
-            $PresetFile = Join-Path $PSScriptRoot 'mathmos-wheels.json'
+            $PresetFile = Join-Path $PSScriptRoot 'slide-presets.json'
         }
     }
     $registry = Get-Content -Raw -LiteralPath $PresetFile | ConvertFrom-Json

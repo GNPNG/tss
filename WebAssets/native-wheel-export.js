@@ -1,4 +1,4 @@
-import { materialMotionFields } from './material-motion.js';
+import { detailScaleFields, materialMotionFields } from './material-motion.js';
 import { hasRelease } from './native-wheel.js';
 
 // Capture the selected track and its scheduled performance once. Frames stay native.
@@ -6,7 +6,9 @@ export function wheelMovieRequest(selection, duration, events, baseline) {
   return {
     layerId: selection.layerId,
     wheel: selection.wheel,
+    ...(selection.swatches ? {swatches:selection.swatches} : {}),
     ...materialMotionFields(selection),
+    ...detailScaleFields(selection),
     ...(selection.visibleFilms ? {visibleFilms: selection.visibleFilms} : {}),
     ...(selection.motion ? {motion: selection.motion, motionTake: selection.motionTake} : {}),
     ...(selection.stack ? {stack: selection.stack} : {}),
@@ -30,7 +32,7 @@ export class NativeWheelExport {
     this.count = byId('native-export-count');
     this.cancelButton = byId('cancel-native-export');
     this.button.addEventListener('click', () => this.start().catch(error => this.status(
-      String(error) === 'Export cancelled.' ? 'Wheel export cancelled' : 'Wheel export failed: ' + String(error))));
+      String(error) === 'Export cancelled.' ? 'Slide export cancelled' : 'Slide export failed: ' + String(error))));
     const cancel = () => {
       this.cancelButton.disabled = true;
       this.count.textContent = 'Cancelling after the current frame…';
@@ -47,7 +49,7 @@ export class NativeWheelExport {
     const {audioPath, duration, proceduralBusy} = this.source();
     const selection = this.selection();
     this.group.hidden = !selection;
-    this.button.textContent = selection?.stack?.some(l => l.media) ? 'Export artwork program in 4K' : selection?.stack?.length > 1 ? 'Export wheel stack in 4K' : 'Export selected wheel in 4K';
+    this.button.textContent = selection?.stack?.some(l => l.media) ? 'Export artwork program in 4K' : selection?.stack?.length > 1 ? 'Export slide stack in 4K' : 'Export selected slide in 4K';
     this.button.disabled = this.busy || proceduralBusy || !audioPath || !(duration > 0);
   }
 
@@ -64,10 +66,10 @@ export class NativeWheelExport {
       if (!outputPath) return;
       const current = this.selection();
       if (current?.layerId !== selection.layerId || current.wheel !== selection.wheel ||
-          current.motion !== selection.motion || current.motionTake !== selection.motionTake ||
+          JSON.stringify(current.swatches) !== JSON.stringify(selection.swatches) || current.motion !== selection.motion || current.motionTake !== selection.motionTake ||
           current.materialMotion?.rear !== selection.materialMotion?.rear || current.materialMotion?.front !== selection.materialMotion?.front ||
-          current.visibleFilms !== selection.visibleFilms || JSON.stringify(current.stack) !== JSON.stringify(selection.stack) ||
-          this.source().audioPath !== audioPath || this.source().proceduralBusy) throw Error('The selected wheel, films, motion or song changed.');
+          current.visibleFilms !== selection.visibleFilms || current.detailScale !== selection.detailScale || JSON.stringify(current.stack) !== JSON.stringify(selection.stack) ||
+          this.source().audioPath !== audioPath || this.source().proceduralBusy) throw Error('The selected slide, films, motion or song changed.');
       await this.finishRecording();
       this.pause();
       await this.prepare();

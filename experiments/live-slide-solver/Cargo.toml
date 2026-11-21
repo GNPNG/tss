@@ -1,0 +1,16 @@
+[package]
+name = "tss-basilisk-live"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+publish = false
+
+[features]
+cimg-optics = ["dep:cc"]
+
+[build-dependencies]
+cc = { version = "1", optional = true }
+
+[[example]]
+name = "optical_pair"
+required-features = ["cimg-optics"]

@@ -12,8 +12,7 @@ using cimg_library::CImg;
 
 // Reconstruct the antialiased crossing before measuring it. Keep distances in
 // the same 720p design units even when the physics grid has a different pitch.
-inline CImg<float> optical_distance(const char* path, int width, int height) {
-    CImg<float> fraction(path);
+inline CImg<float> optical_distance(const CImg<float>& fraction, int width, int height) {
     if (fraction.spectrum() != 1 || fraction.width() * height != fraction.height() * width)
         throw std::runtime_error("Expected a grayscale phase mask matching the output aspect ratio");
     CImg<float> binary = fraction.get_resize(width, height, 1, 1, 5).threshold(127.5f);
@@ -28,5 +27,9 @@ inline CImg<float> optical_distance(const char* path, int width, int height) {
     // effect on the phase field used by the solver.
     distance.blur(0.8f, 0.8f, 0.0f, 1);
     return distance;
+}
+
+inline CImg<float> optical_distance(const char* path, int width, int height) {
+    return optical_distance(CImg<float>(path), width, height);
 }
 

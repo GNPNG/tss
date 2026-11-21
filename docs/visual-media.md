@@ -6,7 +6,7 @@ The native importer uses the local FFmpeg and FFprobe executables. Both tools mu
 
 ## Put footage over moving oil in the Windows source build
 
-1. Select a Mathmos wheel and start its motion. For the small front droplets, choose **Violet / Blue → Wheel with coral beads**.
+1. Select a slide and start its motion. For the small front droplets, choose **Violet / Blue → Recorded slide with coral beads**.
 2. Choose **Add artwork** and open the file. The new track appears above the wheel. Use the arrows in the track list to move it behind a film stack.
 3. Open **Artwork settings**. Choose **Original color and alpha** for a cutout PNG, GIF or full-colour cartoon. For green-screen footage, turn on **Apply chroma key**, sample the key colour with the colour control, and adjust **Key range** and **Key softness**. Choose **Cycling gradient** to recolour the surviving figure.
 4. To cut a moving aperture, add its source as another artwork track. Select it as **Mask A** on the figure. Hide the mask's own track to keep only its effect on the figure. Add **Mask B** for intersection, union, subtraction or exclusive-or.

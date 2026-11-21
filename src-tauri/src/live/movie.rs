@@ -42,11 +42,15 @@ pub struct Event {
 #[serde(rename_all = "camelCase")]
 pub struct Request {
     #[serde(default)]
+    pub(super) detail_scale: Option<f32>,
+    #[serde(default)]
     pub(super) stack: Vec<super::StackLayer>,
     #[serde(default)]
     pub(super) visible_films: super::VisibleFilms,
     pub layer_id: u64,
     pub wheel: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) swatches: Option<[u32; 4]>,
     #[serde(default)]
     pub(super) motion: super::MotionPreset,
     #[serde(default)]
@@ -60,6 +64,7 @@ pub struct Request {
 impl Request {
     pub fn validate(&self) -> Result<u64, String> {
         if self.layer_id == 0
+            || self.detail_scale.is_some_and(|s| !(0.4..=2.0).contains(&s))
             || self.wheel.is_empty()
             || !self.duration.is_finite()
             || self.duration <= 0.
@@ -237,6 +242,7 @@ mod tests {
             visible_films: super::super::VisibleFilms::Both,
             layer_id: 2,
             wheel: "violet-blue".into(),
+            swatches: None,
             motion: Default::default(),
             material_motion: Default::default(),
             motion_take: 0,

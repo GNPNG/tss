@@ -346,7 +346,7 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
         await finishPendingRecording();
       } else {
         const layer = selection();
-        if (!layer) { note('Select a live Mathmos wheel first.'); return; }
+        if (!layer) { note('Select a live slide first.'); return; }
         await prepare();
         stop();
         await sequence;

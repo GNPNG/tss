@@ -10,6 +10,8 @@ async function exerciseControls(platform) {
   const coral = platform === 'Windows coral project';
   const oils = platform === 'Windows film oils';
   const windows = platform === 'Windows';
+  const solver = platform === 'Windows live solver';
+  const helperAvailable = solver && location.hash !== '#missing-helper';
   Object.defineProperty(navigator,'userAgent',{value:platform+' project controls'});
   const $ = id => document.getElementById(id);
   const check = (ok, message) => { if (!ok) throw Error(message); };
@@ -25,7 +27,7 @@ async function exerciseControls(platform) {
   const set = (id,value) => {
     const input=$(id);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
   };
-  const audio = coral || oils ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
+  const audio = coral || oils || solver ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
   let documentText, incoming, linked=null, lastSelection=1;
   const advisorRequests=[],reviewedLyrics=[],previewRequests=[],movieRequests=[];
   let finishInference;
@@ -47,6 +49,7 @@ async function exerciseControls(platform) {
     case 'install_media_tools':
       mediaInstalls++;
       throw Error('Package download failed.');
+    case 'live_simulation_available': return helperAvailable;
     case 'choose_audio': return [lastSelection,'/music/two-slide-cues.m4a'];
     case 'choose_export_path': return '/movies/two-slide-cues.mp4';
     case 'export_native_wheel': movieRequests.push(args);return;
@@ -78,12 +81,79 @@ async function exerciseControls(platform) {
   window.requestAnimationFrame=()=>0;
   await import('/app.js');
   await until(()=>$('edit-history').options.length>0);
+  if (solver) {
+    const latest = () => previewRequests.at(-1);
+    const save = async () => { click('save-project'); await idle(); return JSON.parse(documentText); };
+    const reopen = async text => {
+      incoming=text;
+      click('open-project');
+      await until(()=>$('replace-project').open || !$('project-operation').open);
+      if ($('replace-project').open) $('replace-project').querySelector('[value=replace]').click();
+      await idle();
+    };
+    const option=$('wheel-motion').querySelector('[value=simulated]');
+    if (!helperAvailable) {
+      check(option.disabled,'missing helper disables new simulations');
+      const authored=JSON.parse(sessionStorage.getItem('seeded-project'));
+      const start=previewRequests.length;
+      await reopen(JSON.stringify(authored));
+      check(!$('solver-unavailable').hidden && !$('wheel-motion').disabled,'operator sees the missing helper and can explicitly choose a recorded study');
+      check(!previewRequests.slice(start).some(c=>c?.simulation || c?.stack?.some(l=>l.simulation)),
+        'missing helper does not send any seeded track to the native renderer');
+      const notices=['app-status','preview-status','native-frame-rate','native-instruction'].map(id=>$(id).textContent).join(' ');
+      const preserved=await save();
+      check(preserved.layers.every((l,i)=>l.simulationSeed===authored.layers[i].simulationSeed),
+        'opening without the solver must preserve the authored tracks');
+      check(/(?:solver|simulation|Basilisk|helper).*(?:unavailable|missing|required|install)|(?:unavailable|missing|required|install).*(?:solver|simulation|Basilisk|helper)/i.test(notices),
+        'opening seeded tracks explicitly identifies the unavailable helper: '+notices);
+      return;
+    }
+
+    await until(()=>latest()?.simulation!=null);
+    const initial=latest(), firstSeed=initial.simulation.seed;
+    check(Number.isInteger(firstSeed) && !option.disabled && $('wheel-motion').value==='simulated' &&
+      !$('speed').disabled && !$('scale').disabled,'ordinary desktop startup uses a live physical track');
+    for (const [i,name] of ['orchid','lagoon','ember','twilight','sunrise','meadow'].entries()) {
+      $('palette-grid').querySelectorAll('button')[i].click();
+      await until(()=>latest()?.wheel===name);
+      check(latest().simulation.seed===firstSeed && latest().swatches?.length===4,
+        name+' changes the film pigments while preserving the existing physical solve');
+    }
+    set('speed','0');await until(()=>latest()?.simulation?.rate===0);
+    set('speed','1.65');set('scale','.55');set('opacity','.41');
+    await until(()=>latest()?.simulation?.rate===1.65 && latest()?.detailScale===.55 && latest()?.stack?.[0].opacity===.41);
+    click('add-layer');await until(()=>latest()?.stack?.length===2);
+    const secondSeed=latest().simulation.seed;
+    check(secondSeed!==firstSeed,'independent initial conditions on the second track');
+    set('speed','.3');set('scale','1.7');set('opacity','.69');
+    await until(()=>latest()?.stack?.some(l=>l.simulation?.seed===secondSeed && l.simulation.rate===.3 && l.detailScale===1.7 && l.opacity===.69));
+    const other=latest().stack.find(l=>l.simulation.seed===firstSeed);
+    check(other.wheel==='meadow' && other.simulation.rate===1.65 && other.detailScale===.55 && other.opacity===.41,
+      'editing the second track preserves the first track physics, optics and opacity');
+    const authored=await save();sessionStorage.setItem('seeded-project',JSON.stringify(authored));
+    set('wheel-motion','wheel-with-coral-beads');
+    await until(()=>latest()?.motion==='wheel-with-coral-beads' && !latest().simulation);
+    check(latest().stack.find(l=>l.layerId===latest().layerId).simulation===undefined &&
+      latest().stack.some(l=>l.simulation?.seed===firstSeed),'switching one track to a recorded study preserves its neighbour');
+    const recorded=await save();
+    check(!Object.hasOwn(recorded.layers.find(l=>l.id===latest().layerId),'simulationSeed'),'saved recorded study has no solver seed');
+    const legacy=await (await fetch('/coral-wheel.tss')).text();
+    await reopen(legacy);
+    await until(()=>latest()?.motion==='wheel-with-coral-beads' && !latest().stack);
+    check(!latest().simulation && $('wheel-motion').value==='wheel-with-coral-beads','legacy recorded motion survives opening with a solver installed');
+    check(JSON.stringify(await save())===JSON.stringify(JSON.parse(legacy)),'legacy project content survives round trip');
+
+    // Restart the real editor with a separate capability response and reopen its saved live project.
+    location.hash='missing-helper';location.reload();
+    return new Promise(()=>{});
+  }
   if (coral || oils) {
+
     incoming=await (await fetch('/coral-wheel.tss')).text();
     click('open-project');await idle();
     check($('app-status').textContent==='Opened coral-wheel.tss.' && $('track-title').textContent==='coral-wheel.tss','normal project open');
     check($('layer-count').textContent.startsWith('1') && $('selected-name').textContent==='Wheel with coral beads','selected coral wheel');
-    check($('mathmos-wheel').value==='violet-blue' && $('wheel-motion').value==='wheel-with-coral-beads' &&
+    check($('slide-preset').value==='violet-blue' && $('wheel-motion').value==='wheel-with-coral-beads' &&
       $('wheel-films').value==='both' && $('wheel-slide').value==='front' && $('wheel-gesture').value==='tug' &&
       $('wheel-focus').value==='90' && $('wheel-width').value==='960' && $('tug-response').value==='0.4','capture controls');
     check($('play').disabled && $('relink-audio').hidden && $('source-name').textContent==='No audio selected','audio-free project');
@@ -119,7 +189,7 @@ async function exerciseControls(platform) {
       incoming=documentText;set('rear-film-oil','wheel');
       click('open-project');await until(()=>$('replace-project').open);$('replace-project').querySelector('[value=replace]').click();await idle();
       check(rear.value==='pdms-20' && front.value==='pdms-1000' && front.disabled,'normal reopen restores both oils and source override');
-      set('wheel-motion','wheel-flow');click('add-layer');set('mathmos-wheel','yellow-red');
+      set('wheel-motion','wheel-flow');click('add-layer');set('slide-preset','yellow-red');
       await until(()=>previewRequests.at(-1)?.stack?.length===2);
       check(rear.value==='wheel' && front.value==='wheel','new wheel starts with original motion');
       set('front-film-oil','pdms-20');
@@ -252,10 +322,11 @@ const editorCases=[
   ['Windows','Windows '+projectControls],
   ['Macintosh','Mac desktop native wheel selection, optics and modal visibility'],
   ['Windows coral project','Open and replay the standalone coral capture project without audio'],
+  ['Windows live solver','Desktop live solver lifecycle, independent pigments and seed-preserving offline reopen'],
   ['Windows film oils','Independent slide oil selection, release overrides, undo, save, reopen and stack'],
 ];
 for (const [platform,title] of editorCases) test(title,
-  {skip:!chrome && 'Set CHROME_BIN to a Chrome executable', timeout:30000}, async()=>{
+  {skip:!chrome && 'Set CHROME_BIN to a Chrome executable', timeout:platform==='Windows live solver'?45000:30000}, async()=>{
     const web=new URL('../../WebAssets/',import.meta.url);
     const media=new URL('../slide-look-study/approval/windows-live/gesture-controls/export/two-slide-cues.m4a',import.meta.url);
     const scratch=await mkdtemp(join(tmpdir(),'tss-project-ui-'));
@@ -274,7 +345,7 @@ for (const [platform,title] of editorCases) test(title,
           res.end(await readFile(new URL('../slide-look-study/approval/coral-wheel/coral-wheel.tss',import.meta.url)));return;
         }
         if(req.url==='/sample.m4a'){res.writeHead(200,{'Content-Type':'audio/mp4'});res.end(await readFile(media));return;}
-        const allowed=/^\/(?:[a-z-]+\.js|styles\.css|assets\/(?:mathmos-wheels\.json|visual-advice\.json|tss-project-logo\.jpeg))$/;
+        const allowed=/^\/(?:[a-z-]+\.js|styles\.css|assets\/(?:slide-presets\.json|visual-advice\.json|tss-project-logo\.jpeg))$/;
         if(!allowed.test(req.url)){res.writeHead(404);res.end();return;}
         const type=req.url.endsWith('.js')?'text/javascript':req.url.endsWith('.css')?'text/css':req.url.endsWith('.json')?'application/json':'image/jpeg';
         res.writeHead(200,{'Content-Type':type});res.end(await readFile(new URL(req.url.slice(1),web)));
@@ -286,7 +357,7 @@ for (const [platform,title] of editorCases) test(title,
     const exited=new Promise(resolve=>{proc.once('exit',resolve);proc.once('error',e=>{report(String(e));resolve();});});
     let timer;
     try {
-      const timeout=new Promise(resolve=>{timer=setTimeout(()=>resolve('Browser timed out'),24000);});
+      const timeout=new Promise(resolve=>{timer=setTimeout(()=>resolve('Browser timed out'),platform==='Windows live solver'?40000:24000);});
       assert.equal(await Promise.race([done,timeout,exited.then(()=> 'Browser exited')]),'pass');
     } finally {
       clearTimeout(timer);proc.kill();await exited;server.closeAllConnections();server.close();

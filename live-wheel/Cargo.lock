@@ -1139,6 +1139,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tss-basilisk-live"
+version = "0.1.0"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "tss-live-wheel"
 version = "0.1.0"
 dependencies = [
@@ -1152,6 +1159,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tiff",
+ "tss-basilisk-live",
  "ttf-parser",
  "wgpu",
 ]

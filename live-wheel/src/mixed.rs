@@ -347,6 +347,7 @@ impl LiveWheel {
         let wheels = std::mem::take(&mut self.stack);
         let selected = self.active;
         let active_wheel = std::mem::take(&mut self.wheel);
+        let selected_optics = (self.swatches, self.active_material);
         let active_motion = (self.motion, self.material_motion);
         let active_films = self.slide_visibility;
         let wheel_count = scene
@@ -430,6 +431,8 @@ impl LiveWheel {
             if let Some(w) = wheels.iter().find(|w| w.id == id) {
                 self.active = id;
                 self.wheel.clone_from(&w.wheel);
+                self.swatches = w.swatches;
+                self.active_material = self.stack_materials[&id];
                 self.switch_film_sources(w.motion, w.material_motion)
                     .expect("validated film");
                 self.slide_visibility = w.films;
@@ -439,7 +442,7 @@ impl LiveWheel {
                     *self.stack_times.get(&id).unwrap_or(&selected_times)
                 };
                 let spacing = (2 * wheel_count - 1) as f32;
-                let mut mat = self.materials[&w.wheel];
+                let mut mat = self.active_material;
                 mat.lens = [
                     self.focus.unwrap_or(-1.),
                     -1. - w.opacity_at(time),
@@ -481,6 +484,7 @@ impl LiveWheel {
         }
         self.active = selected;
         self.wheel = active_wheel;
+        (self.swatches, self.active_material) = selected_optics;
         self.switch_film_sources(active_motion.0, active_motion.1)
             .expect("restore selected wheel");
         self.slide_visibility = active_films;
@@ -736,6 +740,7 @@ mod tests {
         r.set_stack(vec![WheelLayer {
             id: 8,
             wheel: "violet-blue".into(),
+            swatches: None,
             motion: MotionPreset::WheelFlow,
             material_motion: MaterialMotion::default(),
             films: [true; 2],

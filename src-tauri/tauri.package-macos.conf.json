@@ -4,7 +4,7 @@
     "active": true,
     "targets": ["app"],
     "icon": ["icons/icon.icns"],
-    "externalBin": ["target/mac-package/tss-performer"],
+    "externalBin": ["target/mac-package/tss-performer", "target/mac-package/tss-slide-solver"],
     "macOS": {
       "minimumSystemVersion": "13.0",
       "signingIdentity": "-"

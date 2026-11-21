@@ -45,6 +45,17 @@ export async function analyzeAudio(buffer, onProgress = () => {}, isCurrent = ()
 
 export function featuresAt(analysis, time) {
   if (!analysis?.frames.length) return { energy: 0, bass: 0, mid: 0, treble: 0 };
-  const index = Math.max(0, Math.min(analysis.frames.length - 1, Math.floor(time * analysis.fps)));
-  return analysis.frames[index];
+  const last = analysis.frames.length - 1;
+  const position = Math.min(last, Math.max(0, time * analysis.fps));
+  const index = Math.floor(position);
+  const mix = position - index;
+  const a = analysis.frames[index];
+  if (mix === 0) return a;
+  const b = analysis.frames[index + 1];
+  return {
+    energy: a.energy + mix * (b.energy - a.energy),
+    bass: a.bass + mix * (b.bass - a.bass),
+    mid: a.mid + mix * (b.mid - a.mid),
+    treble: a.treble + mix * (b.treble - a.treble),
+  };
 }

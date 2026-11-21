@@ -6,7 +6,9 @@ param(
     [string] $BinaryDirectory = (Join-Path $PSScriptRoot '../src-tauri/target/release'),
     [ValidatePattern('^[a-fA-F0-9]{7,40}$')] [string] $DocumentationCommit,
     # Root of the curated example tree. Paths inside it are preserved under examples/.
-    [string] $ExampleDirectory
+    [string] $ExampleDirectory,
+    # Output of build-windows-solver.ps1 paired with a live-solver feature build.
+    [string] $LiveSolverDirectory
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -19,6 +21,12 @@ $scratch = [IO.Directory]::CreateDirectory((Join-Path $out ([Guid]::NewGuid().To
 try {
     foreach ($exe in 'the-sacred-swirls.exe','tss-performer.exe') {
         Copy-Item -LiteralPath (Join-Path $bin $exe) -Destination $scratch
+    }
+    if ($LiveSolverDirectory) {
+        $solver = (Resolve-Path -LiteralPath $LiveSolverDirectory).Path
+        foreach ($name in 'tss-slide-solver.exe','cygwin1.dll','BASILISK-COPYING','CYGWIN-COPYING','CYGWIN-LICENSE') {
+            Copy-Item -LiteralPath (Join-Path $solver $name) -Destination $scratch
+        }
     }
     $quickstart = Get-Content (Join-Path $repo 'docs/windows-preview.md') -Raw -Encoding UTF8
     $ref = if ($DocumentationCommit) { $DocumentationCommit } else { $Tag }

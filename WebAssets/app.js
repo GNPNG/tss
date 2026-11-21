@@ -1,9 +1,10 @@
 import { LiquidRenderer, LIQUID_PALETTES } from './liquid-renderer.js';
+import {isNativePalette, paletteFields, rotateColor} from './film-palette.js';
 import { installVisualAdvisor } from './visual-advisor.js';
 import { installMediaTools } from './media-tools.js';
 import { installLocalLyrics } from './local-lyrics.js';
 import { analyzeAudio, featuresAt } from './audio-features.js';
-import { materialMotionFields } from './material-motion.js';
+import { materialMotionFields, simulationFields, detailScaleFields } from './material-motion.js';
 import { NativeWheelSurface, hasRelease } from './native-wheel.js';
 import { PlateFormatControls } from './plate-format.js';
 import { NativeWheelPlates } from './native-wheel-plates.js';
@@ -21,19 +22,27 @@ import {bindProjectMedia} from './project-media.js';
 
 const byId = (id) => document.getElementById(id);
 const preview = byId('preview');
-const context = preview.getContext('2d');
+let proceduralPreview = null;
 const paletteNames = {
   orchid: 'Magenta, lime and violet', lagoon: 'Blue, cyan and green',
   ember: 'Crimson and gold', twilight: 'Violet, rose and turquoise',
   sunrise: 'Orange and fuchsia', meadow: 'Green and gold',
 };
-const mathmosWheels = new Map();
-const wheelSelect = byId('mathmos-wheel');
+const slidePresets = new Map();
+const isWheel = layer => isNativePalette(layer, slidePresets);
+const slideSelect = byId('slide-preset');
 const wheelStudy = byId('wheel-study');
 const wheelVideo = byId('wheel-study-video');
 const windowsDesktop = !!window.__TAURI__?.core && /Windows/i.test(navigator.userAgent);
 const nativeDesktop = windowsDesktop || (!!window.__TAURI__?.core && /Macintosh/i.test(navigator.userAgent));
 let startingNative = nativeDesktop;
+let solverAvailable = false;
+const newFluidSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
+const liveFluidTrack = layer => layer?.simulationSeed != null && !layer.media;
+const solvingProgram = () => state.layers.some(layer => liveFluidTrack(layer) &&
+  (layer.visible || state.layers.some(({visible, media}) => visible && media?.assetId != null &&
+    (media.maskA === layer.id || media.maskB === layer.id))));
+const missingSolver = () => !solverAvailable && solvingProgram();
 let projectorFocus = null;
 let projectorDeck = null;
 let visualMedia = null;
@@ -54,14 +63,13 @@ const state = {
 function wheelGestureSelection() { return selectedLayer()?.media ? null : liveSelection(); }
 function liveSelection() {
   const layer = selectedLayer();
-  const isWheel = l => l?.nativeLive && !l.media && !l.customColors && mathmosWheels.has(l.palette);
-  if (!nativeDesktop || !layer || (!isWheel(layer) && !layer.media) || state.exporting) return null;
+  if (!nativeDesktop || (startingNative && !slidePresets.size) || !layer || (!isWheel(layer) && !layer.media) || state.exporting || missingSolver()) return null;
   const stack = programLayers(state.layers,isWheel);
   if (!stack.some(l=>!l.matteOnly)) return null;
   const timed = stack.some(l=>l.envelope!=null || l.media);
   const needsStack = timed || stack.length > 1 || stack[0].opacity !== 1 || stack[0].layerId !== layer.id;
   return { ...(needsStack ? {stack} : {}), layerId: layer.id, wheel: layer.media?'violet-blue':layer.palette, slide: layer.slide, gesture: layer.gesture,
-    motion: layer.motion, motionTake: layer.motionTake, ...materialMotionFields(layer.media ? null : layer), visibleFilms: layer.visibleFilms ?? 'both',
+    ...paletteFields(layer), ...simulationFields(layer), ...detailScaleFields(layer), motion: layer.motion, motionTake: layer.motionTake, ...materialMotionFields(layer.media ? null : layer), visibleFilms: layer.visibleFilms ?? 'both',
     mousePressure: layer.mousePressure?.[layer.slide] ?? 0.5,
     tugResponse: layer.tugResponse[layer.slide], renderWidth: layer.renderWidth, focus: projectorFocus,
     ...feedbackDeck.config(projectorDeck?.enabled || timed), keepPresenting:!!projectorDeck?.enabled };
@@ -87,13 +95,14 @@ function reportNativeStats(stats) {
     return;
   }
   readout.textContent = `${stats.adapter} · ${stats.width} × ${stats.height} · ${stats.fps.toFixed(1)} FPS · p95 ${stats.p95Ms.toFixed(1)} ms · queue limit ${stats.frameLatency} frames`;
+  if (Number.isSafeInteger(stats.simulationTick)) readout.textContent += ' · fluid step ' + stats.simulationTick;
 }
 
 const nativeSurface = nativeDesktop ? new NativeWheelSurface(
   window.__TAURI__.core.invoke, preview, liveSelection, reportNativeStats
 ) : null;
 async function prepareWheel(){
-  if(!liveSelection()) throw new Error('Select a visible native wheel or artwork track first.');
+  if(!liveSelection()) throw new Error('Select a visible native slide or artwork track first.');
   preview.scrollIntoView({block:'nearest'});
   await nativeSurface.sync();
 }
@@ -123,7 +132,7 @@ if (window.__TAURI__?.core) installVisualAdvisor({
 
 const wheelExporter = nativeDesktop ? new NativeWheelExport({
   invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: liveSelection,
-  source: () => ({audioPath: state.audioPath, duration: state.audioBuffer?.duration, proceduralBusy: state.exporting || !!plateExporter?.busy}),
+  source: () => ({audioPath: state.audioPath, duration: state.audioBuffer?.duration, proceduralBusy: state.exporting || !!plateExporter?.busy || solvingProgram()}),
   getEvents: (id, duration) => macroDeck?.exportEvents(id, duration) ?? songGestureEvents(
     detachedGestures.macros, [...detachedGestures.audioGroups, ...detachedGestures.lyricGroups], id, duration),
   finishRecording: async () => { await macroDeck?.finishPendingRecording(); },
@@ -137,14 +146,14 @@ const plateFormat = windowsDesktop ? new PlateFormatControls(byId('plate-formats
 },status,layout => window.__TAURI__.core.invoke("print_geometry",{layout})) : null;
 const plateExporter = windowsDesktop ? new NativeWheelPlates({
   button: byId('export-wheel-plates'), format: () => plateFormat.options(), invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: wheelGestureSelection,
-  busy: () => state.exporting || !!wheelExporter?.busy, prepare: prepareWheel, pause, status,
+  busy: () => state.exporting || !!wheelExporter?.busy || solvingProgram(), prepare: prepareWheel, pause, status,
   refresh: updateTransport,
 }) : null;
 
 const performerDeck = windowsDesktop ? installPerformerDeck({
   invoke:window.__TAURI__.core.invoke, listen:window.__TAURI__.event.listen,
   selection:wheelGestureSelection, prepare:prepareWheel,
-  layers:()=>state.layers.filter(l=>l.nativeLive && !l.customColors && mathmosWheels.has(l.palette)),
+  layers:()=>state.layers.filter(isWheel),
 }) : null;
 
 function status(message) {
@@ -166,7 +175,7 @@ function updateTransport() {
   byId('play').disabled = !ready;
   byId('restart').disabled = !ready;
   byId('stop').disabled = !ready;
-  byId('export').disabled = !state.exporting && (!ready || !state.audioPath || !window.__TAURI__?.core || !!plateExporter?.busy);
+  byId('export').disabled = !state.exporting && (!ready || !state.audioPath || !window.__TAURI__?.core || !!plateExporter?.busy || solvingProgram());
   wheelExporter?.refresh();
   plateExporter?.refresh();
   byId('play').textContent = state.playing ? '❚❚' : '▶';
@@ -337,26 +346,6 @@ function drawWaveform() {
     ctx.fillRect(x, mid - height / 2, 1, height);
   }
 }
-function rotateColor(hex, degrees) {
-  const values = hex.slice(1).match(/../g).map((part) => parseInt(part, 16) / 255);
-  const max = Math.max(...values), min = Math.min(...values), delta = max - min;
-  let hue = 0;
-  if (delta) {
-    if (max === values[0]) hue = ((values[1] - values[2]) / delta) % 6;
-    else if (max === values[1]) hue = (values[2] - values[0]) / delta + 2;
-    else hue = (values[0] - values[1]) / delta + 4;
-  }
-  hue = ((hue * 60 + degrees) % 360 + 360) % 360;
-  const chroma = delta, x = chroma * (1 - Math.abs((hue / 60) % 2 - 1)), m = min;
-  let rgb;
-  if (hue < 60) rgb = [chroma, x, 0];
-  else if (hue < 120) rgb = [x, chroma, 0];
-  else if (hue < 180) rgb = [0, chroma, x];
-  else if (hue < 240) rgb = [0, x, chroma];
-  else if (hue < 300) rgb = [x, 0, chroma];
-  else rgb = [chroma, 0, x];
-  return rgb.map((component) => component + m);
-}
 function selectedLayer() { return state.layers.find((layer) => layer.id === state.selected); }
 function applyPalette(layer, name, colors) {
   layer.palette = name;
@@ -365,25 +354,28 @@ function applyPalette(layer, name, colors) {
   renderControls();
 }
 
-async function loadWheelPresets() {
+async function loadSlidePresets() {
   try {
-    const response = await fetch(new URL('./assets/mathmos-wheels.json', import.meta.url));
+    const response = await fetch(new URL('./assets/slide-presets.json', import.meta.url));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const { version, wheels } = await response.json();
-    if (version !== 1 || !Array.isArray(wheels) || wheels.length === 0) throw new Error('Invalid wheel list');
+    if (version !== 1 || !Array.isArray(wheels) || wheels.length === 0) throw new Error('Invalid slide list');
     const presets = wheels.map(({ id, name, swatches }) => {
       const colors = [swatches.carrier, swatches.rear, swatches.overlap, swatches.front];
       if (!/^[a-z]+(?:-[a-z]+)+$/.test(id) || !name || colors.some((color) => !/^#[0-9a-f]{6}$/i.test(color))) {
-        throw new Error('Invalid wheel preset');
+        throw new Error('Invalid slide preset');
       }
       return { id, name, colors };
     });
     for (const preset of presets) {
-      mathmosWheels.set(preset.id, preset);
-      wheelSelect.add(new Option(preset.name, preset.id));
+      slidePresets.set(preset.id, preset);
+      slideSelect.add(new Option(preset.name, preset.id));
     }
     if (nativeDesktop) {
       const benchmark = await window.__TAURI__.core.invoke('live_wheel_benchmark_config');
+      // Historical benchmarks replay the original recorded fields by design.
+      solverAvailable = !benchmark && (await window.__TAURI__.core.invoke('live_simulation_available').catch(() => false)) === true;
+      byId('wheel-motion').querySelector('[value="simulated"]').disabled = !solverAvailable;
       if (benchmark) {
         await window.__TAURI__.event.listen('tss-benchmark-release', () => byId('replay-release').click());
         await window.__TAURI__.event.listen('tss-benchmark-wheel', ({ payload }) => {
@@ -392,7 +384,7 @@ async function loadWheelPresets() {
             control.value = value;
             control.dispatchEvent(new Event('change'));
           }
-          chooseWheel(payload.wheel);
+          chooseSlidePreset(payload.wheel);
         });
       }
       // Both paths select a wheel through the same editor control.
@@ -401,7 +393,8 @@ async function loadWheelPresets() {
         layer.slide = benchmark?.slide ?? 'rear';
         layer.gesture = benchmark?.gesture ?? 'tug';
         layer.renderWidth = benchmark?.renderWidth ?? 640;
-        chooseWheel(benchmark?.wheel ?? 'violet-blue');
+        if (solverAvailable) layer.simulationSeed = newFluidSeed();
+        chooseSlidePreset(benchmark?.wheel ?? 'violet-blue');
         if (benchmark) {
           const control = byId('wheel-motion');
           control.value = benchmark.motion;
@@ -414,7 +407,7 @@ async function loadWheelPresets() {
         }
         if (benchmark?.wheelStack) {
           byId('add-layer').click();
-          chooseWheel('yellow-red');
+          chooseSlidePreset('yellow-red');
           selectLayer(layer.id);
         }
         if (benchmark?.verifyPlates) await plateExporter.start();
@@ -443,33 +436,26 @@ async function loadWheelPresets() {
       }
     }
   } catch (error) {
-    wheelSelect.options[0].textContent = 'Wheel presets unavailable';
-    status(`Could not read oil wheels: ${error.message}`);
+    slideSelect.options[0].textContent = 'Slide presets unavailable';
+    status(`Could not read oil slides: ${error.message}`);
   } finally {
     startingNative = false;
     renderControls();
   }
 }
 
-function chooseWheel(id) {
-  if (!mathmosWheels.has(id)) return;
-  wheelSelect.value = id;
-  wheelSelect.dispatchEvent(new Event('change'));
+function chooseSlidePreset(id) {
+  if (!slidePresets.has(id)) return;
+  slideSelect.value = id;
+  slideSelect.dispatchEvent(new Event('change'));
 }
 
-function layerCanvas() {
-  const canvas = document.createElement('canvas');
-  canvas.width = preview.width;
-  canvas.height = preview.height;
-  return canvas;
-}
 function makeLayer() {
-  const canvas = layerCanvas();
   const id = Math.max(state.nextId, highestId + 1);
   highestId = id;
   state.nextId = id + 1;
-  return { id, name: `Liquid ${id}`, visible: true, palette: 'orchid', colors: [...LIQUID_PALETTES.orchid], customColors: false, hue: 0, speed: 1, scale: 1, opacity: state.layers.length ? 0.7 : 1, canvas, renderer: null, nativeLive: nativeDesktop,
-    motion: 'wheel-flow', motionTake: 0, visibleFilms: 'both',
+  return { id, name: `Liquid ${id}`, visible: true, palette: 'orchid', colors: [...LIQUID_PALETTES.orchid], customColors: false, hue: 0, speed: 1, scale: 1, opacity: state.layers.length ? 0.7 : 1, nativeLive: nativeDesktop,
+    ...(solverAvailable ? {simulationSeed:newFluidSeed()} : {}), motion: 'wheel-flow', motionTake: 0, visibleFilms: 'both',
     slide: 'rear', gesture: 'tug', tugResponse: { rear: 0.4, front: 0.4 }, mousePressure: { rear: 0.5, front: 0.5 }, renderWidth: 640 };
 }
 function selectLayer(id) {
@@ -516,7 +502,7 @@ function renderTimeline() {
     const up = layerButton('↑', `Move ${layer.name} up`, () => { [state.layers[index - 1], state.layers[index]] = [state.layers[index], state.layers[index - 1]]; renderTimeline(); }, index === 0);
     const down = layerButton('↓', `Move ${layer.name} down`, () => { [state.layers[index + 1], state.layers[index]] = [state.layers[index], state.layers[index + 1]]; renderTimeline(); }, index === state.layers.length - 1);
     const remove = layerButton('×', `Remove ${layer.name}`, () => {
-      layer.renderer?.dispose(); state.layers.splice(index, 1);
+      state.layers.splice(index, 1);
       state.renderError = null;
       byId('render-error').hidden = true;
       if (state.selected === layer.id) state.selected = state.layers[0]?.id ?? null;
@@ -564,31 +550,33 @@ function renderControls() {
     button.title = paletteNames[name] || name; button.setAttribute('aria-label', paletteNames[name] || name);
     button.setAttribute('aria-pressed', String(layer?.palette === name && !layer?.customColors)); button.disabled = !layer || !!layer.media;
     colors.forEach((color) => { const swatch = document.createElement('span'); swatch.style.backgroundColor = color; button.append(swatch); });
-    button.addEventListener('click', () => applyPalette(layer, name, colors)); grid.append(button);
+    button.addEventListener('click', () => { layer.nativeLive = nativeDesktop; applyPalette(layer, name, colors); }); grid.append(button);
   });
-  const wheel = layer && !layer.media && mathmosWheels.get(layer.palette);
+  const wheel = layer && !layer.media && slidePresets.get(layer.palette);
+  const paletteAvailable = !!wheel || (!!layer && !layer.media && Object.hasOwn(LIQUID_PALETTES, layer.palette));
   const live = liveSelection();
   byId('plate-formats').hidden = !live || !!layer.media;
   wheelExporter?.refresh();
   plateExporter?.refresh();
   byId('video-feedback').hidden = !live;
-  byId('native-wheel-controls').hidden = !nativeDesktop || !wheel;
+  byId('native-wheel-controls').hidden = !nativeDesktop || !paletteAvailable;
   byId('native-performance').hidden = !live;
   byId('native-wheel-controls').hidden ||= !!layer?.media;
   byId('live-wheel').checked = !!live;
-  byId('live-wheel').disabled = !wheel || !!layer?.customColors || !layer?.visible;
-  byId('wheel-motion').value = layer?.motion ?? 'wheel-flow';
-  byId('wheel-motion').disabled = !live;
+  byId('live-wheel').disabled = !paletteAvailable || !layer?.visible || liveFluidTrack(layer);
+  byId('wheel-motion').value = liveFluidTrack(layer) ? 'simulated' : layer?.motion ?? 'wheel-flow';
+  byId('wheel-motion').disabled = !live && !(nativeDesktop && liveFluidTrack(layer) && missingSolver());
   const coral = layer?.motion === 'coral-release', beads = layer?.motion === 'wheel-with-coral-beads';
   for (const slide of ['rear','front']) {
     const control = byId(slide+'-film-oil');
     control.value = layer?.materialMotion?.[slide] ?? 'wheel';
-    control.disabled = !live || coral || (beads && slide==='front');
+    control.disabled = !live || liveFluidTrack(layer) || coral || (beads && slide==='front');
   }
   const oilNote = byId('film-oil-note');
-  oilNote.hidden = !(coral || beads);
-  oilNote.textContent = coral ? 'Coral release supplies both films. Wheel flow restores their oil selections.'
-    : beads ? 'The front film uses the coral bead release. Wheel flow restores its oil selection.' : '';
+  oilNote.hidden = !(coral || beads || liveFluidTrack(layer));
+  oilNote.textContent = liveFluidTrack(layer) ? 'Independent oil and carrier in each sealed cell. Live simulation uses the solver’s default fluid properties. Movie and plate export are currently available for recorded studies.'
+    : coral ? 'Coral release supplies both films. Slide flow restores their oil selections.'
+    : beads ? 'The front film uses the coral bead release. Slide flow restores its oil selection.' : '';
   byId('wheel-films').value = layer?.visibleFilms ?? 'both';
   byId('wheel-films').disabled = !live;
   byId('replay-release').hidden = !hasRelease(layer?.motion);
@@ -608,63 +596,69 @@ function renderControls() {
   byId('wheel-focus').disabled = !live;
   updateFocusControl();
   preview.parentElement.classList.toggle('native-active', !!live);
-  byId('preview-status').textContent = live?.stack?.length > 1 ? `NATIVE GPU · ${live.stack.filter(l=>!l.matteOnly).length} TRACKS` : live?.stack?.some(l=>l.media) ? 'NATIVE GPU · ARTWORK' : live ? 'NATIVE GPU · SELECTED WHEEL' : 'PROCEDURAL PREVIEW';
+  byId('preview-status').textContent = live?.stack?.length > 1 ? `NATIVE GPU · ${live.stack.filter(l=>!l.matteOnly).length} TRACKS` : live?.stack?.some(l=>l.media) ? 'NATIVE GPU · ARTWORK' : live ? 'RECORDED SLIDE STUDY' : 'PROCEDURAL PREVIEW';
+  if (liveFluidTrack(layer) && live) byId('preview-status').textContent = 'LIVE FLUID SIMULATION';
+  byId('solver-unavailable').hidden = !missingSolver();
+  if (missingSolver()) byId('preview-status').textContent = 'LIVE FLUID SIMULATION UNAVAILABLE';
   byId('native-instruction').textContent = layer?.media ? layer.media.name : layer?.gesture === 'rotate'
     ? `Drag around the center to turn the ${layer.slide} glass slide.`
     : layer?.gesture === 'pressure' ? `Press and hold the ${layer.slide} slide to compress it. Drag the contact point. Release to restore the gap.`
     : `Drag to tug the material in the ${layer?.slide ?? 'rear'} slide.`;
   byId('audio-note').hidden = !!live;
-  for (const id of ['hue', 'speed', 'scale']) byId(id).disabled = !layer || !!live;
+  byId('hue').disabled = !layer || !!layer.media;
+  byId('speed').disabled = !layer || !!layer.media || (!!live && !liveFluidTrack(layer));
+  byId('speed').title = liveFluidTrack(layer) ? 'Simulated seconds per second. Zero pauses the fluid.' : live ? 'This recorded study has a fixed timebase.' : 'Procedural animation rate';
+  byId('scale').disabled = !layer || !!layer.media;
   byId('opacity').disabled = !layer;
   byId('export').title = 'Export the procedural timeline composite';
   if (!state.exporting) byId('export').textContent = live ? 'Export procedural preview' : 'Export 4K preview';
-  if (live && !nativeSurface.surfaceRequested) byId('native-frame-rate').textContent = 'Starting native wheel…';
+  if (live && !nativeSurface.surfaceRequested) byId('native-frame-rate').textContent = 'Starting native slide…';
   nativeSurface?.sync();
-  wheelSelect.disabled = !layer || !!layer.media || mathmosWheels.size === 0;
-  wheelSelect.value = wheel && !layer.customColors ? wheel.id : '';
-  if (mathmosWheels.size) wheelSelect.options[0].textContent = wheel && layer.customColors ? `Custom · ${wheel.name}` : 'Choose a wheel';
+  slideSelect.disabled = !layer || !!layer.media || slidePresets.size === 0;
+  slideSelect.value = wheel && !layer.customColors ? wheel.id : '';
+  if (slidePresets.size) slideSelect.options[0].textContent = wheel && layer.customColors ? `Custom · ${wheel.name}` : 'Choose a slide';
   byId('show-wheel-study').disabled = !wheel;
-  byId('pigment-heading').textContent = wheel ? 'PREVIEW SWATCHES' : 'COLOR LAYERS';
+  byId('pigment-heading').textContent = wheel ? 'SLIDE SWATCHES' : 'FILM PIGMENTS';
   const pigments = byId('pigment-colors'); pigments.replaceChildren();
   if (layer) layer.colors.forEach((color, index) => {
     const label = document.createElement('label');
-    const name = wheel ? ['Clear', 'Rear slide', 'Overlap', 'Front slide'][index] : `Color ${index + 1}`;
+    const name = wheel ? ['Clear', 'Rear slide', 'Overlap', 'Front slide'][index] : ['Rear oil', 'Front oil', 'Rear rim', 'Front rim'][index];
     label.textContent = name;
     const picker = document.createElement('input');
     picker.type = 'color'; picker.value = color;
-    picker.disabled = !!live;
-    picker.setAttribute('aria-label', wheel ? `${name} preview color` : `Liquid color ${index + 1}`);
-    picker.addEventListener('input', () => { layer.colors[index] = picker.value; layer.customColors = true; });
-    picker.addEventListener('change', renderControls);
+    picker.disabled = !!layer.media;
+    picker.setAttribute('aria-label', `${name} color`);
+    picker.addEventListener('input', () => { layer.colors[index] = picker.value; layer.customColors = true; nativeSurface?.sync(); });
+    picker.addEventListener('change', () => { renderControls(); checkpoint('Set film pigment'); });
     label.append(picker); pigments.append(label);
   });
   if (!layer) return;
   ['hue', 'speed', 'scale', 'opacity'].forEach((id) => { byId(id).value = layer[id]; });
   byId('hue-label').textContent = `${layer.hue}°`;
   byId('speed-output').textContent = `${layer.speed.toFixed(1)}×`;
-  byId('scale-output').textContent = `${layer.scale.toFixed(1)}×`;
+  byId('scale-output').textContent = `${layer.scale.toFixed(2)}×`;
   byId('opacity-output').textContent = `${Math.round(layer.opacity * 100)}%`;
 }
 function renderFrame(timestamp) {
   macroDeck?.tick();
-  if (context && !startingNative && !liveSelection() && !nativeSurface?.surfaceRequested &&
+  if (!startingNative && !missingSolver() && !liveSelection() && !nativeSurface?.surfaceRequested &&
       !state.renderError && !state.exporting && !document.hidden && !document.querySelector('dialog[open]')) {
     try {
-      context.clearRect(0, 0, preview.width, preview.height);
+      proceduralPreview ??= new LiquidRenderer(preview, {composite:true});
+      proceduralPreview.gl.clear(proceduralPreview.gl.COLOR_BUFFER_BIT);
       const time = state.audioBuffer ? currentPosition() : state.audioRef ? state.position : timestamp / 1000;
       const features = featuresAt(state.analysis, time);
-      for (const layer of [...state.layers].reverse()) {
+      const exposed = [];
+      for (const layer of state.layers) {
         if (!layer.visible || layer.media) continue;
-        if (!layer.renderer) {
-          layer.renderer = new LiquidRenderer(layer.canvas);
-          layer.renderer.resize(layer.canvas.width, layer.canvas.height);
-        }
-        const palette = layer.colors.map((color) => rotateColor(color, layer.hue));
-        layer.renderer.render({time, ...features, palette, speed: layer.speed, scale: layer.scale});
-        context.globalAlpha = layer.opacity * opacityAt(layer.envelope,time);
-        context.drawImage(layer.canvas, 0, 0);
+        const opacity = layer.opacity * opacityAt(layer.envelope,time);
+        if (opacity > 0) exposed.push({layer, opacity});
+        if (opacity === 1) break;
       }
-      context.globalAlpha = 1;
+      for (const {layer, opacity} of exposed.reverse()) {
+        const palette = layer.colors.map((color) => rotateColor(color, layer.hue));
+        proceduralPreview.render({time, ...features, palette, speed:layer.speed, scale:layer.scale, opacity});
+      }
     } catch (error) { showRenderError(error); }
   }
   if (state.playing) updateTransport();
@@ -709,6 +703,7 @@ if (desktopInvoke) {
 }
 
 async function exportVideo() {
+  if (solvingProgram() && !state.exporting) throw Error('Live solver trajectories are not yet supported by movie export.');
   if (state.exporting) {
     state.cancelExport = true;
     status('Cancelling export…');
@@ -843,7 +838,16 @@ byId('wheel-films').addEventListener('change', (event) => {
 });
 byId('wheel-motion').addEventListener('change', (event) => {
   const layer = selectedLayer();
-  if (!layer || layer.motion === event.target.value) return;
+  if (!layer) return;
+  if (event.target.value === 'simulated') {
+    if (!solverAvailable) return;
+    layer.simulationSeed ??= newFluidSeed();
+    layer.motion = 'wheel-flow';
+    renderControls();
+    return;
+  }
+  if (!liveFluidTrack(layer) && layer.motion === event.target.value) return;
+  delete layer.simulationSeed;
   layer.motion = event.target.value;
   if (hasRelease(layer.motion)) layer.motionTake++;
   renderControls();
@@ -892,13 +896,13 @@ byId('wheel-focus-reset').addEventListener('click', () => {
   projectorFocus = null;
   updateFocusControl(); nativeSurface?.sync();
 });
-wheelSelect.addEventListener('change', () => {
+slideSelect.addEventListener('change', () => {
   const layer = selectedLayer();
-  const preset = mathmosWheels.get(wheelSelect.value);
+  const preset = slidePresets.get(slideSelect.value);
   if (layer && preset) { layer.nativeLive = nativeDesktop; applyPalette(layer, preset.id, preset.colors); }
 });
 byId('show-wheel-study').addEventListener('click', async () => {
-  const preset = mathmosWheels.get(selectedLayer()?.palette);
+  const preset = slidePresets.get(selectedLayer()?.palette);
   if (!preset) return;
   byId('wheel-study-name').textContent = preset.name;
   byId('wheel-study-error').hidden = true;
@@ -1010,13 +1014,13 @@ function applyTimelineSuggestion(s) {
   if(s.fadeOut!==undefined)rule.fadeOut=s.fadeOut;
   const envelope=advisorIntervals({...s,signal:s.signal??'time',fit:s.fit??'elastic'},rule,selectedCues(),state.analysis);
   const source=selectedLayer()?.media?null:selectedLayer(), key=s.wheel??s.palette??source?.palette??'violet-blue';
-  if(!mathmosWheels.has(key)&&!LIQUID_PALETTES[key])throw Error('Choose a known wheel or palette.');
+  if(!slidePresets.has(key)&&!LIQUID_PALETTES[key])throw Error('Choose a known slide or palette.');
   if(s.opacity!==undefined&&(!Number.isFinite(s.opacity)||s.opacity<0||s.opacity>1))throw Error('Choose an opacity between 0 and 1.');
   const layer=makeLayer(), id=layer.id;
   if(source)Object.assign(layer,structuredClone(layerSettings(source)));
   if(source?.palette!==key || s.wheel || s.palette){
-    layer.palette=key;layer.colors=[...(mathmosWheels.get(key)?.colors??LIQUID_PALETTES[key])];
-    layer.customColors=false;layer.nativeLive=mathmosWheels.has(key);
+    layer.palette=key;layer.colors=[...(slidePresets.get(key)?.colors??LIQUID_PALETTES[key])];
+    layer.customColors=false;layer.nativeLive=nativeDesktop;
   }
   Object.assign(layer,{id,name:s.label||s.cue||'Oil cue',visible:true,envelope,opacity:s.opacity??source?.opacity??1});
   state.layers.unshift(layer);selectLayer(id);checkpoint('Apply reviewed oil cue');
@@ -1065,7 +1069,14 @@ seekArea.addEventListener('click',event=>{
   dragged=false;
 });
 for (const id of ['hue', 'speed', 'scale', 'opacity']) {
-  byId(id).addEventListener('input', (event) => { const layer = selectedLayer(); if (!layer) return; layer[id] = Number(event.target.value); renderControls(); });
+  byId(id).addEventListener('input', (event) => {
+    const layer = selectedLayer();
+    if (!layer) return;
+    layer[id] = Number(event.target.value);
+    if (id === 'hue') { renderControls(); return; }
+    byId(id+'-output').textContent = id === 'opacity' ? Math.round(layer.opacity*100)+'%' : layer[id].toFixed(2)+'×';
+    nativeSurface?.sync();
+  });
 }
 function authoredState() {
   for(const {media} of state.layers)if(media?.assetId!=null) {
@@ -1099,13 +1110,12 @@ function restoreEdits(doc, newProject) {
   state.layers = doc.layers.map(config => {
     const existing = newProject ? null : old.get(config.id);
     if (existing) old.delete(existing.id);
-    const layer=Object.assign(existing || {canvas:layerCanvas(), renderer:null}, {envelope:null,media:undefined,materialMotion:undefined}, layerSettings(config));
+    const layer=Object.assign(existing || {}, {envelope:null,media:undefined,materialMotion:undefined,simulationSeed:undefined}, layerSettings(config));
     const grant=layer.media&&visualGrants.get(layer.media.sha256);
     if(grant)bindProjectMedia(layer,grant);
     return layer;
   });
   for (const layer of old.values()) {
-    layer.renderer?.dispose();
     if (!newProject && nativeSurface) retainedNativeLayers.add(layer.id);
   }
   state.nextId = doc.nextId;
@@ -1152,9 +1162,9 @@ function chooseReplacement() {
     dialog.showModal();
   });
 }
-const palettes = () => new Set([...Object.keys(LIQUID_PALETTES), ...mathmosWheels.keys()]);
+const palettes = () => new Set([...Object.keys(LIQUID_PALETTES), ...slidePresets.keys()]);
 const shippedTracks = new Map([
-  ['wheel',{name:'Violet / Blue wheel',palette:'violet-blue',motion:'wheel-flow',rule:{glyph:'[---]',mode:'stretch',fadeIn:.25,fadeOut:.4}}],
+  ['wheel',{name:'Violet / Blue slide',palette:'violet-blue',motion:'wheel-flow',rule:{glyph:'[---]',mode:'stretch',fadeIn:.25,fadeOut:.4}}],
   ['beads',{name:'Coral bead release',palette:'violet-blue',motion:'wheel-with-coral-beads',rule:{glyph:'(---)',mode:'repeat',length:2,interval:4,fadeIn:.15,fadeOut:.4}}],
   ['lagoon',{name:'Lagoon liquid',palette:'lagoon',motion:'wheel-flow',rule:{glyph:'*---*',mode:'signal',signal:'bass',threshold:.18,fadeIn:.08,fadeOut:.2}}],
 ]);
@@ -1249,8 +1259,9 @@ async function addTrackFromSource() {
     if(!envelope.length)throw Error('The boundary found no matches in this selection.');
     const layer=makeLayer();
     layer.name=s.name;layer.motion=s.motion;layer.palette=s.palette;
-    layer.colors=[...(mathmosWheels.get(s.palette)?.colors??LIQUID_PALETTES[s.palette])];
-    layer.nativeLive=mathmosWheels.has(s.palette);
+    if (s.motion !== 'wheel-flow') delete layer.simulationSeed;
+    layer.colors=[...(slidePresets.get(s.palette)?.colors??LIQUID_PALETTES[s.palette])];
+    layer.nativeLive=nativeDesktop;
     layer.envelope=envelope;
     state.layers.unshift(layer);selectLayer(layer.id);checkpoint('Add '+s.name);status('Added '+s.name);return;
   }
@@ -1332,7 +1343,8 @@ async function openProject(file,merge=false) {
   installAudio(audio, doc.audio, selection?.[1], selection?.[0], doc.position);
   resetHistory('Open project'); savedEdits = editSignature();
   const audioNotice=doc.audio&&!audio?' Relink '+doc.audio.name+' to play.':'';
-  status('Opened '+name+'.'+audioNotice+(offlineMedia.length?' Offline visual media: '+offlineMedia.join(', '):''));
+  const solverNotice = !solverAvailable && state.layers.some(liveFluidTrack) ? ' The Basilisk solver is unavailable on this installation. Saved fluid seeds are retained.' : '';
+  status('Opened '+name+'.'+audioNotice+solverNotice+(offlineMedia.length?' Offline visual media: '+offlineMedia.join(', '):''));
 }
 async function saveProject(regionOnly=false) {
   await macroDeck?.finishPendingRecording();
@@ -1387,9 +1399,10 @@ document.querySelector('.control-body').addEventListener('change', event => {
   if (!event.target.closest('#performer-deck, #artwork-settings')) checkpoint(event.target.getAttribute('aria-label') || event.target.labels?.[0]?.textContent.trim().split('\n')[0] || 'Edit layer');
 });
 window.addEventListener('resize', drawWaveform);
-window.addEventListener('beforeunload', () => { state.layers.forEach((layer) => layer.renderer?.dispose()); });
+window.addEventListener('beforeunload', () => proceduralPreview?.dispose());
 function addArtwork(media) {
   const layer=makeLayer();
+  delete layer.simulationSeed;
   Object.assign(layer,{name:media.name,media,opacity:1});
   state.layers.unshift(layer);
   selectLayer(layer.id);
@@ -1398,13 +1411,12 @@ function addArtwork(media) {
 }
 visualMedia = nativeDesktop ? installVisualMedia({
   invoke:desktopInvoke, selected:selectedLayer,layers:()=>state.layers,
-  isWheel:l=>l?.nativeLive&&!l.customColors&&mathmosWheels.has(l.palette),
+  isWheel,
   add:addArtwork,
   changed:label=>{renderTimeline();renderControls();checkpoint(label);},report:status,
 }) : null;
 byId('artwork-add').hidden=!nativeDesktop;
-if (!context) showRenderError(new Error('Canvas 2D is not available'));
-else addLayer();
+addLayer();
 renderTimeline(); renderControls(); updateTransport(); requestAnimationFrame(renderFrame);
-const presetsReady = loadWheelPresets();
+const presetsReady = loadSlidePresets();
 presetsReady.then(() => { if (!editHistory.entries.length) { resetHistory('New session'); savedEdits = editSignature(); } });

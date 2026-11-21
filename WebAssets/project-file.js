@@ -14,6 +14,7 @@ const layerFields = [
 export function layerSettings(layer) {
   const settings=Object.fromEntries(layerFields.map(key => [key, layer[key]]));
   Object.assign(settings,materialMotionFields(layer));
+  if (layer.simulationSeed != null) settings.simulationSeed = layer.simulationSeed;
   if(layer.envelope!=null) settings.envelope=layer.envelope;
   if(layer.media)settings.media=portableMediaSettings(layer.media);
   return settings;
@@ -34,7 +35,8 @@ const pair = v => record(v) && num(v.front, 0, 1) && num(v.rear, 0, 1);
 const requireField = (valid, field) => { if (!valid) throw Error('Invalid project field: ' + field); };
 
 function validLayer(l, palettes) {
-  return record(l) && validMaterialMotion(l.materialMotion) && (l.media==null || validMediaSettings(l.media)) && validEnvelope(l.envelope) && id(l.id) && named(l.name) && flag(l.visible) && palettes.has(l.palette) &&
+  return record(l) && (l.simulationSeed === undefined || (index(l.simulationSeed) && l.simulationSeed <= 0xffffffff && l.motion === 'wheel-flow' && !l.media)) &&
+    validMaterialMotion(l.materialMotion) && (l.media==null || validMediaSettings(l.media)) && validEnvelope(l.envelope) && id(l.id) && named(l.name) && flag(l.visible) && palettes.has(l.palette) &&
     Array.isArray(l.colors) && l.colors.length === 4 && l.colors.every(c => string(c) && /^#[0-9a-f]{6}$/i.test(c)) &&
     flag(l.customColors) && num(l.hue, 0, 360) && num(l.speed, 0, 2) && num(l.scale, .4, 2) && num(l.opacity, 0, 1) &&
     flag(l.nativeLive) && oneOf(l.motion, 'wheel-flow', 'coral-release', 'wheel-with-coral-beads') &&

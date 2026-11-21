@@ -503,7 +503,7 @@
     "platform": "No TSS target run",
     "scope": "solidification_mwe.c 322 physical lines in fetched sandbox example; relies on additional modules",
     "decision": "Retain thermal reference. Moderate test harness, substantial extension from the pure-substance front to the measured wax melting interval; compare front trajectory and energy balance.",
-    "evidence": "Source-reviewed plane ice/water front, not a wax run. Oil-wheel optics and viscosity proofs used no phase-change model.",
+    "evidence": "Source-reviewed plane ice/water front, not a wax run. Slide optics and viscosity proofs used no phase-change model.",
     "sources": [
       "[Solid/liquid example](https://basilisk.fr/sandbox/qmagdelaine/phase_change/1_elementary_body/solidification_mwe.c)",
       "[Measured wax](../live-wheel/MATERIAL-MODELS.md)"
@@ -1397,7 +1397,7 @@
   },
   {
     "group": "Visual and optical references",
-    "name": "Mathmos wheels / Joshua Light Show / user-selected reference C",
+    "name": "slide presets / Joshua Light Show / user-selected reference C",
     "model": "Physical projected light, overlapping dyes, menisci, focus, droplets and performance motion.",
     "stack": "Physical apparatus, supplied photos, archival film and video references.",
     "application": "Use wheel photographs for spatial/color comparisons and footage for motion. The project logo supplies branding. Preserve clean live appearance.",
@@ -1406,7 +1406,7 @@
     "decision": "Reference, no code port. Compare separated slide outputs and projected crossings; the owner approves the appearance.",
     "evidence": "Owner reviewed the Violet / Blue focus proof positively. Other candidate material appearances require separate review.",
     "sources": [
-      "[Mathmos demo](https://www.youtube.com/watch?v=SqM5iv0OoCg)",
+      "[Projected slide demonstration](https://www.youtube.com/watch?v=SqM5iv0OoCg)",
       "[Original 42 s reference](https://www.youtube.com/watch?v=fkv8hXnmKrQ&t=42s)",
       "[Liquid Loops](https://www.moma.org/collection/works/200467)",
       "[Wheel references](../experiments/slide-look-study/wheel-references.md)"

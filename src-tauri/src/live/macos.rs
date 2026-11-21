@@ -286,8 +286,10 @@ fn run(
                 Command::Movie(job, reply) => {
                     let result = match (engine.as_mut(), active.as_ref()) {
                         (Some(r), Some(c))
-                            if c.layer_id == job.request.layer_id
+                            if !c.uses_simulation() && c.layer_id == job.request.layer_id
                                 && c.wheel == job.request.wheel
+                                && c.detail_scale == job.request.detail_scale
+                                && c.swatches == job.request.swatches
                                 && c.material_motion == job.request.material_motion
                                 && c.motion == job.request.motion
                                 && c.stack == job.request.stack
@@ -478,6 +480,7 @@ fn run(
         if presented {
             let now = Instant::now();
             stats.presents += 1;
+            stats.simulation_tick = r.live_solver_status(c.layer_id).map(|s| s.tick);
             if let Some(last) = last_present.replace(now) {
                 periods.push_back(now.duration_since(last).as_secs_f64() * 1000.);
                 if periods.len() > 60 {
@@ -494,7 +497,7 @@ fn run(
                     proof_window = Some(proof::inspect(window, dir)?);
                 }
             }
-            if stats.presents == 5 {
+            if stats.presents >= 5 && (c.simulation.is_none() || stats.simulation_tick.is_some_and(|tick| tick >= 24)) {
                 if let Some(dir) = output {
                     proof::capture(
                         dir,
@@ -611,6 +614,7 @@ fn configure(
     old: Option<&Config>,
     c: &Config,
 ) -> Result<(), String> {
+    c.configure_simulation(r)?;
     if old.map(|v| &v.stack) != Some(&c.stack) {
         r.set_stack(
             c.stack
@@ -619,6 +623,7 @@ fn configure(
                 .map(|s| WheelLayer {
                     id: s.layer_id,
                     wheel: s.wheel.clone(),
+                    swatches: s.swatches,
                     motion: s.motion,
                     material_motion: s.material_motion,
                     films: s.visible_films.slides(),
@@ -666,8 +671,8 @@ fn configure(
         r.set_preview_width(c.render_width)?;
     }
     r.select_track(c.layer_id);
-    if old.map(|v| (&v.wheel, v.layer_id)) != Some((&c.wheel, c.layer_id)) {
-        r.set_wheel(&c.wheel)?;
+    if old.map(|v| (&v.wheel, v.swatches, v.layer_id)) != Some((&c.wheel, c.swatches, c.layer_id)) {
+        r.set_wheel_palette(&c.wheel, c.swatches)?;
     }
     if old.map(|v| (v.motion, v.material_motion, v.layer_id))
         != Some((c.motion, c.material_motion, c.layer_id))

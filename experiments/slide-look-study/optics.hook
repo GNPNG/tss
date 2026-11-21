@@ -137,6 +137,9 @@ vec3 apertureRay(vec2 uv, vec2 aperture, vec2 frontNormal, vec2 rearNormal,
     vec3 correction = pairedDensityCorrection * min(frontPath, rearPath);
     // Some wheel photographs show a different hue at the rear phase boundary.
     correction += rearRimDelta * rearPath * rimSupport.r * bell(farD - 2.9, 3.2);
+#ifdef TSS_FRONT_RIM_DELTA
+    correction += TSS_FRONT_RIM_DELTA * frontPath * rimSupport.g * bell(nearD - 2.9, 3.2);
+#endif
     return front * rear * exp(-correction);
 #else
     return front * rear;

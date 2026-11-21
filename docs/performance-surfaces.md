@@ -1,10 +1,10 @@
 # Performance surfaces
 
-Use Safari on a Mac as a Force Touch compression surface, or on an iPad as a Pencil swirl surface. The Windows editor receives the gestures and renders the selected Mathmos wheel. Several performers can join one show.
+Use Safari on a Mac as a Force Touch compression surface, or on an iPad as a Pencil swirl surface. The Windows editor receives the gestures and renders the selected slide. Several performers can join one show.
 
 ## Pair the first surface
 
-1. Keep `tss-performer.exe` beside `the-sacred-swirls.exe`. Select a visible native Mathmos wheel in the editor and open **Performance surfaces**. The listener starts only when you press **Start listener**.
+1. Keep `tss-performer.exe` beside `the-sacred-swirls.exe`. Select a visible native slide in the editor and open **Performance surfaces**. The listener starts only when you press **Start listener**.
 2. Enter the Windows machine’s LAN interface address under **Listen on IP**. The initial `127.0.0.1` accepts connections from the editor machine only. Enter the DNS name or IP address the performers will use under **Certificate hostname**. The name must resolve to that interface from each device and appear in the certificate’s subject alternative names. The default port is 47892. Port 0 chooses an available port.
 3. Choose the PEM certificate chain and matching PEM private key on Windows. Browsers must already trust the issuing CA. For an internal CA, distribute its **public root certificate** through your usual device management process. On an iPad with a manually installed root, Apple documents the additional step under **Settings → General → About → Certificate Trust Settings**. Keep the server private key on Windows. [Apple’s iPad certificate instructions](https://support.apple.com/en-us/102390) · [macOS Keychain trust settings](https://support.apple.com/guide/keychain-access/change-the-trust-settings-of-a-certificate-kyca11871/mac)
 4. Press **Start listener**, then **Copy pairing link**. Open it in Safari on each performance device. Enter a performer name and press **Connect**. The link contains a session secret. Share it privately with the performers. Each connection gets its own row in the editor.
