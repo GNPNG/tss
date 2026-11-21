@@ -1,0 +1,77 @@
+{
+  "dsp-cover": {
+    "size": [
+      4000,
+      4000
+    ],
+    "encoding": "srgb",
+    "cicp": [
+      1,
+      13,
+      0,
+      1
+    ],
+    "distinctRGB": [
+      64733,
+      59445,
+      41622
+    ]
+  },
+  "vertical": {
+    "size": [
+      2160,
+      3840
+    ],
+    "encoding": "rec709",
+    "cicp": [
+      1,
+      1,
+      0,
+      1
+    ],
+    "distinctRGB": [
+      65174,
+      62648,
+      44615
+    ]
+  },
+  "panorama": {
+    "size": [
+      10800,
+      2160
+    ],
+    "encoding": "display-p3",
+    "cicp": [
+      12,
+      13,
+      0,
+      1
+    ],
+    "distinctRGB": [
+      62807,
+      58753,
+      43191
+    ],
+    "identicalPanelPixels": 23328000,
+    "meanEndToStartDifference": 33.53395061728395,
+    "meanAdjacentColumnDifference": 33.647453703703704
+  },
+  "visualizer": {
+    "size": [
+      3840,
+      2160
+    ],
+    "encoding": "display-p3",
+    "cicp": [
+      12,
+      13,
+      0,
+      1
+    ],
+    "distinctRGB": [
+      63616,
+      59918,
+      43943
+    ]
+  }
+}

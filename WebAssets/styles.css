@@ -905,3 +905,11 @@ input[type=range].hue-slider {
 #lyrics-review[hidden], #lyrics-review [hidden] { display: none; }
 #advice-direction { width: 100%; display: block; padding: .5rem; font: inherit; }
 #advice-review[hidden] { display: none; }
+
+.plate-formats { padding: 10px 16px; }
+.plate-formats summary { cursor: pointer; }
+.plate-formats .native-choices, .plate-formats figure, #plate-horizon-controls { margin: 10px 0; }
+.plate-formats figure svg { display: block; max-width: 100%; max-height: 230px; width: auto; background: #202228; border: 1px solid #787c80; }
+.plate-formats figcaption { margin-top: 5px; font-size: .8rem; }
+#plate-horizon-controls label { margin-right: 1em; }
+#plate-horizon-y { width: 5em; }

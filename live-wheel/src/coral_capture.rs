@@ -304,3 +304,36 @@ fn capture_digital_4k_plates() -> Result<(), String> {
     println!("Plate bundle {}", bundle.display());
     Ok(())
 }
+
+#[test]
+#[ignore = "requires a guarded discrete GPU and an existing TSS_PLATE_CAPTURE_DIR"]
+fn capture_production_formats() -> Result<(), String> {
+    use crate::production::{DigitalFormat, Encoding, Layout};
+    let dir = PathBuf::from(
+        std::env::var_os("TSS_PLATE_CAPTURE_DIR").ok_or("Missing plate output folder")?,
+    );
+    let (mut r, _) = discrete_renderer([320, 180])?;
+    r.select_track(1);
+    r.set_motion(MotionPreset::WheelWithCoralBeads)?;
+    r.set_focus(Some(0.9))?;
+    r.set_footprint_sampling(true);
+    let times = [2.635, 0.75];
+    r.render_film_times_offscreen(times[0], times[1], times[0])?;
+    let preview = r.capture_rgba8()?.2;
+    crate::plates::check_preview_alignment(&mut r, times, &preview)?;
+    for (layout, encoding) in [
+        (Layout::DspCover, Encoding::Srgb),
+        (Layout::Vertical, Encoding::Rec709),
+        (Layout::Panorama, Encoding::DisplayP3),
+        (Layout::Visualizer, Encoding::DisplayP3),
+    ] {
+        let format = DigitalFormat {
+            layout,
+            encoding,
+            horizon_y: (layout == Layout::Visualizer).then_some(1339),
+        };
+        let bundle = pollster::block_on(r.export_digital_plates(&dir, times, format, |_| Ok(())))?;
+        println!("{layout:?} {}", bundle.display());
+    }
+    Ok(())
+}

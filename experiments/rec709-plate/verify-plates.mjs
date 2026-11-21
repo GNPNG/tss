@@ -11,6 +11,7 @@ assert.equal(manifest.profile, 'DIGITAL_4K');
 assert.deepEqual(manifest.size, [3840, 2160]);
 const [width, height] = manifest.size;
 const byteLength = width * height * 8;
+const p3 = manifest.encoding === "display-p3";
 
 function run(program, args, maxBuffer) {
   const result = spawnSync(program, args, {maxBuffer});
@@ -24,7 +25,7 @@ function readPlate(name, retain) {
   const path = join(dir, name);
   const [stream] = JSON.parse(run('ffprobe', ['-v', 'error','-show_streams','-of','json',path], 1024*1024)).streams;
   assert.deepEqual([stream.width, stream.height, stream.pix_fmt, stream.color_range, stream.color_space,
-    stream.color_transfer, stream.color_primaries], [width, height, 'rgba64be', 'pc', 'gbr', 'bt709', 'bt709'], name);
+    stream.color_transfer, stream.color_primaries], [width, height, 'rgba64be', 'pc', 'gbr', p3 ? 'iec61966-2-1' : 'bt709', p3 ? 'smpte432' : 'bt709'], name);
   const raw = run('ffmpeg', ['-nostdin','-loglevel','error','-threads','1','-i',path,
     '-frames:v','1','-pix_fmt','rgba64le','-f','rawvideo','pipe:1'], byteLength + 65536);
   assert.equal(raw.byteLength, byteLength);
@@ -50,6 +51,7 @@ const projection = readPlate('projection.png', true);
 assert.ok(counts['projection.png'].slice(0,3).every(count => count > 256), '8-bit projection precision');
 const linear = Float64Array.from({length:65536}, (_, i) => {
   const v = i/65535;
+  if (p3) return v <= 0.04045 ? v/12.92 : ((v+0.055)/1.055)**2.4;
   // BT.709's rounded branch constants leave a narrow interval at the junction.
   return v < 0.081 ? v/4.5 : Math.max(0.018, ((v+0.099)/1.099)**(1/0.45));
 });

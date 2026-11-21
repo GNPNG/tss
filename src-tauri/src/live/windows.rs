@@ -54,6 +54,7 @@ pub(super) fn plate_verification() -> Option<PathBuf> {
 }
 
 enum Command {
+    PlatePreview(super::plates::Selection, macros::Reply<Vec<u8>>),
     Plates(super::plates::Selection, PathBuf, macros::Reply<PathBuf>),
     VerifyVisibility(macros::Reply<VisibilityProof>),
     Projector(bool, u32, macros::Reply<()>),
@@ -72,6 +73,13 @@ pub struct Host {
 }
 
 impl Host {
+    pub async fn plate_preview(
+        &self,
+        selected: super::plates::Selection,
+    ) -> Result<Vec<u8>, String> {
+        self.request(|reply| Command::PlatePreview(selected, reply))
+            .await
+    }
     pub async fn plates(
         &self,
         selected: super::plates::Selection,
@@ -557,16 +565,26 @@ fn run(
                     *shared.lock().map_err(|e| e.to_string())? = stats.clone();
                     let _ = reply.try_send(result);
                 }
+                Command::PlatePreview(selected, reply) => {
+                    let result = match (engine.as_mut(), config.as_ref()) {
+                        (Some(r), Some(c)) if selected.matches(c) => {
+                            let times = last_presented_film_times.unwrap_or_else(|| {
+                                release_clock.film_times(
+                                    c.layer_id,
+                                    c.motion,
+                                    c.motion_take,
+                                    start.elapsed().saturating_sub(export_pause),
+                                )
+                            });
+                            pollster::block_on(r.plate_framing_preview(times))
+                        }
+                        _ => Err("Select the wheel again to preview its framing".into()),
+                    };
+                    let _ = reply.try_send(result);
+                }
                 Command::Plates(selected, folder, reply) => {
                     let result = match (engine.as_mut(), config.as_ref()) {
-                        (Some(r), Some(c))
-                            if c.layer_id == selected.layer_id
-                                && c.wheel == selected.wheel
-                                && c.motion == selected.motion
-                                && c.motion_take == selected.motion_take
-                                && c.visible_films == selected.visible_films
-                                && c.focus == selected.focus =>
-                        {
+                        (Some(r), Some(c)) if selected.matches(c) => {
                             consume_mouse(r, c.slide, c.gesture, c.mouse_pressure)?;
                             macros::flush(app, c)?;
                             let started = Instant::now();
@@ -582,8 +600,11 @@ fn run(
                                 ShowWindow(child.0, SW_HIDE);
                             }
                             let mut stage = String::new();
-                            let result =
-                                pollster::block_on(r.export_4k_plates(&folder, times, |name| {
+                            let result = pollster::block_on(r.export_digital_plates(
+                                &folder,
+                                times,
+                                selected.format,
+                                |name| {
                                     pump();
                                     if unsafe { IsWindow(parent) == 0 } {
                                         return Err(
@@ -596,7 +617,8 @@ fn run(
                                         stage = name.to_owned();
                                     }
                                     Ok(())
-                                }));
+                                },
+                            ));
                             if !c.preview_hidden && unsafe { IsWindow(parent) != 0 } {
                                 child.place(c.rect)?;
                             }

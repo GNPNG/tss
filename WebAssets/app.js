@@ -3,6 +3,7 @@ import { installVisualAdvisor } from './visual-advisor.js';
 import { installLocalLyrics } from './local-lyrics.js';
 import { analyzeAudio, featuresAt } from './audio-features.js';
 import { NativeWheelSurface, hasRelease } from './native-wheel.js';
+import { PlateFormatControls } from './plate-format.js';
 import { NativeWheelPlates } from './native-wheel-plates.js';
 import { NativeWheelExport } from './native-wheel-export.js';
 import { VideoFeedbackControls } from './video-feedback.js';
@@ -125,8 +126,12 @@ const wheelExporter = windowsDesktop ? new NativeWheelExport({
   pause, prepare: prepareWheel, sync: () => nativeSurface.sync(), status,
 }) : null;
 
+const plateFormat = windowsDesktop ? new PlateFormatControls(byId('plate-formats'), async () => {
+  await prepareWheel();
+  return window.__TAURI__.core.invoke('preview_wheel_plates',{selection:liveSelection()});
+},status) : null;
 const plateExporter = windowsDesktop ? new NativeWheelPlates({
-  button: byId('export-wheel-plates'), invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: liveSelection,
+  button: byId('export-wheel-plates'), format: () => plateFormat.options(), invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: liveSelection,
   busy: () => state.exporting || !!wheelExporter?.busy, prepare: prepareWheel, pause, status,
   refresh: updateTransport,
 }) : null;
@@ -533,6 +538,7 @@ function renderControls() {
   });
   const wheel = layer && mathmosWheels.get(layer.palette);
   const live = liveSelection();
+  byId('plate-formats').hidden = !live;
   wheelExporter?.refresh();
   plateExporter?.refresh();
   byId('video-feedback').hidden = !live;

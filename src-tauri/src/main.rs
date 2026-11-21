@@ -288,6 +288,7 @@ fn main() {
             live::live_wheel_stats,
             live::live_wheel_benchmark_config,
             live::plates::export_native_wheel_plates,
+            live::plates::preview_wheel_plates,
             live::movie::export_native_wheel,
             live::movie::cancel_native_wheel_export,
             choose_audio,

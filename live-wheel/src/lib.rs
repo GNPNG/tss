@@ -6,6 +6,7 @@ mod fields;
 pub use feedback::FeedbackSettings;
 mod movie;
 mod plates;
+pub mod production;
 pub use movie::WheelMovie;
 mod material;
 mod motion;
@@ -114,7 +115,11 @@ fn pipeline(
         .enumerate()
         .map(|(i, b)| gpu::BindGroupLayoutEntry {
             binding: i as u32,
-            visibility: gpu::ShaderStages::FRAGMENT,
+            visibility: if i == 2 && matches!(b, Binding::Buffer) {
+                gpu::ShaderStages::VERTEX_FRAGMENT
+            } else {
+                gpu::ShaderStages::FRAGMENT
+            },
             count: None,
             ty: match b {
                 Binding::Image(dim) => gpu::BindingType::Texture {

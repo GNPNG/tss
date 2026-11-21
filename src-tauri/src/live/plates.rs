@@ -1,6 +1,14 @@
 use super::{Host, MotionPreset, VisibleFilms};
 use serde::Deserialize;
 use tauri::State;
+#[cfg(windows)]
+use tss_live_wheel::production::DigitalFormat;
+#[cfg(not(windows))]
+#[path = "../../../live-wheel/src/production.rs"]
+#[allow(dead_code)]
+mod production;
+#[cfg(not(windows))]
+use production::DigitalFormat;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,8 +20,40 @@ pub struct Selection {
     pub(super) motion_take: u64,
     pub(super) visible_films: VisibleFilms,
     pub(super) focus: Option<f32>,
+    #[serde(default)]
+    pub(super) format: DigitalFormat,
 }
 
+#[tauri::command]
+pub async fn preview_wheel_plates(
+    host: State<'_, Host>,
+    selection: Selection,
+) -> Result<String, String> {
+    #[cfg(windows)]
+    {
+        use base64::Engine;
+        return host
+            .plate_preview(selection)
+            .await
+            .map(|v| base64::engine::general_purpose::STANDARD.encode(v));
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (host, selection);
+        Err("Native wheel framing requires Windows".into())
+    }
+}
+#[cfg(windows)]
+impl Selection {
+    pub(super) fn matches(&self, c: &super::Config) -> bool {
+        c.layer_id == self.layer_id
+            && c.wheel == self.wheel
+            && c.motion == self.motion
+            && c.motion_take == self.motion_take
+            && c.visible_films == self.visible_films
+            && c.focus == self.focus
+    }
+}
 #[tauri::command]
 pub async fn export_native_wheel_plates(
     app: tauri::AppHandle,
@@ -23,6 +63,7 @@ pub async fn export_native_wheel_plates(
     #[cfg(windows)]
     {
         use tauri_plugin_dialog::DialogExt;
+        selection.format.validate()?;
         let fixture = super::windows::plate_verification();
         let folder = if let Some(dir) = &fixture {
             if !dir.is_absolute() || !dir.is_dir() {
