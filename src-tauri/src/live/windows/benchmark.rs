@@ -65,8 +65,9 @@ pub(super) struct Benchmark {
 impl Benchmark {
     pub fn new(path: PathBuf, footprint_sampling: bool) -> Self {
         let settings = BenchmarkConfig::current();
-        let single =
-            settings.gesture == Gesture::Pressure || settings.motion != MotionPreset::WheelFlow;
+        let single = settings.wheel_stack
+            || settings.gesture == Gesture::Pressure
+            || settings.motion != MotionPreset::WheelFlow;
         Self {
             path,
             footprint_sampling,
@@ -325,7 +326,7 @@ impl Benchmark {
     pub fn before(&mut self, r: &mut LiveWheel, hwnd: HWND, c: &Config) -> Result<(), String> {
         let release = self.settings.motion != MotionPreset::WheelFlow;
         let pressure = self.settings.gesture == Gesture::Pressure;
-        let (wheel, slide, gesture) = if release || pressure {
+        let (wheel, slide, gesture) = if release || pressure || self.settings.wheel_stack {
             (
                 self.settings.wheel,
                 self.settings.slide,
@@ -352,7 +353,29 @@ impl Benchmark {
         }
         if self.began.is_none() {
             if self.index == 0 {
-                if release {
+                if self.settings.wheel_stack {
+                    let other = &c.stack[1];
+                    let frozen = |r: &mut LiveWheel, time| -> Result<Vec<u8>, String> {
+                        r.set_layer_times(other.layer_id, [time; 2])?;
+                        r.render_offscreen(0.65)?;
+                        Ok(r.capture_rgba8()?.2)
+                    };
+                    let a = frozen(r, 0.2)?;
+                    let b = frozen(r, 2.)?;
+                    let count = a
+                        .chunks_exact(4)
+                        .zip(b.chunks_exact(4))
+                        .filter(|(u, v)| {
+                            u[..3].iter().zip(&v[..3]).any(|(x, y)| x.abs_diff(*y) >= 3)
+                        })
+                        .count();
+                    if count == 0 {
+                        return Err(
+                            "The second wheel did not move through the frozen first wheel".into(),
+                        );
+                    }
+                    self.proof = json!({"selectedFieldTime":0.65,"secondFieldTimes":[0.2,2.0],"changedPixelsAtLeast3Codes":count});
+                } else if release {
                     let beads = self.settings.motion == MotionPreset::WheelWithCoralBeads;
                     let frame = |r: &mut LiveWheel, time| -> Result<Vec<u8>, String> {
                         if beads {
@@ -568,7 +591,7 @@ impl Benchmark {
         scripted_mouse(hwnd, c.rect, WM_LBUTTONUP, [0.5, 0.5]);
         let n = self.intervals.len() as f64;
         let seconds = self.intervals.iter().sum::<f64>() / 1000.;
-        self.results.push(json!({"wheel":c.wheel,"motion":c.motion,"replayRequests":self.replays.len(),
+        self.results.push(json!({"wheel":c.wheel,"stack":c.stack,"motion":c.motion,"replayRequests":self.replays.len(),
             "replays":self.replays,"measuredFromUnixMs":self.measured_from_unix_ms,"measuredThroughUnixMs":unix_ms()?,
             "slide":c.slide,"gesture":c.gesture,"tugResponse":c.tug_response,"presented":self.presents,
             "skipped":self.skips,"mouseMovesApplied":self.drags,"secondsBetweenPresents":seconds,

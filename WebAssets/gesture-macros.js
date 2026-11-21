@@ -214,10 +214,14 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
       }
     });
   }
+  function projectedLayers() {
+    const layer = selection();
+    return new Set(layer?.stack?.map(l => l.layerId) ?? (layer ? [layer.layerId] : []));
+  }
   function startMacro(m, startTime, hit, index = 0) {
     if (recording || !m?.enabled) return;
-    const layer = selection();
-    if (!layer || m.events.some(e => e.layerId !== layer.layerId)) {
+    const layers = projectedLayers();
+    if (m.events.some(e => !layers.has(e.layerId))) {
       if (!hit) note('Select the visual track where this gesture was recorded.');
       return;
     }
@@ -259,8 +263,8 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
     }
     if (batch) send(batch.player,batch.header,batch.samples);
   }
-  function beginCues(runs,wallToSong,layerId) {
-    const eligible = runs.filter(r=>r.macro.events.every(e=>e.layerId===layerId));
+  function beginCues(runs,wallToSong,layers) {
+    const eligible = runs.filter(r=>r.macro.events.every(e=>layers.has(e.layerId)));
     if (!eligible.length) return;
     const start = eligible[0].start;
     pump(start,wallToSong,true);
@@ -278,15 +282,15 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
   function tick() {
     const c = clock();
     const wallToSong = c.position - performance.now()/1000;
-    const layerId = selection()?.layerId;
-    for (const p of players) if (p.events[0].layerId !== layerId) stopPlayer(p);
+    const layers = projectedLayers();
+    for (const p of players) if (!layers.has(p.events[0].layerId)) stopPlayer(p);
     if (c.playing && previousSongTime !== null && c.position >= previousSongTime && !recording) {
       schedule ??= cueSchedule(all.values(),candidates());
       for (let i=firstAtOrAfter(schedule,previousSongTime);i<schedule.length && schedule[i].start<=c.position;) {
         const first=i++, start=schedule[first].start;
         while (i<schedule.length && schedule[i].start===start) ++i;
         if (includePreviousStart || start!==previousSongTime)
-          beginCues(schedule.slice(first,i),wallToSong,layerId);
+          beginCues(schedule.slice(first,i),wallToSong,layers);
       }
       includePreviousStart = false;
     }

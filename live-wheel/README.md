@@ -33,6 +33,12 @@ The first selection prepares the entire coral cache on the CPU. Five fresh proce
 
 To measure this preset on a Windows GPU, use the existing editor benchmark with `--benchmark-live NEW-REPORT.json --coral-trial`. The trial requests three releases during a twelve-second front-slide tug and checks that the editor applied all three. Its frozen-frame check compares the start, middle, end and held state before collecting presentation timings.
 
+## Stack native wheels
+
+On Windows, select a Mathmos wheel, add a visual layer and choose another wheel for it. The upper timeline row sits nearest the audience. Select either wheel to tug, rotate or press one of its films while the other wheel continues. Use the layer visibility button, opacity slider, reorder arrows and **Projected films** to change what reaches the screen. Preview, the delayed audience window and **Export wheel stack in 4K** use the same ordered light path. Scheduled gestures retain their target wheel in the movie.
+
+Each wheel samples its own pair of film clocks and poses. Its existing optical shader attenuates the incident linear RGB image and adds that wheel’s fitted veiling light. A single lamp illuminates the stack. With manual focus, the ordered film planes span the existing focus travel. Each wheel integrates its own pupil footprint before transmitting the result to the next wheel. This screen-space approximation does not trace refracted rays across wheels. A single opaque wheel keeps its original optical path. The native stack accepts Mathmos wheel tracks.
+
 ## Export the selected wheel
 
 Open a local song, choose the live wheel, then select **Export selected wheel in 4K**. Choose a new MP4 filename. Export finishes an open gesture recording before reading the schedule. A take recorded while the song was paused can be assigned a trigger in the gesture deck. The current wheel material and focus apply throughout. Enabled gestures scheduled at a recording position, audio motif or lyric phrase replay in song order at 30 fps. **Export starting pose** offers three choices.

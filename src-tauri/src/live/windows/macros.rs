@@ -295,10 +295,15 @@ impl Playback {
         b: ReplayBatch,
     ) -> Result<(), String> {
         let c = config
-            .filter(|c| c.layer_id == b.layer_id)
-            .ok_or("Macro target must be the active native preview track")?;
+            .filter(|c| {
+                c.layer_id == b.layer_id || c.stack.iter().any(|l| l.layer_id == b.layer_id)
+            })
+            .ok_or("Macro target must be in the projected wheel stack")?;
         let r = engine.ok_or("Native wheel is unavailable")?;
-        self.apply_to(r, c, &b, true)
+        r.select_track(b.layer_id);
+        let result = self.apply_to(r, c, &b, b.layer_id == c.layer_id);
+        r.select_track(c.layer_id);
+        result
     }
 
     fn apply_to(

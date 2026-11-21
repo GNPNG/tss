@@ -225,7 +225,7 @@ impl Feedback {
             &self.images.input.view,
         )
     }
-    pub fn compose(
+    pub fn compose_from(
         &mut self,
         device: &gpu::Device,
         queue: &gpu::Queue,
@@ -233,6 +233,7 @@ impl Feedback {
         smp: &gpu::Sampler,
         present: &gpu::TextureView,
         pts: f64,
+        input: Option<&gpu::TextureView>,
     ) {
         use gpu::BindingResource::{Sampler, TextureView};
         let delay = f64::from(self.settings.delay_ms) / 1000.;
@@ -250,7 +251,7 @@ impl Feedback {
             device,
             &self.mix,
             &[
-                TextureView(&self.images.input.view),
+                TextureView(input.unwrap_or(&self.images.input.view)),
                 TextureView(past),
                 Sampler(smp),
                 self.params.as_entire_binding(),

@@ -82,7 +82,7 @@ pub(super) fn render(
     let manager = app.state::<ExportManager>();
     manager.start_rgba(audio, output, SIZE[0], SIZE[1], FPS)?;
     let mut events = request.events.into_iter().peekable();
-    let mut held = [None; 2];
+    let mut held = std::collections::HashMap::new();
     let mut next_report = Instant::now();
     let frames = (|| {
         for index in 0..count {
@@ -92,12 +92,13 @@ pub(super) fn render(
             }
             let pts = index as f64 / f64::from(FPS);
             while let Some(e) = events.next_if(|e| e.time <= pts) {
+                target.select_gesture_layer(e.layer_id)?;
                 let slide = e.slide as u32;
                 if e.gesture == Gesture::Pressure {
                     target.set_slide_pressure(slide, e.amount.unwrap_or(0.), e.point)?;
                     continue;
                 }
-                let previous = &mut held[slide as usize];
+                let previous = held.entry((e.layer_id, slide)).or_insert(None);
                 match e.phase {
                     Phase::Down => {
                         target.end_gesture(slide);

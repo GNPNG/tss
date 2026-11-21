@@ -42,6 +42,8 @@ pub struct Event {
 #[serde(rename_all = "camelCase")]
 pub struct Request {
     #[serde(default)]
+    pub(super) stack: Vec<super::StackLayer>,
+    #[serde(default)]
     pub(super) visible_films: super::VisibleFilms,
     pub layer_id: u64,
     pub wheel: String,
@@ -63,10 +65,23 @@ impl Request {
         {
             return Err("Choose a wheel and a finite song duration".into());
         }
-        let mut held = [[None; 2]; 2];
+        let mut ids = std::collections::HashSet::new();
+        for layer in &self.stack {
+            if layer.layer_id == 0
+                || !ids.insert(layer.layer_id)
+                || !(0.0..=1.0).contains(&layer.opacity)
+                || layer.wheel.is_empty()
+            {
+                return Err("Invalid wheel stack in export".into());
+            }
+        }
+        if self.stack.is_empty() {
+            ids.insert(self.layer_id);
+        }
+        let mut held = std::collections::HashMap::new();
         let mut previous = 0.;
         for event in &self.events {
-            if event.layer_id != self.layer_id
+            if !ids.contains(&event.layer_id)
                 || !(previous..=self.duration).contains(&event.time)
                 || event.point.iter().any(|v| !(0.0..=1.0).contains(v))
                 || !super::valid_amount(event.gesture, event.phase, event.amount)
@@ -76,8 +91,13 @@ impl Request {
             {
                 return Err("Invalid wheel export event timing, track or coordinates".into());
             }
-            let anchor =
-                &mut held[event.slide as usize][usize::from(event.gesture == Gesture::Pressure)];
+            let anchor = held
+                .entry((
+                    event.layer_id,
+                    event.slide as u8,
+                    event.gesture == Gesture::Pressure,
+                ))
+                .or_insert(None);
             match event.phase {
                 Phase::Down => *anchor = Some(event.gesture),
                 Phase::Move if *anchor != Some(event.gesture) => {
@@ -148,7 +168,9 @@ mod tests {
         assert_eq!(legacy.motion_take, 0);
         assert_eq!(legacy.visible_films.slides(), [true, true]);
         for (mode, shown) in [
-            ("rear", [true, false]), ("front", [false, true]), ("clear", [false, false]),
+            ("rear", [true, false]),
+            ("front", [false, true]),
+            ("clear", [false, false]),
         ] {
             body["visibleFilms"] = serde_json::json!(mode);
             assert_eq!(parse(body.clone()).unwrap().visible_films.slides(), shown);
@@ -188,6 +210,7 @@ mod tests {
     }
     fn request(events: Vec<Event>) -> Request {
         Request {
+            stack: Vec::new(),
             visible_films: super::super::VisibleFilms::Both,
             layer_id: 2,
             wheel: "violet-blue".into(),

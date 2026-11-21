@@ -466,7 +466,7 @@ fn run(
         return Err("Run motion capture separately from the benchmark".into());
     }
     let mut first_cmd = None;
-    let mut playback = macros::Playback::default();
+    let mut playback = std::collections::HashMap::<u64, macros::Playback>::new();
     let mut known_tracks = std::collections::BTreeSet::<u64>::new();
     let mut performers = std::collections::BTreeMap::<u64, macros::Playback>::new();
     let mut release_clock = super::release_clock::ReleaseClock::default();
@@ -499,7 +499,9 @@ fn run(
                     .iter()
                     .any(|s| matches!(s.1, PointerSample::Press(_)))
             }) {
-                playback.physical_press(c.slide, c.gesture);
+                if let Some(p) = playback.get_mut(&c.layer_id) {
+                    p.physical_press(c.slide, c.gesture);
+                }
                 if let Some(p) = performers.get_mut(&c.layer_id) {
                     p.physical_press(c.slide, c.gesture);
                 }
@@ -545,6 +547,7 @@ fn run(
                     let result = match (engine.as_mut(), config.as_ref()) {
                         (Some(r), Some(c))
                             if c.layer_id == job.request.layer_id
+                                && c.stack == job.request.stack
                                 && c.wheel == job.request.wheel
                                 && c.motion == job.request.motion
                                 && c.visible_films == job.request.visible_films
@@ -614,7 +617,11 @@ fn run(
                             Err("A performer has this slide control".into())
                         }
                     } else {
-                        playback.apply(engine.as_mut(), config.as_ref(), batch)
+                        playback.entry(batch.layer_id).or_default().apply(
+                            engine.as_mut(),
+                            config.as_ref(),
+                            batch,
+                        )
                     };
                     let _ = reply.try_send(result);
                 }
@@ -625,8 +632,10 @@ fn run(
                             let down = batch.samples.iter().any(|s| matches!(s.phase, Phase::Down));
                             let result =
                                 macros::perform(&mut performers, r, c, batch, received, app);
-                            if down && result.is_ok() && c.layer_id == id {
-                                playback.physical_press(slide, gesture);
+                            if down && result.is_ok() {
+                                if let Some(p) = playback.get_mut(&id) {
+                                    p.physical_press(slide, gesture);
+                                }
                             }
                             result
                         }
@@ -636,6 +645,7 @@ fn run(
                 }
                 Command::Forget(id) => {
                     release_clock.forget(id);
+                    playback.remove(&id);
                     performers.remove(&id);
                     known_tracks.remove(&id);
                     if let Some(r) = engine.as_mut() {
@@ -653,7 +663,11 @@ fn run(
                         r.set_feedback(None)?;
                         finish_mouse(child.0, r, c)?;
                         macros::flush(app, c)?;
-                        playback.release(r)?;
+                        for (id, mut p) in playback.drain() {
+                            r.select_track(id);
+                            p.release(r)?;
+                        }
+                        r.select_track(c.layer_id);
                         for (id, p) in std::mem::take(&mut performers) {
                             let mut p = p;
                             if macros::recording() {
@@ -676,6 +690,7 @@ fn run(
                 }
                 Command::Set(Some(next)) => {
                     known_tracks.insert(next.layer_id);
+                    known_tracks.extend(next.stack.iter().map(|s| s.layer_id));
                     if config.as_ref() == Some(&next) {
                         continue;
                     }
@@ -699,6 +714,20 @@ fn run(
                     let r = engine.as_mut().unwrap();
                     if config.as_ref().and_then(|c| c.feedback.as_ref()) != next.feedback.as_ref() {
                         r.set_feedback(next.feedback.as_ref().map(|f| f.native()))?;
+                    }
+                    if config.as_ref().map(|c| &c.stack) != Some(&next.stack) {
+                        r.set_stack(
+                            next.stack
+                                .iter()
+                                .map(|s| tss_live_wheel::WheelLayer {
+                                    id: s.layer_id,
+                                    wheel: s.wheel.clone(),
+                                    motion: s.motion,
+                                    films: s.visible_films.slides(),
+                                    opacity: s.opacity,
+                                })
+                                .collect(),
+                        )?;
                     }
                     let old_clock = config.as_ref().and_then(|c| c.feedback_clock.as_ref());
                     if old_clock != next.feedback_clock.as_ref() {
@@ -734,9 +763,25 @@ fn run(
                         {
                             finish_mouse(child.0, r, old)?;
                             macros::flush(app, old)?;
-                            playback.release(r)?;
+                            if !next.stack.iter().any(|s| s.layer_id == old.layer_id) {
+                                if let Some(mut p) = playback.remove(&old.layer_id) {
+                                    p.release(r)?;
+                                }
+                            }
                         }
                     }
+                    let removed: Vec<_> = playback
+                        .keys()
+                        .copied()
+                        .filter(|id| {
+                            *id != next.layer_id && !next.stack.iter().any(|l| l.layer_id == *id)
+                        })
+                        .collect();
+                    for id in removed {
+                        r.select_track(id);
+                        playback.remove(&id).unwrap().release(r)?;
+                    }
+                    r.select_track(next.layer_id);
                     if next.preview_hidden {
                         unsafe {
                             ShowWindow(child.0, SW_HIDE);
@@ -848,6 +893,12 @@ fn run(
         macros::flush(app, c)?;
         stats.drags += drags as u64;
         let frame_time = start.elapsed().saturating_sub(export_pause);
+        for l in &c.stack {
+            r.set_layer_times(
+                l.layer_id,
+                release_clock.film_times(l.layer_id, l.motion, l.motion_take, frame_time),
+            )?;
+        }
         let film_times = release_clock.film_times(c.layer_id, c.motion, c.motion_take, frame_time);
         let [rear_time, front_time] = film_times;
         let program_time =

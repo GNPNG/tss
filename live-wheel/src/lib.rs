@@ -18,6 +18,8 @@ pub use fields::bundled_fields;
 pub use motion::SlideGesture;
 use motion::SlidePose;
 pub use preset::MotionPreset;
+mod stack;
+pub use stack::WheelLayer;
 pub use wgpu;
 
 use bytemuck::{Pod, Zeroable};
@@ -238,6 +240,9 @@ pub struct LiveWheel {
     slots: [Option<u32>; 2],
     tracks: HashMap<u64, Track>,
     active: u64,
+    stack: Vec<WheelLayer>,
+    stack_times: HashMap<u64, [f64; 2]>,
+    stack_gpu: Option<stack::StackGpu>,
     zero: Target,
     interpolated: Target,
     sampler: gpu::Sampler,
@@ -534,6 +539,9 @@ impl LiveWheel {
             slots: [None, None],
             tracks: HashMap::new(),
             active: 0,
+            stack: Vec::new(),
+            stack_times: HashMap::new(),
+            stack_gpu: None,
             zero,
             interpolated,
             sampler,
@@ -633,6 +641,13 @@ impl LiveWheel {
     }
     /// Switch film geometry while retaining the optics, poses and GPU allocation.
     pub fn set_motion(&mut self, preset: MotionPreset) -> Result<(), String> {
+        if self.motion != preset {
+            self.switch_motion(preset)?;
+            self.reset_feedback_history();
+        }
+        Ok(())
+    }
+    fn switch_motion(&mut self, preset: MotionPreset) -> Result<(), String> {
         if self.motion == preset {
             return Ok(());
         }
@@ -656,7 +671,6 @@ impl LiveWheel {
             self.slots = [None, None];
         }
         self.motion = preset;
-        self.reset_feedback_history();
         Ok(())
     }
     fn upload_material(&self) {
@@ -907,6 +921,27 @@ impl LiveWheel {
         front_time: f64,
         program_time: f64,
     ) {
+        if self.stack.is_empty()
+            || self.stack.len() == 1
+                && self.stack[0].opacity == 1.
+                && self.stack[0].wheel == self.wheel
+                && self.stack[0].motion == self.motion
+                && self.stack[0].films == self.slide_visibility
+                && self.stack[0].id == self.active
+        {
+            self.render_one(out, rear_time, front_time, program_time, None);
+        } else {
+            self.render_stack(out, [rear_time, front_time], program_time);
+        }
+    }
+    fn render_one(
+        &mut self,
+        out: Option<&gpu::TextureView>,
+        rear_time: f64,
+        front_time: f64,
+        program_time: f64,
+        stack: Option<stack::Exposure<'_>>,
+    ) {
         let size = self.preview_size();
         if let Some(f) = &mut self.feedback {
             f.prepare(&self.device, size);
@@ -1028,6 +1063,21 @@ impl LiveWheel {
         } else {
             &optical_resources[..3]
         };
+        if let Some(layer) = stack {
+            let mut resources = entries.to_vec();
+            resources.push(TextureView(layer.incident));
+            let pass = layer.gpu.optics(integrate, self.wheel == "violet-blue");
+            let optics = bind(&self.device, pass, &resources);
+            draw(
+                &mut enc,
+                "Transmit incident light through wheel",
+                layer.output,
+                pass,
+                &optics,
+            );
+            self.queue.submit(Some(enc.finish()));
+            return;
+        }
         let (optic_pipe, destination) = if let Some(f) = &self.feedback {
             f.optics(integrate, self.wheel == "violet-blue")
         } else {
@@ -1042,13 +1092,14 @@ impl LiveWheel {
             &optics,
         );
         if let Some(f) = &mut self.feedback {
-            f.compose(
+            f.compose_from(
                 &self.device,
                 &self.queue,
                 &mut enc,
                 &self.sampler,
                 &self.optics.view,
                 program_time,
+                None,
             );
         }
         if let Some(out) = out {

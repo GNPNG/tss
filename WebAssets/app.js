@@ -33,9 +33,15 @@ const state = {
 
 function liveSelection() {
   const layer = selectedLayer();
-  if (!windowsDesktop || !layer?.visible || !layer.nativeLive || state.exporting ||
-      layer.customColors || !mathmosWheels.has(layer.palette)) return null;
-  return { layerId: layer.id, wheel: layer.palette, slide: layer.slide, gesture: layer.gesture,
+  const isWheel = l => l?.nativeLive && !l.customColors && mathmosWheels.has(l.palette);
+  if (!windowsDesktop || !isWheel(layer) || state.exporting) return null;
+  const stack = state.layers.filter(l => l.visible && isWheel(l)).reverse().map(l => ({
+    layerId: l.id, wheel: l.palette, motion: l.motion, motionTake: l.motionTake,
+    visibleFilms: l.visibleFilms ?? 'both', opacity: l.opacity,
+  }));
+  if (!stack.length) return null;
+  const needsStack = stack.length > 1 || stack[0].opacity !== 1 || stack[0].layerId !== layer.id;
+  return { ...(needsStack ? {stack} : {}), layerId: layer.id, wheel: layer.palette, slide: layer.slide, gesture: layer.gesture,
     motion: layer.motion, motionTake: layer.motionTake, visibleFilms: layer.visibleFilms ?? 'both',
     mousePressure: layer.mousePressure?.[layer.slide] ?? 0.5,
     tugResponse: layer.tugResponse[layer.slide], renderWidth: layer.renderWidth, focus: projectorFocus,
@@ -341,6 +347,11 @@ async function loadWheelPresets() {
             focus.dispatchEvent(new Event('input'));
           }
         }
+        if (benchmark?.wheelStack) {
+          byId('add-layer').click();
+          chooseWheel('yellow-red');
+          selectLayer(layer.id);
+        }
         if (benchmark?.verifyExport) {
           const { verifyWheelExport } = await import('./verify-wheel-export.js');
           await nativeSurface.sync();
@@ -432,6 +443,7 @@ function renderTimeline() {
     const clipDuration = document.createElement('small'); clipDuration.textContent = state.audioBuffer ? formatTime(state.audioBuffer.duration) : 'Full track';
     clip.append(clipName, clipDuration); lane.append(clip); lanes.append(lane);
   });
+  nativeSurface?.sync();
   byId('layer-count').textContent = `${state.layers.length} visual ${state.layers.length === 1 ? 'layer' : 'layers'}`;
   const ruler = byId('ruler'); ruler.replaceChildren();
   for (let i = 0; i <= 8; i++) {
@@ -478,13 +490,14 @@ function renderControls() {
   byId('wheel-focus').disabled = !live;
   updateFocusControl();
   preview.parentElement.classList.toggle('native-active', !!live);
-  byId('preview-status').textContent = live ? 'NATIVE GPU · SELECTED WHEEL' : 'PROCEDURAL PREVIEW';
+  byId('preview-status').textContent = live?.stack?.length > 1 ? `NATIVE GPU · ${live.stack.length} WHEELS` : live ? 'NATIVE GPU · SELECTED WHEEL' : 'PROCEDURAL PREVIEW';
   byId('native-instruction').textContent = layer?.gesture === 'rotate'
     ? `Drag around the center to turn the ${layer.slide} glass slide.`
     : layer?.gesture === 'pressure' ? `Press and hold the ${layer.slide} slide to compress it. Drag the contact point. Release to restore the gap.`
     : `Drag to tug the material in the ${layer?.slide ?? 'rear'} slide.`;
   byId('audio-note').hidden = !!live;
-  for (const id of ['hue', 'speed', 'scale', 'opacity']) byId(id).disabled = !layer || !!live;
+  for (const id of ['hue', 'speed', 'scale']) byId(id).disabled = !layer || !!live;
+  byId('opacity').disabled = !layer;
   byId('export').title = 'Export the procedural timeline composite';
   if (!state.exporting) byId('export').textContent = live ? 'Export procedural preview' : 'Export 4K preview';
   if (live && !nativeSurface.surfaceRequested) byId('native-frame-rate').textContent = 'Starting native wheel…';

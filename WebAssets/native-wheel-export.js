@@ -7,10 +7,11 @@ export function wheelMovieRequest(selection, duration, events, baseline) {
     wheel: selection.wheel,
     ...(selection.visibleFilms ? {visibleFilms: selection.visibleFilms} : {}),
     ...(selection.motion ? {motion: selection.motion, motionTake: selection.motionTake} : {}),
+    ...(selection.stack ? {stack: selection.stack} : {}),
     duration,
     events,
     baseline: baseline === 'auto'
-      ? (events.length || hasRelease(selection.motion) ? 'neutral' : 'current')
+      ? (events.length || hasRelease(selection.motion) || selection.stack?.some(l => hasRelease(l.motion)) ? 'neutral' : 'current')
       : baseline,
   };
 }
@@ -42,7 +43,9 @@ export class NativeWheelExport {
 
   refresh() {
     const {audioPath, duration, proceduralBusy} = this.source();
-    this.group.hidden = !this.selection();
+    const selection = this.selection();
+    this.group.hidden = !selection;
+    this.button.textContent = selection?.stack?.length > 1 ? 'Export wheel stack in 4K' : 'Export selected wheel in 4K';
     this.button.disabled = this.busy || proceduralBusy || !audioPath || !(duration > 0);
   }
 
@@ -60,12 +63,14 @@ export class NativeWheelExport {
       const current = this.selection();
       if (current?.layerId !== selection.layerId || current.wheel !== selection.wheel ||
           current.motion !== selection.motion || current.motionTake !== selection.motionTake ||
-          current.visibleFilms !== selection.visibleFilms ||
+          current.visibleFilms !== selection.visibleFilms || JSON.stringify(current.stack) !== JSON.stringify(selection.stack) ||
           this.source().audioPath !== audioPath || this.source().proceduralBusy) throw Error('The selected wheel, films, motion or song changed.');
       await this.finishRecording();
       this.pause();
       await this.prepare();
-      const request = wheelMovieRequest(selection, duration, this.getEvents(selection.layerId, duration), this.pose.value);
+      const ids = selection.stack?.map(layer => layer.layerId) ?? [selection.layerId];
+      const events = ids.flatMap(id => this.getEvents(id, duration)).sort((a, b) => a.time - b.time);
+      const request = wheelMovieRequest(selection, duration, events, this.pose.value);
       this.count.textContent = 'Preparing 3840 × 2160 optical render…';
       this.progress.removeAttribute('value');
       this.cancelButton.disabled = false;

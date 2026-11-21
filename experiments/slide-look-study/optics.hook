@@ -181,9 +181,17 @@ vec4 hook() {
         const float frontMm = 51.8;
         const float screenPixelsPerMm = 1.8; // design pixels at 1280 x 720
         float focusMm = mix(rearMm, frontMm, clamp(liveFocus, 0.0, 1.0));
+
+#ifdef TSS_STACK
+        float layerRear = mix(rearMm, frontMm, mat.lens.z);
+        float layerFront = mix(rearMm, frontMm, mat.lens.w);
+#else
+        const float layerRear = rearMm;
+        const float layerFront = frontMm;
+#endif
         float scale = 8.0 * 1600.0 * screenPixelsPerMm;
-        rearBlur = scale * (1.0 / rearMm - 1.0 / focusMm);
-        frontBlur = scale * (1.0 / frontMm - 1.0 / focusMm);
+        rearBlur = scale * (1.0 / layerRear - 1.0 / focusMm);
+        frontBlur = scale * (1.0 / layerFront - 1.0 / focusMm);
     }
 #endif
 
@@ -237,6 +245,15 @@ vec4 hook() {
     // a little color into neighbouring pockets.
     float clearFraction = (1.0 - cover.r) * (1.0 - cover.g);
     float flare = (0.0018 + 0.073 * clearFraction * opticalPatch(uv - vec2(0.54, 0.47), vec2(0.19, 0.21)));
+#ifdef TSS_STACK
+    // Project the lamp once. Successive wheels attenuate the incoming light.
+    vec3 incident = mat.lens.z == 0.0 ? lamp : textureLod(sampler2D(incomingLight,fieldSampler),uv,0.0).rgb;
+    vec3 projected = incident * trans + irradiance * flare * vec3(0.86, 0.95, 1.0);
+#ifdef TSS_WHEEL_PROFILE
+    projected *= wheelCarrier;
+#endif
+    return vec4(mix(incident, projected, mat.lens.y), 1.0);
+#endif
     vec3 radiance = lamp * trans + irradiance * flare * vec3(0.86, 0.95, 1.0);
 #ifdef TSS_WHEEL_PROFILE
     radiance *= wheelCarrier;

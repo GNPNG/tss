@@ -75,6 +75,13 @@ fn main() {
         ),
     ] {
         for (suffix, sampler) in [("", ""), ("-footprint", footprint.as_str())] {
+            let stack = format!("{sampler}\n#define TSS_STACK 1\nlayout(set=0,binding={}) uniform texture2D incomingLight;", if suffix.is_empty() { 3 } else { 7 });
+            compile(
+                &format!("{name}{suffix}-stack"),
+                &stack,
+                material,
+                "void main() { result = hook(); }",
+            );
             compile(
                 &format!("{name}{suffix}"),
                 sampler,

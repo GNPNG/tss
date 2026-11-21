@@ -224,6 +224,8 @@ pub struct FeedbackAnchor {
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     #[serde(default)]
+    stack: Vec<StackLayer>,
+    #[serde(default)]
     visible_films: VisibleFilms,
     layer_id: u64,
     wheel: String,
@@ -247,6 +249,20 @@ pub struct Config {
     #[serde(default)]
     preview_hidden: bool,
 }
+#[derive(Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct StackLayer {
+    layer_id: u64,
+    wheel: String,
+    #[serde(default)]
+    motion: MotionPreset,
+    #[serde(default)]
+    motion_take: u64,
+    #[serde(default)]
+    visible_films: VisibleFilms,
+    opacity: f32,
+}
+
 fn default_pressure() -> f32 {
     0.5
 }
@@ -362,6 +378,7 @@ pub struct BenchmarkConfig {
     gesture: Gesture,
     render_width: u32,
     verify_export: bool,
+    wheel_stack: bool,
     coral_trial: bool,
     motion: MotionPreset,
     focus: Option<f32>,
@@ -397,6 +414,7 @@ impl BenchmarkConfig {
             },
             render_width: if preview_960 { 960 } else { 640 },
             verify_export,
+            wheel_stack: false,
             coral_trial: motion == MotionPreset::CoralRelease,
             motion,
             focus: beads.then_some(0.90),
@@ -406,17 +424,23 @@ impl BenchmarkConfig {
     #[cfg(windows)]
     fn current() -> Self {
         let flag = |name: &str| std::env::args_os().any(|arg| arg == name);
-        Self::from_flags(
+        let mut config = Self::from_flags(
             windows::pressure_trial(),
             flag("--coral-trial"),
             flag("--coral-beads-trial"),
             flag("--preview-960"),
             crate::export_smoke::enabled(),
-        )
+        );
+        config.wheel_stack = flag("--wheel-stack-trial");
+        config
     }
 
     fn matches_optics(&self, c: &Config, preview: [u32; 2]) -> bool {
-        c.motion == self.motion
+        (!self.wheel_stack
+            || c.stack.len() == 2
+                && c.stack[0].wheel == "violet-blue"
+                && c.stack[1].wheel == "yellow-red")
+            && c.motion == self.motion
             && c.focus == self.focus
             && c.render_width == self.render_width
             && preview == [self.render_width, self.render_width * 9 / 16]

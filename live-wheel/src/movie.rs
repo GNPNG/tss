@@ -5,7 +5,10 @@ pub struct WheelMovie<'a> {
     renderer: &'a mut LiveWheel,
     original_optics: Option<Target>,
     original_feedback: Option<feedback::Feedback>,
-    original_track: Option<Track>,
+    original_tracks: HashMap<u64, Track>,
+    selected: u64,
+    original_times: HashMap<u64, [f64; 2]>,
+    current_pose: bool,
     readback: gpu::Buffer,
     row_bytes: u32,
 }
@@ -66,8 +69,10 @@ impl LiveWheel {
         }
         let original_optics = Some(std::mem::replace(&mut self.optics, optics));
         let original_feedback = std::mem::replace(&mut self.feedback, feedback);
-        let original_track = self.tracks.remove(&self.active);
-        if let Some(track) = &original_track {
+        let selected = self.active;
+        let original_times = self.stack_times.clone();
+        let original_tracks = std::mem::take(&mut self.tracks);
+        for (&id, track) in &original_tracks {
             let mut slides = track.slides;
             for pose in &mut slides {
                 if current_pose {
@@ -80,7 +85,7 @@ impl LiveWheel {
             }
             let dirty = slides.iter().any(|p| p.strength != [0.; 2]);
             self.tracks.insert(
-                self.active,
+                id,
                 Track {
                     slides,
                     dirty,
@@ -92,7 +97,10 @@ impl LiveWheel {
             renderer: self,
             original_optics,
             original_feedback,
-            original_track,
+            original_tracks,
+            selected,
+            original_times,
+            current_pose,
             readback,
             row_bytes,
         })
@@ -100,6 +108,13 @@ impl LiveWheel {
 }
 
 impl WheelMovie<'_> {
+    pub fn select_gesture_layer(&mut self, id: u64) -> Result<(), String> {
+        if id != self.selected && !self.renderer.stack.iter().any(|l| l.id == id) {
+            return Err("Movie gesture targets an unknown wheel".into());
+        }
+        self.renderer.select_track(id);
+        Ok(())
+    }
     pub fn set_slide_pressure(
         &mut self,
         slide: u32,
@@ -146,6 +161,19 @@ impl WheelMovie<'_> {
         }
         let r = &mut self.renderer;
         let [w, h] = r.preview_size();
+        r.select_track(self.selected);
+        for layer in &r.stack {
+            let origin = if self.current_pose {
+                self.original_times
+                    .get(&layer.id)
+                    .copied()
+                    .unwrap_or([0.; 2])
+            } else {
+                [0.; 2]
+            };
+            r.stack_times
+                .insert(layer.id, [origin[0] + song_time, origin[1] + song_time]);
+        }
         r.render_films_to(None, rear, front, song_time);
         let mut encoder = r.device.create_command_encoder(&Default::default());
         encoder.copy_texture_to_buffer(
@@ -178,10 +206,9 @@ impl Drop for WheelMovie<'_> {
         let r = &mut self.renderer;
         r.optics = self.original_optics.take().unwrap();
         r.feedback = self.original_feedback.take();
-        r.tracks.remove(&r.active);
-        if let Some(track) = self.original_track.take() {
-            r.tracks.insert(r.active, track);
-        }
+        r.active = self.selected;
+        r.stack_times = std::mem::take(&mut self.original_times);
+        r.tracks = std::mem::take(&mut self.original_tracks);
     }
 }
 
