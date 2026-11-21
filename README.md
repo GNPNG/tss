@@ -12,6 +12,8 @@ In the source build, open the coral wheel project or choose **Violet / Blue → 
 
 **Projected films** lets you inspect either film in isolation and return to the moving overlap. [Watch the rear film, front film and combined projection side by side](experiments/slide-look-study/approval/coral-solo/coral-solo.mp4)
 
+Use **Rear film oil** and **Front film oil** to select the original wheel motion, 20 cSt PDMS or 1,000 cSt PDMS independently. Open either comparison project to watch the same violet rear wheel through a different cyan front film. [Two editable projects and a side-by-side Radeon capture](experiments/oil-projection/README.md)
+
 The coral wheel sustained 40.00 FPS on the Windows GTX 1650 Ti Max-Q at both 640 × 360 and 960 × 540. Each 12-second trial recorded 481 successful presentations, three front-slide replays, 475 applied mouse movements and zero skipped acquisitions. [Windows presentation timings and GPU telemetry](experiments/slide-look-study/approval/coral-wheel/windows/README.md)
 
 The source build adds **Slide motion → Coral release**. Watch the front film shed two drops, then pull focus through them onto the violet film behind. [Radeon capture](experiments/slide-look-study/approval/coral-release/coral-release.mp4) · [Full-size frame](experiments/slide-look-study/approval/coral-release/coral-release.png) · [How the films were solved and measured](experiments/coral-release/README.md)

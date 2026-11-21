@@ -1,0 +1,40 @@
+{
+  "adapter": "AMD Radeon Pro 5300M",
+  "backend": "Metal",
+  "byteIdenticalMovieFramesAtTwoSeconds": 2,
+  "changedSamplesAfterFrontEdit": [
+    0,
+    73668
+  ],
+  "changedSamplesAfterRearEdit": [
+    96145,
+    0
+  ],
+  "comparisonTimeSeconds": 2.0,
+  "fieldChannels": [
+    "rear",
+    "front"
+  ],
+  "fieldSize": [
+    512,
+    288
+  ],
+  "focus": 0.9,
+  "footprintSampling": true,
+  "fps": 24,
+  "framesPerGrade": 96,
+  "initialChangedSamples": [
+    0,
+    0
+  ],
+  "movieFronts": [
+    "pdms-20",
+    "pdms-1000"
+  ],
+  "movieRear": "wheel",
+  "size": [
+    640,
+    360
+  ],
+  "wheel": "violet-blue"
+}
