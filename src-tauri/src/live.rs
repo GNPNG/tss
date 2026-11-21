@@ -8,7 +8,7 @@ mod media_track;
 #[cfg(not(any(windows, target_os = "macos")))]
 use media_track::MediaSettings;
 #[cfg(any(windows, target_os = "macos"))]
-use tss_live_wheel::{MotionPreset, OpacityEnvelope};
+use tss_live_wheel::{MaterialMotion, MotionPreset, OpacityEnvelope};
 #[cfg(not(any(windows, target_os = "macos")))]
 #[path = "../../live-wheel/src/envelope.rs"]
 mod envelope;
@@ -18,7 +18,7 @@ use envelope::OpacityEnvelope;
 #[path = "../../live-wheel/src/preset.rs"]
 mod preset;
 #[cfg(not(any(windows, target_os = "macos")))]
-use preset::MotionPreset;
+use preset::{MaterialMotion, MotionPreset};
 #[cfg(any(windows, target_os = "macos", test))]
 mod mouse_pressure;
 pub mod movie;
@@ -251,6 +251,8 @@ pub struct Config {
     #[serde(default)]
     motion: MotionPreset,
     #[serde(default)]
+    material_motion: MaterialMotion,
+    #[serde(default)]
     motion_take: u64,
     slide: Slide,
     #[serde(default)]
@@ -280,6 +282,8 @@ pub(super) struct StackLayer {
     wheel: String,
     #[serde(default)]
     motion: MotionPreset,
+    #[serde(default)]
+    material_motion: MaterialMotion,
     #[serde(default)]
     motion_take: u64,
     #[serde(default)]

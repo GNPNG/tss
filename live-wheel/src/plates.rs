@@ -392,7 +392,7 @@ impl LiveWheel {
             "schemaVersion": 1, "profile": "DIGITAL_4K", "size": format.size(),
             "layout": format.layout, "horizonY": format.horizon_y,
             "scope": "Selected wheel projected alone at full optical density, before stack propagation and electronic feedback.",
-            "wheel": self.wheel, "layerId": self.active, "motion": self.motion, "focus": self.focus,
+            "wheel": self.wheel, "layerId": self.active, "motion": self.motion, "materialMotion": self.material_motion, "focus": self.focus,
             "rearSeconds": times[0], "frontSeconds": times[1], "visibleFilms": {"rear": rear, "front": front},
             "gpu": self.adapter_name(), "source": "RGBA32Float linear optical radiance before video feedback",
             "encoding":format.encoding, "cICP":format.encoding.cicp(), "iccEmbedded":true, "alpha":"16-bit, straight linear",

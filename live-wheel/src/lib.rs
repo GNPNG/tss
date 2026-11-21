@@ -20,7 +20,9 @@ mod coral_layer_proof;
 pub use fields::bundled_fields;
 pub use motion::SlideGesture;
 use motion::SlidePose;
-pub use preset::MotionPreset;
+pub use preset::{FilmOil, MaterialMotion, MotionPreset};
+mod film_sources;
+use film_sources::{FilmFrame, FilmSource, OilFields};
 mod envelope;
 pub use envelope::{OpacityEnvelope, OpacityRegion};
 pub mod media_track;
@@ -251,11 +253,13 @@ pub struct LiveWheel {
     cfg: gpu::SurfaceConfiguration,
     fields: Fields,
     motion: MotionPreset,
+    material_motion: MaterialMotion,
+    oils: OilFields,
     inactive_fields: Option<Fields>,
     small_front: Option<SmallFront>,
     cache: gpu::Texture,
     cache_view: gpu::TextureView,
-    slots: [Option<u32>; 2],
+    slots: [[Option<FilmFrame>; 2]; 2],
     tracks: HashMap<u64, Track>,
     active: u64,
     stack: Vec<WheelLayer>,
@@ -551,11 +555,13 @@ impl LiveWheel {
             cfg,
             fields,
             motion: MotionPreset::WheelFlow,
+            material_motion: MaterialMotion::default(),
+            oils: OilFields::default(),
             inactive_fields: None,
             small_front: None,
             cache,
             cache_view,
-            slots: [None, None],
+            slots: [[None; 2]; 2],
             tracks: HashMap::new(),
             active: 0,
             stack: Vec::new(),
@@ -663,29 +669,53 @@ impl LiveWheel {
     }
     /// Switch film geometry while retaining the optics, poses and GPU allocation.
     pub fn set_motion(&mut self, preset: MotionPreset) -> Result<(), String> {
-        if self.motion != preset {
-            self.switch_motion(preset)?;
-            // A stack changes its program history when its projected layers change.
-            // Selecting a different wheel only changes the input target.
-            if self.stack.is_empty() {
+        self.set_film_sources(preset, self.material_motion)
+    }
+    /// Assign the continuous viscosity solve on each slide. A coral release supplies its own
+    /// geometry on its participating films and leaves the assigned oils available on return.
+    pub fn set_material_motion(&mut self, materials: MaterialMotion) -> Result<(), String> {
+        self.set_film_sources(self.motion, materials)
+    }
+    /// Apply a preset and its two material assignments together when restoring a track.
+    pub fn set_film_sources(
+        &mut self,
+        preset: MotionPreset,
+        materials: MaterialMotion,
+    ) -> Result<(), String> {
+        if (self.motion, self.material_motion) != (preset, materials) {
+            let previous = FilmSource::for_slides(self.motion, self.material_motion);
+            self.switch_film_sources(preset, materials)?;
+            // A stack invalidates its program history when its projected layers change.
+            if self.stack.is_empty() && FilmSource::for_slides(preset, materials) != previous {
                 self.reset_feedback_history();
             }
         }
         Ok(())
     }
-    fn switch_motion(&mut self, preset: MotionPreset) -> Result<(), String> {
-        if self.motion == preset {
+    fn switch_film_sources(
+        &mut self,
+        preset: MotionPreset,
+        materials: MaterialMotion,
+    ) -> Result<(), String> {
+        if (self.motion, self.material_motion) == (preset, materials) {
             return Ok(());
         }
+        let wheel_fields = if self.motion == MotionPreset::CoralRelease {
+            self.inactive_fields.as_ref().expect("retained wheel solve")
+        } else {
+            &self.fields
+        };
+        self.oils
+            .prepare(FilmSource::for_slides(preset, materials), wheel_fields)?;
         if preset == MotionPreset::WheelWithCoralBeads && self.small_front.is_none() {
-            if !self.fields.matches_small_front() {
+            if !wheel_fields.registered_full_slide() {
                 return Err(
                     "Small coral droplets require the registered full-slide geometry".into(),
                 );
             }
             self.small_front = Some(SmallFront::load()?);
         }
-        if self.motion == MotionPreset::CoralRelease || preset == MotionPreset::CoralRelease {
+        if (self.motion == MotionPreset::CoralRelease) != (preset == MotionPreset::CoralRelease) {
             if self.inactive_fields.is_none() {
                 let coral = Fields::coral_release()?;
                 if !coral.same_glass_as(&self.fields) {
@@ -694,9 +724,9 @@ impl LiveWheel {
                 self.inactive_fields = Some(coral);
             }
             std::mem::swap(&mut self.fields, self.inactive_fields.as_mut().unwrap());
-            self.slots = [None, None];
         }
         self.motion = preset;
+        self.material_motion = materials;
         Ok(())
     }
     fn upload_material(&self) {
@@ -786,16 +816,32 @@ impl LiveWheel {
             pose.end();
         }
     }
-    fn cache_pair(&mut self, a: u32, b: u32) -> [u32; 2] {
-        cache_slots(&mut self.slots, [a, b], |slot, frame| {
+    fn cache_pair(&mut self, film: usize, source: FilmSource, frames: [u32; 2]) -> [u32; 2] {
+        let base = 2 * film as u32;
+        let wanted = frames.map(|index| FilmFrame { source, index });
+        cache_slots(&mut self.slots[film], wanted, |slot, frame| {
+            let bytes = match source {
+                FilmSource::SmallCoral => self
+                    .small_front
+                    .as_mut()
+                    .expect("validated coral front")
+                    .frame(frame.index),
+                FilmSource::Wheel | FilmSource::Coral => self.fields.frame(frame.index),
+                _ => self
+                    .oils
+                    .fields(source)
+                    .expect("validated oil")
+                    .frame(frame.index),
+            };
             upload_frame(
                 &self.queue,
                 &self.cache,
                 self.fields.size,
-                slot,
-                self.fields.frame(frame),
+                base + slot,
+                bytes,
             );
         })
+        .map(|slot| base + slot)
     }
     pub fn render(
         &mut self,
@@ -954,6 +1000,7 @@ impl LiveWheel {
                 && self.stack[0].opacity_at(program_time) == 1.
                 && self.stack[0].wheel == self.wheel
                 && self.stack[0].motion == self.motion
+                && self.stack[0].material_motion == self.material_motion
                 && self.stack[0].films == self.slide_visibility
                 && self.stack[0].id == self.active
         {
@@ -978,21 +1025,15 @@ impl LiveWheel {
         if let Some(f) = self.feedback.as_mut().filter(|_| plate.is_none()) {
             f.prepare(&self.device, size);
         }
-        let (a, b, fraction) = self.fields.sample_motion(self.motion, rear_time);
-        let [first, second] = self.cache_pair(a, b);
-        let (front_frames, front_fraction) = if self.motion == MotionPreset::WheelWithCoralBeads {
-            let (a, b, alpha) = self
-                .fields
-                .sample_motion(MotionPreset::CoralRelease, front_time);
-            (
-                self.small_front
-                    .as_mut()
-                    .expect("loaded by set_motion")
-                    .frames(&self.queue, &self.cache, a, b),
-                alpha,
-            )
+        let [rear, front] = FilmSource::for_slides(self.motion, self.material_motion);
+        let (rear_frames, fraction) = rear.sample(&self.fields, rear_time);
+        let (front_pair, front_fraction) = front.sample(&self.fields, front_time);
+        let [first, second] = self.cache_pair(0, rear, rear_frames);
+        // A matching RG8 frame pair already contains both independent physical films.
+        let front_frames = if (front, front_pair) == (rear, rear_frames) {
+            [first, second]
         } else {
-            ([first, second], fraction)
+            self.cache_pair(1, front, front_pair)
         };
         let mut poses = self
             .tracks

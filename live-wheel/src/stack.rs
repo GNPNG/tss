@@ -6,6 +6,8 @@ pub struct WheelLayer {
     pub id: u64,
     pub wheel: String,
     pub motion: MotionPreset,
+    /// The two authored oil solves, retained across coral preset switches.
+    pub material_motion: MaterialMotion,
     pub films: [bool; 2],
     pub opacity: f32,
     pub envelope: Option<OpacityEnvelope>,
@@ -114,11 +116,11 @@ impl LiveWheel {
         }) {
             return Err("Invalid wheel stack ID, wheel or opacity".into());
         }
-        let saved = self.motion;
+        let saved = (self.motion, self.material_motion);
         let result = layers
             .iter()
-            .try_for_each(|layer| self.switch_motion(layer.motion));
-        self.switch_motion(saved)?;
+            .try_for_each(|layer| self.switch_film_sources(layer.motion, layer.material_motion));
+        self.switch_film_sources(saved.0, saved.1)?;
         result?;
         self.stack = layers;
         self.stack_times.retain(|id, _| ids.contains(id));
@@ -153,7 +155,7 @@ impl LiveWheel {
         let layers = std::mem::take(&mut self.stack);
         let selected = self.active;
         let selected_wheel = std::mem::take(&mut self.wheel);
-        let selected_motion = self.motion;
+        let selected_motion = (self.motion, self.material_motion);
         let selected_films = self.slide_visibility;
         // A transparent wheel neither attenuates light nor takes a focal plane.
         // With every wheel transparent, render the lamp through one zero-strength pass.
@@ -169,7 +171,7 @@ impl LiveWheel {
         {
             self.active = layer.id;
             self.wheel.clone_from(&layer.wheel);
-            self.switch_motion(layer.motion)
+            self.switch_film_sources(layer.motion, layer.material_motion)
                 .expect("stack geometry validated at selection");
             self.slide_visibility = layer.films;
             let mut material = self.materials[&layer.wheel];
@@ -208,7 +210,7 @@ impl LiveWheel {
         }
         self.active = selected;
         self.wheel = selected_wheel;
-        self.switch_motion(selected_motion)
+        self.switch_film_sources(selected_motion.0, selected_motion.1)
             .expect("restore active wheel geometry");
         self.slide_visibility = selected_films;
         self.upload_material();
@@ -280,6 +282,7 @@ mod tests {
             id: 1,
             wheel: "violet-blue".into(),
             motion: MotionPreset::WheelFlow,
+            material_motion: MaterialMotion::default(),
             films: [true; 2],
             opacity: 1.,
             envelope: None,
@@ -323,6 +326,7 @@ mod tests {
             id: 1,
             wheel: "violet-blue".into(),
             motion: MotionPreset::WheelFlow,
+            material_motion: MaterialMotion::default(),
             films: [true, true],
             opacity: 1.,
             envelope: None,
@@ -331,6 +335,7 @@ mod tests {
             id: 2,
             wheel: "yellow-red".into(),
             motion: MotionPreset::WheelWithCoralBeads,
+            material_motion: MaterialMotion::default(),
             films: [true, true],
             opacity: 0.68,
             envelope: None,

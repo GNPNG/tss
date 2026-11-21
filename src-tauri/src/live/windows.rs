@@ -665,6 +665,7 @@ fn run(
                                 && c.stack == job.request.stack
                                 && c.wheel == job.request.wheel
                                 && c.motion == job.request.motion
+                                && c.material_motion == job.request.material_motion
                                 && c.visible_films == job.request.visible_films
                                 && c.motion_take == job.request.motion_take =>
                         {
@@ -839,6 +840,7 @@ fn run(
                                     id: s.layer_id,
                                     wheel: s.wheel.clone(),
                                     motion: s.motion,
+                                    material_motion: s.material_motion,
                                     films: s.visible_films.slides(),
                                     opacity: s.opacity,
                                     envelope: s.envelope.clone(),
@@ -938,9 +940,10 @@ fn run(
                     if !config.as_ref().is_some_and(|c| {
                         c.layer_id == next.layer_id
                             && c.motion == next.motion
+                            && c.material_motion == next.material_motion
                             && c.motion_take == next.motion_take
                     }) {
-                        r.set_motion(next.motion)?;
+                        r.set_film_sources(next.motion, next.material_motion)?;
                         last_presented_film_times = None;
                         if next.motion == MotionPreset::CoralRelease
                             && config.as_ref().is_some_and(|old| {

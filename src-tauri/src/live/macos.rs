@@ -507,6 +507,7 @@ fn configure(
                     id: s.layer_id,
                     wheel: s.wheel.clone(),
                     motion: s.motion,
+                    material_motion: s.material_motion,
                     films: s.visible_films.slides(),
                     opacity: s.opacity,
                     envelope: s.envelope.clone(),
@@ -555,8 +556,10 @@ fn configure(
     if old.map(|v| (&v.wheel, v.layer_id)) != Some((&c.wheel, c.layer_id)) {
         r.set_wheel(&c.wheel)?;
     }
-    if old.map(|v| (v.motion, v.layer_id)) != Some((c.motion, c.layer_id)) {
-        r.set_motion(c.motion)?;
+    if old.map(|v| (v.motion, v.material_motion, v.layer_id))
+        != Some((c.motion, c.material_motion, c.layer_id))
+    {
+        r.set_film_sources(c.motion, c.material_motion)?;
     }
     let [rear, front] = c.visible_films.slides();
     r.set_slide_visibility(rear, front);

@@ -237,7 +237,7 @@ impl LiveWheel {
             fs::write(dir.join("dieline.svg"), spec.guide_svg()).map_err(|e| e.to_string())?;
             let data = serde_json::json!({
                 "profile":"PRINT_CMYK", "format":format, "geometry":spec, "canvasMm":spec.canvas_mm(),
-                "wheel":self.wheel, "filmTimes":times, "visibleFilms":self.slide_visibility,
+                "wheel":self.wheel, "motion":self.motion, "materialMotion":self.material_motion, "filmTimes":times, "visibleFilms":self.slide_visibility,
                 "scope":"Selected wheel at full density, before electronic feedback. Flat orthographic full-bleed process art, separate registered finishing guides.",
                 "processFile":"artwork.tif", "pressFile":"press.pdf", "spotPlate":format.gilding.map(|g|g.plate()), "colophonTypePt":format.catalog.map(|_|6.5),"colophonBlack":"C0 M0 Y0 K100 overprint on uninked panel","largeSolidBlack":"C60 M40 Y40 K100 from the registered mask", "nonPrintingGuide":"dieline.svg", "physicalResolutionPpi":300,
                 "destinationIcc":format.stock.profile_name(), "tacPercent":format.stock.tac(),

@@ -4,7 +4,6 @@ use std::io::Read;
 pub(super) struct SmallFront {
     distances: Vec<u8>,
     upload: Vec<u8>,
-    slots: [Option<u32>; 2],
 }
 
 impl SmallFront {
@@ -23,39 +22,27 @@ impl SmallFront {
         Ok(Self {
             distances,
             upload: vec![0; 2 * PIXELS],
-            slots: [None; 2],
         })
     }
 
-    pub fn frames(
-        &mut self,
-        queue: &gpu::Queue,
-        texture: &gpu::Texture,
-        a: u32,
-        b: u32,
-    ) -> [u32; 2] {
-        // GPU array layers 0–1 retain the original wheel. Layers 2–3 contain
-        // only the front film, using the green channel expected by the optics.
+    pub fn frame(&mut self, frame: u32) -> &[u8] {
         let pixels = self.upload.len() / 2;
-        cache_slots(&mut self.slots, [a, b], |slot, frame| {
-            let offset = frame as usize * pixels;
-            for (dst, &value) in self
-                .upload
-                .chunks_exact_mut(2)
-                .zip(&self.distances[offset..offset + pixels])
-            {
-                dst[1] = value;
-            }
-            upload_frame(queue, texture, [704, 704], slot + 2, &self.upload);
-        })
-        .map(|slot| slot + 2)
+        let offset = frame as usize * pixels;
+        for (dst, &value) in self
+            .upload
+            .chunks_exact_mut(2)
+            .zip(&self.distances[offset..offset + pixels])
+        {
+            dst[1] = value;
+        }
+        &self.upload
     }
 }
 
-pub(super) fn cache_slots(
-    slots: &mut [Option<u32>; 2],
-    wanted: [u32; 2],
-    mut upload: impl FnMut(u32, u32),
+pub(super) fn cache_slots<T: Copy + Eq>(
+    slots: &mut [Option<T>; 2],
+    wanted: [T; 2],
+    mut upload: impl FnMut(u32, T),
 ) -> [u32; 2] {
     std::array::from_fn(|i| {
         let frame = wanted[i];

@@ -73,7 +73,7 @@ fn colored_pressure_follows_one_slide_and_releases_exactly() {
         p[0] = (32. + 190. * x / f64::from(w)).round() as u8;
         p[1] = (32. + 190. * y / f64::from(h)).round() as u8;
     }
-    r.slots = [None; 2];
+    r.slots = [[None; 2]; 2];
     r.set_slide_pressure(0, 1., [0.365, 0.48]).unwrap();
     r.gesture(0, SlideGesture::Rotate, [0.75, 0.5], [0.5, 0.75]);
     picture(&mut r);
@@ -103,7 +103,7 @@ fn colored_pressure_follows_one_slide_and_releases_exactly() {
     for p in r.fields.data.chunks_exact_mut(2) {
         p.copy_from_slice(&[255, 0]);
     }
-    r.slots = [None; 2];
+    r.slots = [[None; 2]; 2];
     r.select_track(9);
     r.materials
         .insert("constant".into(), Material::constant_film());

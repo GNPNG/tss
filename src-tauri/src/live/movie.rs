@@ -50,6 +50,8 @@ pub struct Request {
     #[serde(default)]
     pub(super) motion: super::MotionPreset,
     #[serde(default)]
+    pub(super) material_motion: super::MaterialMotion,
+    #[serde(default)]
     pub(super) motion_take: u64,
     pub duration: f64,
     pub baseline: Baseline,
@@ -167,6 +169,26 @@ mod tests {
         let legacy = parse(body.clone()).unwrap();
         assert_eq!(legacy.motion, super::super::MotionPreset::WheelFlow);
         assert_eq!(legacy.motion_take, 0);
+        assert_eq!(
+            legacy.material_motion,
+            super::super::MaterialMotion::default()
+        );
+        body["materialMotion"] = serde_json::json!({"rear":"pdms-1000"});
+        body["stack"] = serde_json::json!([{"layerId":2,"wheel":"violet-blue","opacity":1.0,
+            "materialMotion":{"front":"pdms-20"}}]);
+        let authored = parse(body.clone()).unwrap();
+        let json = |m: super::super::MaterialMotion| serde_json::to_value(m).unwrap();
+        assert_eq!(
+            json(authored.material_motion),
+            serde_json::json!({"rear":"pdms-1000","front":"wheel"})
+        );
+        assert_eq!(
+            json(authored.stack[0].material_motion),
+            serde_json::json!({"rear":"wheel","front":"pdms-20"})
+        );
+        let mut invalid = body.clone();
+        invalid["materialMotion"]["rear"] = serde_json::json!("pdms-200");
+        assert!(parse(invalid).is_err());
         assert_eq!(legacy.visible_films.slides(), [true, true]);
         for (mode, shown) in [
             ("rear", [true, false]),
@@ -216,6 +238,7 @@ mod tests {
             layer_id: 2,
             wheel: "violet-blue".into(),
             motion: Default::default(),
+            material_motion: Default::default(),
             motion_take: 0,
             duration: 0.75,
             baseline: Baseline::Neutral,

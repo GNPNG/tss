@@ -74,14 +74,17 @@ fn parse(b: &[u8]) -> Result<Layout, String> {
     })
 }
 impl Fields {
-    pub fn matches_small_front(&self) -> bool {
+    pub fn registered_full_slide(&self) -> bool {
         self.size == [704, 704]
             && self.view == [96, 208, 512, 288]
             && self.count == 96
             && self.rate == 24
     }
     pub fn coral_release() -> Result<Self, String> {
-        let mut bytes = unpack(include_bytes!("../assets/coral-release.rg8.gz"))?;
+        Self::from_gzip(include_bytes!("../assets/coral-release.rg8.gz"))
+    }
+    pub fn from_gzip(gzip: &[u8]) -> Result<Self, String> {
+        let mut bytes = unpack(gzip)?;
         let layout = parse(&bytes)?;
         bytes.drain(..layout.header);
         Ok(Self::from_layout(layout, bytes))

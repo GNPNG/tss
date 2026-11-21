@@ -40,7 +40,7 @@ fn geometry(phase: Phase) -> Fields {
 
 fn capture(renderer: &mut LiveWheel, phase: Phase, focus: f32, filtered: bool) -> Vec<u8> {
     renderer.fields = geometry(phase);
-    renderer.slots = [None, None];
+    renderer.slots = [[None; 2]; 2];
     renderer.set_focus(Some(focus)).unwrap();
     renderer.set_footprint_sampling(filtered);
     renderer.render_offscreen(0.).unwrap();

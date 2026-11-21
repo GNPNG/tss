@@ -16,8 +16,13 @@ use production::{DigitalFormat, PrintFormat, PrintLayout};
 pub struct Selection {
     pub(super) layer_id: u64,
     pub(super) wheel: String,
+    #[serde(default)]
     pub(super) motion: MotionPreset,
+    #[serde(default)]
+    pub(super) material_motion: super::MaterialMotion,
+    #[serde(default)]
     pub(super) motion_take: u64,
+    #[serde(default)]
     pub(super) visible_films: VisibleFilms,
     pub(super) focus: Option<f32>,
     #[serde(default)]
@@ -50,12 +55,13 @@ pub async fn preview_wheel_plates(
         Err("Native wheel framing requires Windows".into())
     }
 }
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 impl Selection {
     pub(super) fn matches(&self, c: &super::Config) -> bool {
         c.layer_id == self.layer_id
             && c.wheel == self.wheel
             && c.motion == self.motion
+            && c.material_motion == self.material_motion
             && c.motion_take == self.motion_take
             && c.visible_films == self.visible_films
             && c.focus == self.focus
@@ -165,5 +171,28 @@ pub async fn export_native_wheel_plates(
     {
         let _ = (app, host, selection);
         Err("Live wheel plate export requires the Windows native editor".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{super::Config, Selection};
+    use serde_json::{from_value, json};
+
+    #[test]
+    fn plate_selection_matches_each_material_on_the_live_wheel() {
+        let mut payload = json!({"layerId":2,"wheel":"violet-blue","slide":"rear",
+            "rect":{"x":0,"y":0,"width":640,"height":360},"renderWidth":640});
+        let legacy: Config = from_value(payload.clone()).unwrap();
+        let old_plate: Selection = from_value(payload.clone()).unwrap();
+        assert!(old_plate.matches(&legacy));
+
+        payload["materialMotion"] = json!({"front":"pdms-20","rear":"pdms-1000"});
+        let current: Config = from_value(payload.clone()).unwrap();
+        assert!(!old_plate.matches(&current));
+        let current_plate: Selection = from_value(payload.clone()).unwrap();
+        assert!(current_plate.matches(&current));
+        payload["materialMotion"]["front"] = json!("pdms-1000");
+        assert!(!from_value::<Selection>(payload).unwrap().matches(&current));
     }
 }

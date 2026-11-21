@@ -347,7 +347,7 @@ impl LiveWheel {
         let wheels = std::mem::take(&mut self.stack);
         let selected = self.active;
         let active_wheel = std::mem::take(&mut self.wheel);
-        let active_motion = self.motion;
+        let active_motion = (self.motion, self.material_motion);
         let active_films = self.slide_visibility;
         let wheel_count = scene
             .order
@@ -391,7 +391,8 @@ impl LiveWheel {
                     bytemuck::bytes_of(&[w.opacity_at(time), 0., 0., 0.]),
                 );
                 self.active = id;
-                self.switch_motion(w.motion).expect("validated film");
+                self.switch_film_sources(w.motion, w.material_motion)
+                    .expect("validated film");
                 self.slide_visibility = w.films;
                 let times = if id == selected {
                     selected_times
@@ -429,7 +430,8 @@ impl LiveWheel {
             if let Some(w) = wheels.iter().find(|w| w.id == id) {
                 self.active = id;
                 self.wheel.clone_from(&w.wheel);
-                self.switch_motion(w.motion).expect("validated film");
+                self.switch_film_sources(w.motion, w.material_motion)
+                    .expect("validated film");
                 self.slide_visibility = w.films;
                 let times = if id == selected {
                     selected_times
@@ -479,7 +481,7 @@ impl LiveWheel {
         }
         self.active = selected;
         self.wheel = active_wheel;
-        self.switch_motion(active_motion)
+        self.switch_film_sources(active_motion.0, active_motion.1)
             .expect("restore selected wheel");
         self.slide_visibility = active_films;
         self.upload_material();
@@ -735,6 +737,7 @@ mod tests {
             id: 8,
             wheel: "violet-blue".into(),
             motion: MotionPreset::WheelFlow,
+            material_motion: MaterialMotion::default(),
             films: [true; 2],
             opacity: 1.,
             envelope: None,
