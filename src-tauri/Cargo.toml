@@ -15,6 +15,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 reqwest = { version = "0.13", default-features = false, features = ["json"] }
 tempfile = "3"
+png = "=0.18.1"
 process-wrap = { version = "10.0.1", default-features = false, features = ["std", "process-group", "job-object"] }
 sha2 = "0.10"
 

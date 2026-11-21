@@ -59,7 +59,7 @@ impl Transcriber {
     }
 }
 
-fn tool_dirs() -> Vec<PathBuf> {
+pub(crate) fn tool_dirs() -> Vec<PathBuf> {
     let mut dirs: Vec<_> = env::var_os("PATH")
         .map(|v| env::split_paths(&v).filter(|p| p.is_absolute()).collect())
         .unwrap_or_default();
@@ -79,7 +79,7 @@ fn tool_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-fn tool(dirs: &[PathBuf], name: &str) -> Result<PathBuf, String> {
+pub(crate) fn tool(dirs: &[PathBuf], name: &str) -> Result<PathBuf, String> {
     dirs.iter()
         .map(|d| d.join(name))
         .find(|p| p.is_file())

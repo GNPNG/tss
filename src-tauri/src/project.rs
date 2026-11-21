@@ -121,7 +121,7 @@ fn same_audio(path: &Path, expected: &str) -> bool {
     digest_file(path).is_ok_and(|digest| digest == expected)
 }
 
-fn digest_file(path: &Path) -> io::Result<String> {
+pub(crate) fn digest_file(path: &Path) -> io::Result<String> {
     let mut file = File::open(path)?;
     let mut hash = Sha256::new();
     io::copy(&mut file, &mut hash)?;

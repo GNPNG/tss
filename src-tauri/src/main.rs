@@ -4,6 +4,7 @@ mod advisor;
 mod export;
 mod export_smoke;
 mod lyrics;
+mod media;
 mod live;
 mod performer;
 mod project;
@@ -293,6 +294,9 @@ fn main() {
             read_pending_audio,
             confirm_audio,
             read_timed_lyrics,
+            media::choose_visual_media,
+            media::resolve_visual_media,
+            media::relink_visual_media,
             advisor::suggest_visual_layer,
             lyrics::transcribe_song,
             lyrics::cancel_transcription,
