@@ -1,0 +1,17 @@
+{
+  "solid": {
+    "samples": 73149,
+    "mae": 66.00398273842887,
+    "changed": 73149
+  },
+  "keyed": {
+    "samples": 38425,
+    "mae": 0.047998265018434176,
+    "changed": 0
+  },
+  "outsideMatte": {
+    "samples": 208907,
+    "mae": 0.038232323474081766,
+    "changed": 0
+  }
+}
