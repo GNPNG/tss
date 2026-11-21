@@ -288,6 +288,7 @@ fn run(
                         (Some(r), Some(c))
                             if c.layer_id == job.request.layer_id
                                 && c.wheel == job.request.wheel
+                                && c.material_motion == job.request.material_motion
                                 && c.motion == job.request.motion
                                 && c.stack == job.request.stack
                                 && c.motion_take == job.request.motion_take
@@ -356,6 +357,7 @@ fn run(
                         if active.as_ref().is_none_or(|old| {
                             old.layer_id != c.layer_id
                                 || old.wheel != c.wheel
+                                || old.material_motion != c.material_motion
                                 || old.stack != c.stack
                                 || old.motion != c.motion
                                 || old.motion_take != c.motion_take
