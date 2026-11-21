@@ -663,6 +663,32 @@ mod tests {
                 })
                 .unwrap();
         }
+        let mut shaped = track(5);
+        shaped.media.mode = MediaMode::Silhouette;
+        shaped.media.shape = crate::media_track::Cutout::Star;
+        let star = frame(&mut r, vec![shaped.clone()], vec![5], 0.);
+        assert_eq!(pixel(&star, 64, 36), [255, 0, 0]);
+        assert_eq!(pixel(&star, 16, 10), [0, 0, 0]);
+        shaped.media.mode = MediaMode::Gradient;
+        let gradient = frame(&mut r, vec![shaped.clone()], vec![5], 0.);
+        let cycle = frame(&mut r, vec![shaped.clone()], vec![5], 0.4);
+        assert_ne!(pixel(&gradient, 64, 36), pixel(&cycle, 64, 36));
+        shaped.media.bounce = 1.;
+        shaped.media.blur = 1.;
+        shaped.media.distortion = 1.;
+        let quiet = frame(&mut r, vec![shaped], vec![5], 0.25);
+        r.prepare_media(0.25, true, [1.; 4], decoded).unwrap();
+        r.render_program_to(None, 0.25, 0.25);
+        let loud = r.capture_rgba8().unwrap().2;
+        assert!(
+            quiet
+                .chunks_exact(4)
+                .zip(loud.chunks_exact(4))
+                .filter(|(a, b)| a != b)
+                .count()
+                > 500
+        );
+
         // Optical transmission after opaque artwork alters the artwork. Inverted
         // stack order covers the optical result completely.
         r.set_stack(vec![WheelLayer {
@@ -675,7 +701,7 @@ mod tests {
         }])
         .unwrap();
         let under = frame(&mut r, vec![red.clone()], vec![1, 8], 0.);
-        let over = frame(&mut r, vec![red], vec![8, 1], 0.);
+        let over = frame(&mut r, vec![red.clone()], vec![8, 1], 0.);
         assert!(
             under
                 .chunks_exact(4)
@@ -685,5 +711,21 @@ mod tests {
                 > 100
         );
         assert_eq!(pixel(&over, 64, 32), [255, 0, 0]);
+        let mut m = red.clone();
+        m.media.mask_a = Some(8);
+        let masked = frame(&mut r, vec![m.clone()], vec![1], 0.);
+        let bright = masked
+            .chunks_exact(4)
+            .filter(|pixel| pixel[0] > 200)
+            .count();
+        assert!(
+            bright > 200 && bright < 128 * 72 - 200,
+            "oil matte coverage {bright}"
+        );
+        let mut faded = r.stack.clone();
+        faded[0].opacity = 0.;
+        r.set_stack(faded).unwrap();
+        let hidden = frame(&mut r, vec![m], vec![1], 0.);
+        assert!(hidden.chunks_exact(4).all(|p| p[..3] == [0; 3]));
     }
 }
