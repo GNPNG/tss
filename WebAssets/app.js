@@ -553,7 +553,7 @@ function renderControls() {
   });
   const wheel = layer && !layer.media && mathmosWheels.get(layer.palette);
   const live = liveSelection();
-  byId('plate-formats').hidden = !live;
+  byId('plate-formats').hidden = !live || !!layer.media;
   wheelExporter?.refresh();
   plateExporter?.refresh();
   byId('video-feedback').hidden = !live;
