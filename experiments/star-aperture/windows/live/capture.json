@@ -1,0 +1,44 @@
+{
+  "wheel": "violet-blue",
+  "focus": null,
+  "mouseTarget": "rear",
+  "visibleFilms": "both",
+  "track": 1,
+  "adapter": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design (Vulkan)",
+  "size": [
+    960,
+    540
+  ],
+  "frames": 122,
+  "successfulPresentsInWindow": 122,
+  "gesture": "tug",
+  "tugResponse": 0.4000000059604645,
+  "retention": "every successful present before the requested endpoint",
+  "sourceStartSeconds": 1.0482006,
+  "rearSourceStartSeconds": 1.0482006,
+  "frontSourceStartSeconds": 1.0482006,
+  "motion": "wheel-flow",
+  "motionTake": 0,
+  "elapsedSeconds": 3.0030596,
+  "configurations": [
+    {
+      "t": 0.0,
+      "wheel": "violet-blue",
+      "motion": "wheel-flow",
+      "motionTake": 0,
+      "visibleFilms": "both",
+      "fieldTime": 1.0482006,
+      "rearFieldTime": 1.0482006,
+      "frontFieldTime": 1.0482006,
+      "focus": null,
+      "track": 1,
+      "slide": "rear",
+      "gesture": "tug",
+      "tugResponse": 0.4000000059604645,
+      "renderWidth": 960
+    }
+  ],
+  "appliedMouseStrokes": 122,
+  "source": "active editor optical target immediately following successful presentation",
+  "clock": "editor performance time, actual seconds relative to first captured frame"
+}
