@@ -19,6 +19,14 @@ Plate pressure acts independently on each sealed slide. A press reduces the cent
 
 The native viewport shows the two sealed slides on the selected track. Its fluid trajectory advances on a performance clock. The gesture deck can replay live inputs against the song.
 
+## Artwork, footage and rotoscopes
+
+On Windows, **Add artwork** imports an image, animated GIF or video as its own timeline layer. Place the layer above a wheel to project the artwork over the liquid, or below a wheel to transmit its color through both films. Source aspect ratio and alpha are preserved. The GPU blends in linear light. The editor preview and delayed projector use the prepared preview frames. Native movie exports use the full-size source and sample its timestamps at each movie frame.
+
+**Source offset**, **Playback speed** and **Loop footage** set each source clock. Disabling looping holds the last frame. Cropped and repeated timeline intervals retain their local media start and speed. The same interval fades control the artwork and its use as a matte.
+
+**Apply chroma key** removes the selected background color before silhouette or gradient treatment. **Mask A** and **Mask B** take alpha from artwork, or the combined dyed area of a wheel's exposed films. A hidden source used as a matte still runs. Intersection selects the lesser coverage, union the greater, subtraction keeps the positive difference, and exclusive-or takes the absolute difference. The source matte includes its own key, shape, opacity and fades. **Bass bounce**, **Midrange distortion** and **Treble blur** use the song's analyzed bands.
+
 ## Coral release
 
 **Projected films** controls which dyes reach the screen for this wheel track. Select **Front only** to inspect a pinching neck, **Rear only** to inspect the moving fold, or **Clear glass** to see the carrier and lamp. **Both films** restores the overlap at the current time with each slide's pose intact. The same selection applies to the delayed projector and to the full duration of a native export.

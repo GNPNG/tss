@@ -24,15 +24,15 @@ pub(super) struct Exposure<'a> {
 
 pub(super) struct StackGpu {
     passes: [Pass; 4],
-    encode: Pass,
-    images: [Target; 2],
+    pub(super) encode: Pass,
+    pub(super) images: [Target; 2],
 }
 impl StackGpu {
-    fn images(device: &gpu::Device, size: [u32; 2]) -> [Target; 2] {
+    pub(super) fn images(device: &gpu::Device, size: [u32; 2]) -> [Target; 2] {
         std::array::from_fn(|_| Target::new(device, "Transmitted wheel light", size, FIELD_FORMAT))
     }
 
-    fn new(device: &gpu::Device, size: [u32; 2]) -> Self {
+    pub(super) fn new(device: &gpu::Device, size: [u32; 2]) -> Self {
         let quad = shader(device, "Wheel stack quad", include_str!("vertex.wgsl"));
         let output = shader(
             device,

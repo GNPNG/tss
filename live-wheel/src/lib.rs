@@ -22,6 +22,9 @@ use motion::SlidePose;
 pub use preset::MotionPreset;
 mod envelope;
 pub use envelope::{OpacityEnvelope, OpacityRegion};
+pub mod media_track;
+mod mixed;
+pub use mixed::{DecodedMediaFrame, MediaTrack};
 mod stack;
 pub use stack::WheelLayer;
 pub use wgpu;
@@ -235,6 +238,7 @@ fn check_extent(size: [u32; 2], max_dimension: u32) -> Result<(), String> {
 
 enum OpticalExposure<'a> {
     Stack(stack::Exposure<'a>),
+    Mask(&'a Pass, &'a gpu::TextureView, &'a gpu::Buffer),
     Plate(&'a plates::PlateTarget, [bool; 2]),
 }
 
@@ -256,6 +260,7 @@ pub struct LiveWheel {
     stack: Vec<WheelLayer>,
     stack_times: HashMap<u64, [f64; 2]>,
     stack_gpu: Option<stack::StackGpu>,
+    mixed: mixed::MediaScene,
     zero: Target,
     interpolated: Target,
     sampler: gpu::Sampler,
@@ -555,6 +560,7 @@ impl LiveWheel {
             stack: Vec::new(),
             stack_times: HashMap::new(),
             stack_gpu: None,
+            mixed: mixed::MediaScene::default(),
             zero,
             interpolated,
             sampler,
@@ -940,7 +946,9 @@ impl LiveWheel {
         front_time: f64,
         program_time: f64,
     ) {
-        if self.stack.is_empty()
+        if !self.mixed.tracks.is_empty() {
+            self.render_mixed(out, [rear_time, front_time], program_time);
+        } else if self.stack.is_empty()
             || self.stack.len() == 1
                 && self.stack[0].opacity_at(program_time) == 1.
                 && self.stack[0].wheel == self.wheel
@@ -1045,6 +1053,26 @@ impl LiveWheel {
             field_pass,
             &fields,
         );
+        if let Some(OpticalExposure::Mask(pass, target, weight)) = exposure {
+            let group = bind(
+                &self.device,
+                pass,
+                &[
+                    TextureView(&self.interpolated.view),
+                    Sampler(&self.sampler),
+                    weight.as_entire_binding(),
+                ],
+            );
+            draw(
+                &mut enc,
+                "Extract wheel phase coverage",
+                target,
+                pass,
+                &group,
+            );
+            self.queue.submit(Some(enc.finish()));
+            return;
+        }
         // Keep the selected optical model continuous through first movement.
         let integrate = self.footprint_sampling || poses.iter().any(|p| p.pressure.active());
         let optic_pipe = match (integrate, self.wheel == "violet-blue") {

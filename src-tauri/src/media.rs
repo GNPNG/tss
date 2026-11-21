@@ -278,6 +278,26 @@ async fn pick(app: tauri::AppHandle, expected: Option<String>) -> MediaResult<Op
 pub async fn choose_visual_media(app: tauri::AppHandle) -> MediaResult<Option<Grant>> {
     pick(app, None).await
 }
+
+#[tauri::command]
+pub async fn proof_visual_grants(app: tauri::AppHandle) -> MediaResult<Vec<Grant>> {
+    if !crate::export_smoke::enabled() {
+        return Ok(Vec::new());
+    }
+    let Some(visual) = std::env::var_os("TSS_PROOF_MEDIA") else {
+        return Ok(Vec::new());
+    };
+    let root = cache(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        std::iter::once(visual)
+            .chain(std::env::var_os("TSS_PROOF_MATTE"))
+            .map(|path| import(&root, Path::new(&path), None))
+            .collect::<MediaResult<Vec<_>>>()
+    })
+    .await
+    .map_err(ioerr)?
+}
+
 #[tauri::command]
 pub async fn relink_visual_media(
     app: tauri::AppHandle,

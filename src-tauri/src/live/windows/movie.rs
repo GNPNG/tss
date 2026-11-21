@@ -122,6 +122,9 @@ pub(super) fn render(
                     }
                 }
             }
+            target.prepare_media(pts, crate::media_audio::at(pts), |id, us| {
+                crate::media::frame_at(id, us).map(super::packet)
+            })?;
             target.frame_films(rear_origin + pts, front_origin + pts, pts, |bytes| {
                 if let Some((_, path)) = proof.as_ref().filter(|(n, _)| *n == index) {
                     write_rgb(path, bytes)?;

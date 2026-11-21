@@ -54,6 +54,20 @@
             <select id="mathmos-wheel" disabled><option value="" disabled>Choose a wheel</option></select>
             <button class="button quiet" type="button" id="show-wheel-study" aria-haspopup="dialog" disabled>View study</button>
           </div>
+          <details id="artwork-settings" open hidden>
+            <summary>Artwork settings</summary><label><input type="checkbox" data-media="keyEnabled"> Apply chroma key</label><p id="artwork-source"></p><button type="button" id="artwork-relink" class="button quiet" hidden>Relink source</button>
+            <div class="native-choices">
+            <label>Treatment<select data-media="mode"><option value="color">Original color and alpha</option><option value="key">Chroma key</option><option value="silhouette">Silhouette</option><option value="gradient">Cycling gradient</option></select></label>
+            <label>Cutout<select data-media="shape"><option value="none">None</option><option value="circle">Circle</option><option value="diamond">Diamond</option><option value="star">Star</option></select></label>
+            <label>Key color<input type="color" data-media="keyColor"></label><label>Key range<input type="range" data-media="keyThreshold" min="0" max="1" step="0.01"></label><label>Key softness<input type="range" data-media="keySoftness" min="0" max="1" step="0.01"></label>
+            <label>Silhouette / gradient start<input type="color" data-media="gradientA"></label><label>Gradient end<input type="color" data-media="gradientB"></label>
+            <label>Cycles per second<input type="number" data-media="gradientRate" min="0" max="12" step="any"></label>
+            <label>Source offset (s)<input type="number" data-media="offsetUs" min="0" step="any"></label><label>Playback speed<input type="number" data-media="rate" min="0" max="8" step="any"></label><label><input type="checkbox" data-media="loop"> Loop footage</label>
+            <label>Bass bounce<input type="range" data-media="bounce" min="0" max="1" step="0.01"></label><label>Midrange distortion<input type="range" data-media="distortion" min="0" max="1" step="0.01"></label><label>Treble blur<input type="range" data-media="blur" min="0" max="1" step="0.01"></label>
+            <label>Mask A<select data-media="maskA"></select></label><label>Mask B<select data-media="maskB"></select></label>
+            <label>Combine masks<select data-media="maskOp"><option value="intersect">Intersection</option><option value="union">Union</option><option value="subtract">A minus B</option><option value="xor">Exclusive or</option></select></label>
+            </div>
+          </details>
           <div id="native-wheel-controls" hidden>
             <label class="native-toggle"><input type="checkbox" id="live-wheel"> Live selected wheel</label>
             <div class="native-choices">
@@ -127,7 +141,7 @@
     </div>
 
     <section class="timeline card" aria-label="Timeline">
-      <div class="timeline-header"><div><span class="eyebrow">ARRANGEMENT</span><h2>Timeline</h2></div><div class="timeline-actions"><label>History <select id="edit-history" aria-label="Edit history"></select></label><button class="button quiet" type="button" id="undo-edit" disabled>Undo</button><button class="button quiet" type="button" id="redo-edit" disabled>Redo</button><span id="layer-count">1 visual layer</span><label>New track <select id="track-source" aria-label="New track source"><option value="blank">Blank liquid layer</option></select></label><button id="add-layer" class="button add-layer">＋ &nbsp;Add visual layer</button></div></div>
+      <div class="timeline-header"><div><span class="eyebrow">ARRANGEMENT</span><h2>Timeline</h2></div><div class="timeline-actions"><label>History <select id="edit-history" aria-label="Edit history"></select></label><button class="button quiet" type="button" id="undo-edit" disabled>Undo</button><button class="button quiet" type="button" id="redo-edit" disabled>Redo</button><span id="layer-count">1 visual layer</span><label>New track <select id="track-source" aria-label="New track source"><option value="blank">Blank liquid layer</option></select></label><button id="artwork-add" class="button quiet" type="button" hidden>Add artwork</button><button id="add-layer" class="button add-layer">＋ &nbsp;Add visual layer</button></div></div>
       <div class="timeline-content">
         <div class="track-labels"><div class="ruler-label">TRACKS</div><div class="audio-label"><span class="track-symbol">♫</span><div><strong>AUDIO</strong><small>Master track</small></div></div><div id="layer-list"></div></div>
         <div class="timeline-scroll"><div class="timeline-lanes"><div id="ruler" class="ruler" aria-hidden="true"></div><div class="wave-lane" id="seek-area" title="Click to seek"><canvas id="waveform"></canvas><div class="empty-wave" id="empty-wave">YOUR AUDIO WAVEFORM WILL APPEAR HERE</div></div><div id="visual-lanes"></div><div id="playhead" class="playhead" aria-hidden="true"></div></div></div>

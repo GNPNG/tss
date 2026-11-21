@@ -247,12 +247,12 @@ vec4 hook() {
     float flare = (0.0018 + 0.073 * clearFraction * opticalPatch(uv - vec2(0.54, 0.47), vec2(0.19, 0.21)));
 #ifdef TSS_STACK
     // Project the lamp once. Successive wheels attenuate the incoming light.
-    vec3 incident = mat.lens.z == 0.0 ? lamp : textureLod(sampler2D(incomingLight,fieldSampler),uv,0.0).rgb;
+    vec3 incident = mat.lens.z == 0.0 && mat.lens.y >= 0.0 ? lamp : textureLod(sampler2D(incomingLight,fieldSampler),uv,0.0).rgb;
     vec3 projected = incident * trans + irradiance * flare * vec3(0.86, 0.95, 1.0);
 #ifdef TSS_WHEEL_PROFILE
     projected *= wheelCarrier;
 #endif
-    return vec4(mix(incident, projected, mat.lens.y), 1.0);
+    return vec4(mix(incident, projected, mat.lens.y < 0.0 ? -1.0 - mat.lens.y : mat.lens.y), 1.0);
 #endif
     vec3 radiance = lamp * trans + irradiance * flare * vec3(0.86, 0.95, 1.0);
 #ifdef TSS_WHEEL_PROFILE

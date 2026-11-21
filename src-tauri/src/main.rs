@@ -7,6 +7,7 @@ mod lyrics;
 mod media;
 mod live;
 mod performer;
+mod media_audio;
 mod project;
 
 use export::ExportManager;
@@ -273,6 +274,7 @@ fn main() {
             export_smoke::select_wheel_export_fixture,
             export_smoke::finish_wheel_export_verification,
             live::set_live_wheel,
+            media_audio::set_visual_audio_features,
             performer::choose_performer_tls,
             performer::start_performer,
             performer::start_performer_verification,
@@ -296,6 +298,7 @@ fn main() {
             confirm_audio,
             read_timed_lyrics,
             media::choose_visual_media,
+            media::proof_visual_grants,
             media::resolve_visual_media,
             media::relink_visual_media,
             advisor::suggest_visual_layer,

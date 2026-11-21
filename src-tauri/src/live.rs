@@ -1,6 +1,13 @@
 use serde::{Deserialize, Serialize};
 use tauri::{State, WebviewWindow};
 #[cfg(windows)]
+use tss_live_wheel::media_track::MediaSettings;
+#[cfg(not(windows))]
+#[path = "../../live-wheel/src/media_track.rs"]
+mod media_track;
+#[cfg(not(windows))]
+use media_track::MediaSettings;
+#[cfg(windows)]
 use tss_live_wheel::{MotionPreset, OpacityEnvelope};
 #[cfg(not(windows))]
 #[path = "../../live-wheel/src/envelope.rs"]
@@ -259,6 +266,11 @@ pub struct Config {
 #[serde(rename_all = "camelCase")]
 pub(super) struct StackLayer {
     layer_id: u64,
+    #[serde(default)]
+    media: Option<MediaSettings>,
+    #[serde(default)]
+    matte_only: bool,
+    #[serde(default)]
     wheel: String,
     #[serde(default)]
     motion: MotionPreset,

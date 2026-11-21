@@ -108,6 +108,14 @@ impl LiveWheel {
 }
 
 impl WheelMovie<'_> {
+    pub fn prepare_media(
+        &mut self,
+        time: f64,
+        features: [f32; 4],
+        decode: impl FnMut(u64, i64) -> Result<crate::DecodedMediaFrame, String>,
+    ) -> Result<(), String> {
+        self.renderer.prepare_media(time, false, features, decode)
+    }
     pub fn select_gesture_layer(&mut self, id: u64) -> Result<(), String> {
         if id != self.selected && !self.renderer.stack.iter().any(|l| l.id == id) {
             return Err("Movie gesture targets an unknown wheel".into());

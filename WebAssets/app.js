@@ -5,6 +5,7 @@ import { analyzeAudio, featuresAt } from './audio-features.js';
 import { NativeWheelSurface, hasRelease } from './native-wheel.js';
 import { PlateFormatControls } from './plate-format.js';
 import { NativeWheelPlates } from './native-wheel-plates.js';
+import { installVisualMedia, newMedia, programLayers } from './visual-media.js';
 import { NativeWheelExport } from './native-wheel-export.js';
 import { VideoFeedbackControls } from './video-feedback.js';
 import { installPerformerDeck } from './performer-host.js';
@@ -32,6 +33,7 @@ const windowsDesktop = !!window.__TAURI__?.core && /Windows/i.test(navigator.use
 let startingNative = windowsDesktop;
 let projectorFocus = null;
 let projectorDeck = null;
+let visualMedia = null;
 let wheelMediaRequest;
 let projectName = '', detachedGestures = emptyGestures(), savedEdits = '', projectBusy = false;
 const editHistory = new EditHistory();
@@ -46,29 +48,27 @@ const state = {
   layers: [], selected: null, nextId: 1, renderError: null, exporting: false, exportFinalizing: false, cancelExport: false,
 };
 
+function wheelGestureSelection() { return selectedLayer()?.media ? null : liveSelection(); }
 function liveSelection() {
   const layer = selectedLayer();
-  const isWheel = l => l?.nativeLive && !l.customColors && mathmosWheels.has(l.palette);
-  if (!windowsDesktop || !isWheel(layer) || state.exporting) return null;
-  const stack = state.layers.filter(l => l.visible && isWheel(l)).reverse().map(l => ({
-    layerId: l.id, wheel: l.palette, motion: l.motion, motionTake: l.motionTake,
-    visibleFilms: l.visibleFilms ?? 'both', opacity: l.opacity, ...(l.envelope!=null?{envelope:l.envelope}:{}),
-  }));
-  if (!stack.length) return null;
-  const timed = stack.some(l=>l.envelope!=null);
+  const isWheel = l => l?.nativeLive && !l.media && !l.customColors && mathmosWheels.has(l.palette);
+  if (!windowsDesktop || !layer || (!isWheel(layer) && !layer.media) || state.exporting) return null;
+  const stack = programLayers(state.layers,isWheel);
+  if (!stack.some(l=>!l.matteOnly)) return null;
+  const timed = stack.some(l=>l.envelope!=null || l.media);
   const needsStack = timed || stack.length > 1 || stack[0].opacity !== 1 || stack[0].layerId !== layer.id;
-  return { ...(needsStack ? {stack} : {}), layerId: layer.id, wheel: layer.palette, slide: layer.slide, gesture: layer.gesture,
+  return { ...(needsStack ? {stack} : {}), layerId: layer.id, wheel: layer.media?'violet-blue':layer.palette, slide: layer.slide, gesture: layer.gesture,
     motion: layer.motion, motionTake: layer.motionTake, visibleFilms: layer.visibleFilms ?? 'both',
     mousePressure: layer.mousePressure?.[layer.slide] ?? 0.5,
     tugResponse: layer.tugResponse[layer.slide], renderWidth: layer.renderWidth, focus: projectorFocus,
-    ...feedbackDeck.config(projectorDeck?.enabled||timed), keepPresenting:!!projectorDeck?.enabled };
+    ...feedbackDeck.config(projectorDeck?.enabled || timed), keepPresenting:!!projectorDeck?.enabled };
 }
 const feedbackDeck = new VideoFeedbackControls(byId('video-feedback'), () => nativeSurface?.sync());
 function anchorFeedback(discontinuity = false, ended = false) {
   feedbackDeck.clock({loaded:!!(state.audioBuffer||state.audioRef), playing:state.playing,
     position:state.audioBuffer?currentPosition():state.position,ended},discontinuity);
   if(discontinuity) projectorDeck?.flush();
-  if(projectorDeck?.enabled || state.layers.some(l=>l.envelope!=null)) nativeSurface?.sync();
+  if (projectorDeck?.enabled || state.layers.some(l => l.envelope != null || l.media)) nativeSurface?.sync();
 }
 
 function reportNativeStats(stats) {
@@ -90,7 +90,7 @@ const nativeSurface = windowsDesktop ? new NativeWheelSurface(
   window.__TAURI__.core.invoke, preview, liveSelection, reportNativeStats
 ) : null;
 async function prepareWheel(){
-  if(!liveSelection()) throw new Error('Select a visible live Mathmos wheel first.');
+  if(!liveSelection()) throw new Error('Select a visible native wheel or artwork track first.');
   preview.scrollIntoView({block:'nearest'});
   await nativeSurface.sync();
 }
@@ -102,7 +102,7 @@ const macroDeck = windowsDesktop ? initMacroDeck({
   invoke: window.__TAURI__.core.invoke,
   listen: window.__TAURI__.event.listen,
   clock: () => ({position:currentPosition(),playing:state.playing}),
-  selection: liveSelection,
+  selection: wheelGestureSelection,
   prepare:prepareWheel,
   seek, onEdit: checkpoint,
 }) : null;
@@ -131,14 +131,14 @@ const plateFormat = windowsDesktop ? new PlateFormatControls(byId('plate-formats
   return window.__TAURI__.core.invoke('preview_wheel_plates',{selection:liveSelection()});
 },status) : null;
 const plateExporter = windowsDesktop ? new NativeWheelPlates({
-  button: byId('export-wheel-plates'), format: () => plateFormat.options(), invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: liveSelection,
+  button: byId('export-wheel-plates'), format: () => plateFormat.options(), invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: wheelGestureSelection,
   busy: () => state.exporting || !!wheelExporter?.busy, prepare: prepareWheel, pause, status,
   refresh: updateTransport,
 }) : null;
 
 const performerDeck = windowsDesktop ? installPerformerDeck({
   invoke:window.__TAURI__.core.invoke, listen:window.__TAURI__.event.listen,
-  selection:liveSelection, prepare:prepareWheel,
+  selection:wheelGestureSelection, prepare:prepareWheel,
   layers:()=>state.layers.filter(l=>l.nativeLive && !l.customColors && mathmosWheels.has(l.palette)),
 }) : null;
 
@@ -257,6 +257,10 @@ function installAudio(data, ref, path = null, selectionId = null, position = 0) 
   pause();
   state.audioBuffer = data?.decoded ?? null;
   state.analysis = data?.analysis ?? null;
+  if (windowsDesktop) {
+    const analysis=state.analysis;
+    desktopInvoke('set_visual_audio_features',{fps:analysis?.fps??30,frames:analysis?.frames.map(f=>[f.bass,f.mid,f.treble,f.energy])??[]}).catch(e=>status(String(e)));
+  }
   state.audioRef = ref;
   state.audioName = ref?.name ?? '';
   state.audioPath = path;
@@ -407,6 +411,16 @@ async function loadWheelPresets() {
         }
         if (benchmark?.verifyPlates) await plateExporter.start();
         if (benchmark?.verifyExport) {
+          const grants = await desktopInvoke('proof_visual_grants');
+          if (grants.length) {
+            const [source, matte] = grants.map(newMedia);
+            source.mode='gradient'; source.keyEnabled=true;
+            let matteId=null;
+            if (matte) { const mask=addArtwork(matte); mask.visible=false; matteId=mask.id; }
+            source.maskA=matteId;
+            addArtwork(source);
+            selectLayer(layer.id);
+          }
           const { verifyWheelExport } = await import('./verify-wheel-export.js');
           await nativeSurface.sync();
           await verifyWheelExport(liveSelection(), () => state.audioBuffer?.duration, status, projectorDeck,performerDeck);
@@ -481,7 +495,7 @@ function renderTimeline() {
     const icon = document.createElement('span'); icon.className = 'layer-icon'; icon.textContent = '◉';
     const info = document.createElement('div'); info.className = 'layer-text';
     const title = document.createElement('strong'); title.textContent = layer.name;
-    const subtitle = document.createElement('small'); subtitle.textContent = layer.visible ? 'Liquid light' : 'Hidden';
+    const subtitle = document.createElement('small'); subtitle.textContent = layer.visible ? (layer.media ? 'Artwork' : 'Liquid light') : 'Hidden';
     info.append(title, subtitle);
     const toggle = layerButton(layer.visible ? '●' : '○', `${layer.visible ? 'Hide' : 'Show'} ${layer.name}`, () => { layer.visible = !layer.visible; renderTimeline(); renderControls(); });
     const up = layerButton('↑', `Move ${layer.name} up`, () => { [state.layers[index - 1], state.layers[index]] = [state.layers[index], state.layers[index - 1]]; renderTimeline(); }, index === 0);
@@ -526,17 +540,18 @@ function renderTimeline() {
   }
 }
 function renderControls() {
+  visualMedia?.refresh();
   const layer = selectedLayer();
   byId('selected-name').textContent = layer?.name || 'No layer selected';
   const grid = byId('palette-grid'); grid.replaceChildren();
   Object.entries(LIQUID_PALETTES).forEach(([name, colors]) => {
     const button = document.createElement('button'); button.className = `palette${layer?.palette === name && !layer?.customColors ? ' active' : ''}`;
     button.title = paletteNames[name] || name; button.setAttribute('aria-label', paletteNames[name] || name);
-    button.setAttribute('aria-pressed', String(layer?.palette === name && !layer?.customColors)); button.disabled = !layer;
+    button.setAttribute('aria-pressed', String(layer?.palette === name && !layer?.customColors)); button.disabled = !layer || !!layer.media;
     colors.forEach((color) => { const swatch = document.createElement('span'); swatch.style.backgroundColor = color; button.append(swatch); });
     button.addEventListener('click', () => applyPalette(layer, name, colors)); grid.append(button);
   });
-  const wheel = layer && mathmosWheels.get(layer.palette);
+  const wheel = layer && !layer.media && mathmosWheels.get(layer.palette);
   const live = liveSelection();
   byId('plate-formats').hidden = !live;
   wheelExporter?.refresh();
@@ -544,6 +559,7 @@ function renderControls() {
   byId('video-feedback').hidden = !live;
   byId('native-wheel-controls').hidden = !windowsDesktop || !wheel;
   byId('native-performance').hidden = !live;
+  byId('native-wheel-controls').hidden ||= !!layer?.media;
   byId('live-wheel').checked = !!live;
   byId('live-wheel').disabled = !wheel || !!layer?.customColors || !layer?.visible;
   byId('wheel-motion').value = layer?.motion ?? 'wheel-flow';
@@ -567,8 +583,8 @@ function renderControls() {
   byId('wheel-focus').disabled = !live;
   updateFocusControl();
   preview.parentElement.classList.toggle('native-active', !!live);
-  byId('preview-status').textContent = live?.stack?.length > 1 ? `NATIVE GPU · ${live.stack.length} WHEELS` : live ? 'NATIVE GPU · SELECTED WHEEL' : 'PROCEDURAL PREVIEW';
-  byId('native-instruction').textContent = layer?.gesture === 'rotate'
+  byId('preview-status').textContent = live?.stack?.length > 1 ? `NATIVE GPU · ${live.stack.filter(l=>!l.matteOnly).length} TRACKS` : live?.stack?.some(l=>l.media) ? 'NATIVE GPU · ARTWORK' : live ? 'NATIVE GPU · SELECTED WHEEL' : 'PROCEDURAL PREVIEW';
+  byId('native-instruction').textContent = layer?.media ? layer.media.name : layer?.gesture === 'rotate'
     ? `Drag around the center to turn the ${layer.slide} glass slide.`
     : layer?.gesture === 'pressure' ? `Press and hold the ${layer.slide} slide to compress it. Drag the contact point. Release to restore the gap.`
     : `Drag to tug the material in the ${layer?.slide ?? 'rear'} slide.`;
@@ -579,7 +595,7 @@ function renderControls() {
   if (!state.exporting) byId('export').textContent = live ? 'Export procedural preview' : 'Export 4K preview';
   if (live && !nativeSurface.surfaceRequested) byId('native-frame-rate').textContent = 'Starting native wheel…';
   nativeSurface?.sync();
-  wheelSelect.disabled = !layer || mathmosWheels.size === 0;
+  wheelSelect.disabled = !layer || !!layer.media || mathmosWheels.size === 0;
   wheelSelect.value = wheel && !layer.customColors ? wheel.id : '';
   if (mathmosWheels.size) wheelSelect.options[0].textContent = wheel && layer.customColors ? `Custom · ${wheel.name}` : 'Choose a wheel';
   byId('show-wheel-study').disabled = !wheel;
@@ -613,7 +629,7 @@ function renderFrame(timestamp) {
       const time = state.audioBuffer ? currentPosition() : state.audioRef ? state.position : timestamp / 1000;
       const features = featuresAt(state.analysis, time);
       for (const layer of [...state.layers].reverse()) {
-        if (!layer.visible) continue;
+        if (!layer.visible || layer.media) continue;
         if (!layer.renderer) {
           layer.renderer = new LiquidRenderer(layer.canvas);
           layer.renderer.resize(layer.canvas.width, layer.canvas.height);
@@ -680,7 +696,7 @@ async function exportVideo() {
   const audioPath = state.audioPath;
   const audioDuration = state.audioBuffer.duration;
   const analysis = state.analysis;
-  const layers = state.layers.filter((layer) => layer.visible).map((layer) => ({
+  const layers = state.layers.filter((layer) => layer.visible && !layer.media).map((layer) => ({
     colors: [...layer.colors], hue: layer.hue, speed: layer.speed, scale: layer.scale, opacity: layer.opacity, envelope:layer.envelope,
   }));
   const width = 3840, height = 2160, fps = 30;
@@ -1333,10 +1349,25 @@ byId('layer-list').addEventListener('keydown', event => {
   if (event.key === 'Enter' || event.key === ' ') checkpoint('Select layer');
 });
 document.querySelector('.control-body').addEventListener('change', event => {
-  if (!event.target.closest('#performer-deck')) checkpoint(event.target.getAttribute('aria-label') || event.target.labels?.[0]?.textContent.trim().split('\n')[0] || 'Edit layer');
+  if (!event.target.closest('#performer-deck, #artwork-settings')) checkpoint(event.target.getAttribute('aria-label') || event.target.labels?.[0]?.textContent.trim().split('\n')[0] || 'Edit layer');
 });
 window.addEventListener('resize', drawWaveform);
 window.addEventListener('beforeunload', () => { state.layers.forEach((layer) => layer.renderer?.dispose()); });
+function addArtwork(media) {
+  const layer=makeLayer();
+  Object.assign(layer,{name:media.name,media,opacity:1});
+  state.layers.unshift(layer);
+  selectLayer(layer.id);
+  checkpoint('Add artwork');
+  return layer;
+}
+visualMedia = windowsDesktop ? installVisualMedia({
+  invoke:desktopInvoke, selected:selectedLayer,layers:()=>state.layers,
+  isWheel:l=>l?.nativeLive&&!l.customColors&&mathmosWheels.has(l.palette),
+  add:addArtwork,
+  changed:label=>{renderTimeline();renderControls();checkpoint(label);},report:status,
+}) : null;
+byId('artwork-add').hidden=!windowsDesktop;
 if (!context) showRenderError(new Error('Canvas 2D is not available'));
 else addLayer();
 renderTimeline(); renderControls(); updateTransport(); requestAnimationFrame(renderFrame);

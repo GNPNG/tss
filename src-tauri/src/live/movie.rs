@@ -70,7 +70,8 @@ impl Request {
             if layer.layer_id == 0
                 || !ids.insert(layer.layer_id)
                 || !(0.0..=1.0).contains(&layer.opacity)
-                || layer.wheel.is_empty()
+                || (layer.media.is_none() && layer.wheel.is_empty())
+                || layer.media.as_ref().is_some_and(|m| !m.valid())
             {
                 return Err("Invalid wheel stack in export".into());
             }

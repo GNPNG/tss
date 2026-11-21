@@ -45,7 +45,7 @@ export class NativeWheelExport {
     const {audioPath, duration, proceduralBusy} = this.source();
     const selection = this.selection();
     this.group.hidden = !selection;
-    this.button.textContent = selection?.stack?.length > 1 ? 'Export wheel stack in 4K' : 'Export selected wheel in 4K';
+    this.button.textContent = selection?.stack?.some(l => l.media) ? 'Export artwork program in 4K' : selection?.stack?.length > 1 ? 'Export wheel stack in 4K' : 'Export selected wheel in 4K';
     this.button.disabled = this.busy || proceduralBusy || !audioPath || !(duration > 0);
   }
 
@@ -68,7 +68,7 @@ export class NativeWheelExport {
       await this.finishRecording();
       this.pause();
       await this.prepare();
-      const ids = selection.stack?.map(layer => layer.layerId) ?? [selection.layerId];
+      const ids = selection.stack?.filter(layer => !layer.media).map(layer => layer.layerId) ?? [selection.layerId];
       const events = ids.flatMap(id => this.getEvents(id, duration)).sort((a, b) => a.time - b.time);
       const request = wheelMovieRequest(selection, duration, events, this.pose.value);
       this.count.textContent = 'Preparing 3840 × 2160 optical render…';
@@ -82,7 +82,7 @@ export class NativeWheelExport {
       });
       this.dialog.showModal();
       await this.invoke('export_native_wheel', {audioPath, outputPath, request});
-      this.status('Selected wheel saved to ' + outputPath);
+      this.status('Program saved to ' + outputPath);
     } finally {
       if (this.dialog.open) this.dialog.close();
       unlisten?.();

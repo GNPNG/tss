@@ -13,6 +13,10 @@ pub struct OpacityRegion {
     pub source_start: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_end: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media_start_us: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media_rate: Option<f64>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -30,6 +34,8 @@ impl TryFrom<Vec<OpacityRegion>> for OpacityEnvelope {
                 .iter()
                 .all(|n| n.is_finite())
                 || !(0.0..=1.0).contains(&r.level)
+                || r.media_start_us.is_some_and(|start| start < 0)
+                || r.media_rate.is_some_and(|rate| !(0.0..=8.).contains(&rate))
                 || r.start < previous_end
                 || left > r.start
                 || r.start >= r.end
@@ -46,13 +52,14 @@ impl TryFrom<Vec<OpacityRegion>> for OpacityEnvelope {
 }
 
 impl OpacityEnvelope {
-    pub fn level_at(&self, time: f64) -> f32 {
+    pub(crate) fn region_at(&self, time: f64) -> Option<&OpacityRegion> {
         let index = self.0.partition_point(|r| r.end <= time);
-        let Some(r) = self
-            .0
+        self.0
             .get(index)
             .filter(|r| time >= r.start && time < r.end)
-        else {
+    }
+    pub fn level_at(&self, time: f64) -> f32 {
+        let Some(r) = self.region_at(time) else {
             return 0.;
         };
         let left = r.source_start.unwrap_or(r.start);

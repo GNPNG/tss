@@ -13,6 +13,10 @@ export async function verifyWheelExport(selection, duration, status, projector,p
     if (!Number.isFinite(seconds) || seconds<=0) throw Error('Could not decode verification audio');
     if (!selection) throw Error('The verification wheel must be live');
     const el = id => document.getElementById(id);
+    if (selection.stack?.some(l=>l.media)) facts.artworkTracks=selection.stack.filter(l=>l.media).map(l=>({
+      id:l.layerId, matteOnly:!!l.matteOnly, mode:l.media.mode, keyEnabled:l.media.keyEnabled,
+      maskA:l.media.maskA,maskB:l.media.maskB,durationUs:l.media.durationUs,still:l.media.still,
+    }));
     facts.audioDuration=seconds;
     facts.wheelOptions=el('mathmos-wheel').options.length-1;
     facts.wheel=el('mathmos-wheel').value;

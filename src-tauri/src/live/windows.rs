@@ -39,6 +39,15 @@ use benchmark::Benchmark;
 pub(super) fn benchmark_output() -> Option<PathBuf> {
     output_arg("--benchmark-live")
 }
+fn packet(frame: crate::media::DecodedFrame) -> tss_live_wheel::DecodedMediaFrame {
+    tss_live_wheel::DecodedMediaFrame {
+        id: frame.id,
+        pts_us: frame.pts_us,
+        width: frame.width,
+        height: frame.height,
+        rgba: frame.rgba,
+    }
+}
 fn output_arg(option: &str) -> Option<PathBuf> {
     let mut args = std::env::args_os().skip(1);
     while let Some(arg) = args.next() {
@@ -811,6 +820,7 @@ fn run(
                         r.set_stack(
                             next.stack
                                 .iter()
+                                .filter(|s| s.media.is_none())
                                 .map(|s| tss_live_wheel::WheelLayer {
                                     id: s.layer_id,
                                     wheel: s.wheel.clone(),
@@ -819,6 +829,26 @@ fn run(
                                     opacity: s.opacity,
                                     envelope: s.envelope.clone(),
                                 })
+                                .collect(),
+                        )?;
+                        let media = next
+                            .stack
+                            .iter()
+                            .filter_map(|s| {
+                                s.media.as_ref().map(|source| tss_live_wheel::MediaTrack {
+                                    id: s.layer_id,
+                                    opacity: s.opacity,
+                                    envelope: s.envelope.clone(),
+                                    media: source.clone(),
+                                })
+                            })
+                            .collect();
+                        r.set_media_scene(
+                            media,
+                            next.stack
+                                .iter()
+                                .filter(|s| !s.matte_only)
+                                .map(|s| s.layer_id)
                                 .collect(),
                         )?;
                     }
@@ -982,11 +1012,20 @@ fn run(
         if let Some(b) = bench.as_mut() {
             b.before(r, child.0, c)?;
         }
-        let drags = consume_mouse(r, c.slide, c.gesture, c.mouse_pressure)?;
+        let drags = if c
+            .stack
+            .iter()
+            .any(|l| l.layer_id == c.layer_id && l.media.is_some())
+        {
+            MOUSE.with(|m| m.borrow_mut().samples.clear());
+            0
+        } else {
+            consume_mouse(r, c.slide, c.gesture, c.mouse_pressure)?
+        };
         macros::flush(app, c)?;
         stats.drags += drags as u64;
         let frame_time = start.elapsed().saturating_sub(export_pause);
-        for l in &c.stack {
+        for l in c.stack.iter().filter(|l| l.media.is_none()) {
             r.set_layer_times(
                 l.layer_id,
                 release_clock.film_times(l.layer_id, l.motion, l.motion_take, frame_time),
@@ -1002,6 +1041,17 @@ fn run(
                     0.
                 }
             });
+        stats.error = if c.stack.iter().any(|l| l.media.is_some()) {
+            r.prepare_media(
+                program_time,
+                true,
+                crate::media_audio::at(program_time),
+                |id, us| crate::media::frame_for_preview(id, us).map(packet),
+            )
+            .err()
+        } else {
+            None
+        };
         let did_present = if editor_hidden {
             r.render_film_times_offscreen(rear_time, front_time, program_time)?;
             offscreen_submissions += 1;
