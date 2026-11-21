@@ -1,5 +1,6 @@
 import { LiquidRenderer, LIQUID_PALETTES } from './liquid-renderer.js';
 import { installVisualAdvisor } from './visual-advisor.js';
+import { installMediaTools } from './media-tools.js';
 import { installLocalLyrics } from './local-lyrics.js';
 import { analyzeAudio, featuresAt } from './audio-features.js';
 import { materialMotionFields } from './material-motion.js';
@@ -144,7 +145,10 @@ const performerDeck = windowsDesktop ? installPerformerDeck({
   layers:()=>state.layers.filter(l=>l.nativeLive && !l.customColors && mathmosWheels.has(l.palette)),
 }) : null;
 
-function status(message) { byId('app-status').textContent = message; }
+function status(message) {
+  byId('app-status').textContent = message;
+  if (String(message).includes('Open FFmpeg media tools') && !byId('media-tools').hidden) byId('media-tools').open = true;
+}
 function formatTime(seconds) {
   const total = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
@@ -660,6 +664,7 @@ function renderFrame(timestamp) {
   requestAnimationFrame(renderFrame);
 }
 const desktopInvoke = window.__TAURI__?.core?.invoke;
+installMediaTools(byId('media-tools'), desktopInvoke);
 function byteFile(name, bytes) {
   return new File([bytes instanceof ArrayBuffer || ArrayBuffer.isView(bytes) ? bytes : new Uint8Array(bytes)], name);
 }

@@ -60,7 +60,9 @@ The pressure and rotation cues use the same order in the live scheduler and the 
 
 ## Run from source
 
-Install Rust 1.88, Go 1.23 or newer for the optional controller executable, and the platform prerequisites for Tauri 2. MP4 export uses FFmpeg with the `libx264` and AAC encoders on `PATH`. The pinned Rust toolchain is declared in `rust-toolchain.toml`.
+Install Rust 1.88, Go 1.23 or newer for the optional controller executable, and the platform prerequisites for Tauri 2. The pinned Rust toolchain is declared in `rust-toolchain.toml`.
+
+Artwork import and MP4 export use the same local FFmpeg installation. Open **FFmpeg media tools** in the desktop editor to check its paths, versions, codecs and filters. **Install FFmpeg and FFprobe** runs the displayed WinGet command on Windows or Homebrew command on macOS. **Recheck** picks up installations made outside the editor. [WinGet install](https://learn.microsoft.com/en-us/windows/package-manager/winget/install) · [Homebrew FFmpeg formula](https://formulae.brew.sh/formula/ffmpeg)
 
 ```sh
 mise run dev

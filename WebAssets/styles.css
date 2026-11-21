@@ -882,6 +882,7 @@ input[type=range].hue-slider {
 
 
 .macro-deck { margin-top: 12px; padding: 14px 20px; }
+#media-tools pre, #media-tools li { white-space: pre-wrap; overflow-wrap: anywhere; }
 .macro-deck summary { cursor: pointer; font-weight: 600; }
 .macro-controls, .macro-controls fieldset { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
 .macro-controls { padding-top: 12px; }

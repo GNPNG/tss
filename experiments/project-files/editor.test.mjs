@@ -29,6 +29,7 @@ async function exerciseControls(platform) {
   let documentText, incoming, linked=null, lastSelection=1;
   const advisorRequests=[],reviewedLyrics=[],previewRequests=[];
   let finishInference;
+  let mediaChecks=0,mediaInstalls=0,mediaReady=false;
   if (windows) {
     const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',audio)), b=>b.toString(16).padStart(2,'0')).join('');
     const events=['down','up'].map((phase,t)=>({phase,t,layerId:1,slide:'front',gesture:'pressure',amount:1-t,tugResponse:.4,point:[.5,.5]}));
@@ -37,6 +38,15 @@ async function exerciseControls(platform) {
   }
   window.__TAURI__ = {event:{listen:async()=>()=>{}},core:{invoke:async (command,args)=>{
     switch(command) {
+    case 'choose_visual_media': throw Error('Could not find ffmpeg. Open FFmpeg media tools in the editor to install or recheck.');
+    case 'check_media_tools':
+      mediaChecks++;
+      return {ready:mediaReady,managerAvailable:true,installCommand:'brew install ffmpeg',managerHelp:'',
+        tools:[{name:'ffmpeg',version:mediaReady?'9.0.1':null,path:mediaReady?'/usr/local/bin/ffmpeg':null,issues:mediaReady?[]:['Could not find ffmpeg.']},
+          {name:'ffprobe',version:'9.0.1',path:'/usr/local/bin/ffprobe',issues:[]}]};
+    case 'install_media_tools':
+      mediaInstalls++;
+      throw Error('Package download failed.');
     case 'choose_audio': return [lastSelection,'/music/two-slide-cues.m4a'];
     case 'confirm_audio': case 'clear_project_audio': case 'remember_project_audio': return;
     case 'set_visual_audio_features':
@@ -119,6 +129,17 @@ async function exerciseControls(platform) {
     return;
   }
   if (platform==='Macintosh') {
+    const tools=$('media-tools'),install=$('media-tools-install');
+    check(!tools.hidden && mediaChecks===0 && mediaInstalls===0,'desktop starts without scanning packages');
+    click('artwork-add');await until(()=>tools.open && !install.disabled);
+    check($('media-tools-manager').textContent==='brew install ffmpeg' && $('media-tools-versions').textContent.includes('Could not find ffmpeg.'),'operator sees exact command and missing executable');
+    click('media-tools-install');click('media-tools-install');
+    await until(()=>$('media-tools-status').textContent.includes('Package download failed.'));
+    check(mediaInstalls===1 && mediaChecks===2,'failed install is rechecked and duplicate click ignored');
+    mediaReady=true;click('media-tools-check');await until(()=>$('media-tools-status').textContent==='FFmpeg media tools are ready.');
+    check(install.hidden && $('media-tools-versions').textContent.includes('/usr/local/bin/ffprobe') &&
+      !$('media-tools-versions').textContent.includes('Could not find'),'recheck clears stale errors and reports local versions');
+    tools.open=false;
     await until(()=>previewRequests.some(c=>c?.wheel==='violet-blue'));
     const preview=previewRequests.at(-1);
     check(preview.renderWidth===640 && preview.rect.width>0 && preview.rect.height>0,'Mac uses live wheel and device pixel viewport');

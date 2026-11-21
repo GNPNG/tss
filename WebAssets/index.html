@@ -215,6 +215,18 @@
         <output id="projector-state" role="status"></output>
       </div>
     </details>
+    <details id="media-tools" class="timeline card macro-deck" hidden>
+      <summary>FFmpeg media tools</summary>
+      <p>Artwork import uses FFmpeg and FFprobe. MP4 export uses FFmpeg with H.264 and AAC encoding.</p>
+      <p id="media-tools-status" role="status" aria-live="polite"></p>
+      <ul id="media-tools-versions"></ul>
+      <pre id="media-tools-manager" aria-label="Package manager command"></pre>
+      <div class="macro-controls">
+        <button type="button" class="button quiet" id="media-tools-check">Recheck</button>
+        <button type="button" class="button" id="media-tools-install" hidden disabled>Install FFmpeg and FFprobe</button>
+      </div>
+    </details>
+
     <details id="advice-panel" class="timeline card macro-deck" hidden>
       <summary>Local visual advisor</summary>
       <label for="advice-direction">Visual direction for the selection</label>
