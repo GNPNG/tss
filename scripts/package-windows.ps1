@@ -4,7 +4,9 @@ param(
     [Parameter(Mandatory)] [ValidatePattern('^v[0-9][A-Za-z0-9.-]*$')] [string] $Tag,
     [Parameter(Mandatory)] [string] $OutputDirectory,
     [string] $BinaryDirectory = (Join-Path $PSScriptRoot '../src-tauri/target/release'),
-    [ValidatePattern('^[a-fA-F0-9]{7,40}$')] [string] $DocumentationCommit
+    [ValidatePattern('^[a-fA-F0-9]{7,40}$')] [string] $DocumentationCommit,
+    # Root of the curated example tree. Paths inside it are preserved under examples/.
+    [string] $ExampleDirectory
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -27,7 +29,12 @@ try {
     Copy-Item -LiteralPath (Join-Path $repo 'docs/performance-surfaces.md') -Destination (Join-Path $scratch 'PERFORMANCE-SURFACES.md')
     $media = Get-Content (Join-Path $repo 'docs/visual-media.md') -Raw -Encoding UTF8
     [IO.File]::WriteAllText((Join-Path $scratch 'VISUAL-MEDIA.md'), $media.Replace('](windows-preview.md)', '](WINDOWS-QUICKSTART.md)'), $utf8)
-    $files = @(Get-ChildItem -LiteralPath $scratch -File | Sort-Object Name | ForEach-Object FullName)
+    if ($ExampleDirectory) {
+        $example = Get-Item -LiteralPath $ExampleDirectory
+        if (!$example.PSIsContainer) { throw "ExampleDirectory must be a directory: $ExampleDirectory" }
+        Copy-Item -LiteralPath $example.FullName -Destination (Join-Path $scratch 'examples') -Recurse
+    }
+    $files = @(Get-ChildItem -LiteralPath $scratch | Sort-Object Name | ForEach-Object FullName)
     $archive = Join-Path $scratch $name
     Compress-Archive -LiteralPath $files -DestinationPath $archive -CompressionLevel Optimal
     [IO.File]::Move($archive, $target)
