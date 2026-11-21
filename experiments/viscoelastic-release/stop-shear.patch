@@ -1,0 +1,89 @@
+--- a/viscodrop.c
++++ b/viscodrop.c
+@@ -27,7 +27,7 @@
+ #define MUr 1.     // ratio of outer(matrix) to inner(drop) viscosity
+ #define M 1.       // ratio of outer to inner density
+ #define Deb 0.4    // Deborah number
+-#define Beta 0.5   // ratio of the solvent visc. to the total viscoelastic visc.
++static double solvent_fraction;
+ 
+ /**
+ We set a maximum level of 8 only so that the test case runs in less
+@@ -41,15 +41,18 @@
+ /**
+ The top and bottom boundary conditions are those of a Couette flow. */
+ 
+-u.t[top] = dirichlet (y);
+-u.t[bottom] = dirichlet (y);
++u.t[top] = dirichlet (t < 2. ? y : 0.);
++u.t[bottom] = dirichlet (t < 2. ? y : 0.);
+ 
+ /** 
+ The domain is a 16x16 box which will be masked later to a
+ bottom-left corner of the domain of coordinates ($x=-8, y=-4$). We set
+ a maximum timestep of 0.1 */
+ 
+-int main() {
++int main(int argc, char ** argv) {
++  if (argc != 2 || (strcmp(argv[1],"oldroyd-b") && strcmp(argv[1],"newtonian")))
++    return 2;
++  solvent_fraction = !strcmp(argv[1],"newtonian") ? 1. : 0.5;
+   L0 = 16 ;
+   origin (-L0/2, -L0/4.);
+   periodic (right);
+@@ -59,7 +62,7 @@
+   We set the viscosities, densities, surface tension and visco-elastic
+   parameters according to the analysis above. */
+   
+-  mu1 = MUr*Beta/Re;
++  mu1 = MUr*solvent_fraction/Re;
+   mu2 = 1./Re;
+   rho1 = M;
+   rho2 = 1.;
+@@ -101,8 +104,8 @@
+ 
+ event properties (i++) {
+   foreach () {
+-    lam[] = Deb*f[];
+-    mupd[] = MUr*(1. - Beta)*f[]/Re;
++    lam[] = solvent_fraction == 1. ? 0. : Deb*f[];
++    mupd[] = MUr*(1. - solvent_fraction)*f[]/Re;
+   }
+ }
+ 
+@@ -122,6 +125,19 @@
+   output_facets (f);
+ }
+ 
++event shear_stops (t = 2.) {
++  // Schedule an exact step boundary at the change in the wall velocity.
++}
++
++event contours (t = 0.; t <= 10.; t += .25) {
++  char name[48];
++  snprintf(name,sizeof(name),"contour-%03d.dat",(int)lround(4.*t));
++  FILE * fp = fopen(name,"w");
++  if (!fp) { perror(name); exit(1); }
++  output_facets(f,fp);
++  if (fclose(fp)) { perror(name); exit(1); }
++}
++
+ event deformation (t += 0.1) {
+   double rmax = -HUGE, rmin = HUGE ;
+   foreach (reduction(max:rmax) reduction(min:rmin)) 
+@@ -137,7 +153,14 @@
+ 	rmin = rad;
+     }
+   double D = (rmax - rmin)/(rmax + rmin);
+-  fprintf (stderr, "%g %g %g %g\n", t, rmin, rmax, D);
++  double area = 0., stress2 = 0.;
++  foreach (reduction(+:area) reduction(+:stress2)) {
++    double weight = f[]*dv();
++    area += weight;
++    stress2 += weight*(sq(tau_p.x.x[]) + 2.*sq(tau_p.x.y[]) + sq(tau_p.y.y[]));
++  }
++  fprintf (stderr, "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g\n",
++           t, rmin, rmax, D, area, sqrt(stress2/area));
+ }
+ 
+ /**
