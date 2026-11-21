@@ -1,0 +1,44 @@
+{
+  "film": "cyan front",
+  "grade": "pdms-water-20cst",
+  "coarseTreeMaxLevel": 7,
+  "fineTreeMaxLevel": 8,
+  "comparedPhysicalSeconds": [
+    0,
+    0.16666666666666666
+  ],
+  "coarseVsFine": [
+    {
+      "index": 0,
+      "coarsePgmSha256": "7893a7b7321b00899c09a3af88012447c0a891318e8e4cc1fd86bb787a38b2b1",
+      "finePgmSha256": "d8efa403c99a7893badf5b8b44a578c43eeb9472a45adca66bb111c868f9bc03",
+      "gate": {
+        "gatePixels": 310992,
+        "xorPixels": 861,
+        "xorFraction": 0.002768559963,
+        "coverageA": 0.4040264701,
+        "coverageB": 0.4041518753,
+        "boundarySamples": 10837,
+        "meanBoundaryMm": 0.02261375239,
+        "p95BoundaryMm": 0.0949484187,
+        "maxBoundaryMm": 1.514717424
+      }
+    },
+    {
+      "index": 4,
+      "coarsePgmSha256": "678da7b933706ee76452367b8304499291af5019727b3a8cd699b88d0a4791ca",
+      "finePgmSha256": "c7ad86135b41c31be22311e606e51d31516b122ab98bea34e2f8fcec9fb550c6",
+      "gate": {
+        "gatePixels": 310992,
+        "xorPixels": 9467,
+        "xorFraction": 0.03044129753,
+        "coverageA": 0.4302908113,
+        "coverageB": 0.434332716,
+        "boundarySamples": 6716,
+        "meanBoundaryMm": 0.5321408323,
+        "p95BoundaryMm": 2.8238178,
+        "maxBoundaryMm": 5.605174508
+      }
+    }
+  ]
+}

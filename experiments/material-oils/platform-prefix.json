@@ -1,0 +1,104 @@
+{
+  "film": "cyan front",
+  "grade": "pdms-water-1000cst",
+  "level": 7,
+  "hostA": "Intel macOS",
+  "hostB": "Ubuntu WSL on flip",
+  "samples": [
+    {
+      "index": 0,
+      "timeSeconds": 0,
+      "rawSha256": [
+        "7893a7b7321b00899c09a3af88012447c0a891318e8e4cc1fd86bb787a38b2b1",
+        "7893a7b7321b00899c09a3af88012447c0a891318e8e4cc1fd86bb787a38b2b1"
+      ],
+      "gate": {
+        "gatePixels": 310992,
+        "xorPixels": 0,
+        "xorFraction": 0,
+        "coverageA": 0.4040264701,
+        "coverageB": 0.4040264701,
+        "boundarySamples": 10894,
+        "meanBoundaryMm": 0,
+        "p95BoundaryMm": 0,
+        "maxBoundaryMm": 0
+      }
+    },
+    {
+      "index": 4,
+      "timeSeconds": 0.16666666666666666,
+      "rawSha256": [
+        "f0d1184b77be8c526e9c46e4560a70922b0f9eb268ae04433ccb2e0a9d5a17bd",
+        "d3b2b74df8c8e8020aa420fa9a1ac17dc19bbf7297f29df83c7544cf0131ccc0"
+      ],
+      "gate": {
+        "gatePixels": 310992,
+        "xorPixels": 371,
+        "xorFraction": 0.001192956732,
+        "coverageA": 0.4057274785,
+        "coverageB": 0.4057371251,
+        "boundarySamples": 9815,
+        "meanBoundaryMm": 0.009421389318,
+        "p95BoundaryMm": 0,
+        "maxBoundaryMm": 1.076314785
+      }
+    },
+    {
+      "index": 12,
+      "timeSeconds": 0.5,
+      "rawSha256": [
+        "025a40fe319747c44ab012977d8e5265d08a523f8d91cc3e7fbabae0bbb1f5f2",
+        "43e8a123bffe29aad109f842993eb169b8e80a8fb2773235d422013221b9c683"
+      ],
+      "gate": {
+        "gatePixels": 310992,
+        "xorPixels": 442,
+        "xorFraction": 0.001421258425,
+        "coverageA": 0.4103320986,
+        "coverageB": 0.4104028399,
+        "boundarySamples": 8798,
+        "meanBoundaryMm": 0.01334821452,
+        "p95BoundaryMm": 0.06713867188,
+        "maxBoundaryMm": 1.076314785
+      }
+    },
+    {
+      "index": 24,
+      "timeSeconds": 1,
+      "rawSha256": [
+        "09c029cf1a8edcc4d63425c3e481fbcdfcd89eaffaf63df4278b75759f148944",
+        "5f96e2a8d17c7e5fbe3d4039a9fcd03e9c11562bf07f9871235a07db9345d5a0"
+      ],
+      "gate": {
+        "gatePixels": 310992,
+        "xorPixels": 852,
+        "xorFraction": 0.002739620312,
+        "coverageA": 0.4170846839,
+        "coverageB": 0.4171297011,
+        "boundarySamples": 8286,
+        "meanBoundaryMm": 0.03094076757,
+        "p95BoundaryMm": 0.2123111248,
+        "maxBoundaryMm": 1.508753945
+      }
+    },
+    {
+      "index": 40,
+      "timeSeconds": 1.6666666666666667,
+      "rawSha256": [
+        "8b77ab3ee596e17e62645e7aa9bfeb91a0bee03bb6c65c7dd701bc27e489688e",
+        "843e4656a10e57e4f625e118b79b9f059686b892cad01e63522afc3937f0f797"
+      ],
+      "gate": {
+        "gatePixels": 310992,
+        "xorPixels": 1036,
+        "xorFraction": 0.003331275403,
+        "coverageA": 0.4248180017,
+        "coverageB": 0.4248951742,
+        "boundarySamples": 7982,
+        "meanBoundaryMm": 0.03474393045,
+        "p95BoundaryMm": 0.276819829,
+        "maxBoundaryMm": 1.076314785
+      }
+    }
+  ]
+}
