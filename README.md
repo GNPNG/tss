@@ -68,17 +68,9 @@ Install Rust 1.88, Go 1.23 or newer for the optional controller executable, and 
 
 Artwork import and MP4 export use the same local FFmpeg installation. Open **FFmpeg media tools** in the desktop editor to check its paths, versions, codecs and filters. **Install FFmpeg and FFprobe** runs the displayed WinGet command on Windows or Homebrew command on macOS. **Recheck** picks up installations made outside the editor. [WinGet install](https://learn.microsoft.com/en-us/windows/package-manager/winget/install) · [Homebrew FFmpeg formula](https://formulae.brew.sh/formula/ffmpeg)
 
-```sh
-mise run dev
-```
+On Intel macOS and Windows x64, set `CIMG_INCLUDE` to the directory containing the pinned CImg header. On the Mac, set `BASILISK` to the host-built Basilisk `src` directory containing `qcc`. On Windows, set `TSS_LIVE_SOLVER_DIR` to the compiled worker directory, or set `BASILISK_WSL` and `CYGWIN_ROOT` to build it locally. [Solver prerequisites](experiments/live-slide-solver/README.md) · [Windows toolchain and payload](experiments/live-slide-solver/windows/README.md)
 
-To run the editor without building the optional controller executable, use `cargo run --manifest-path src-tauri/Cargo.toml`. The first build downloads Rust dependencies. A release build with both executables is available with `mise run build`. On Windows, package them together using `scripts/package-windows.ps1 -Tag <tag> -OutputDirectory <directory>`.
-
-On a macOS system where a third-party Clang installation is unavailable, select Apple's compiler for a build.
-
-```sh
-CC=/usr/bin/clang CXX=/usr/bin/clang++ mise run dev
-```
+Run `mise run dev` to open the live simulator. Run `mise run build` to produce the release editor, solver and performance controller in the same directory. The first build downloads Rust dependencies. On Windows, `scripts/package-windows.ps1 -Tag <tag> -OutputDirectory <directory>` includes the adjacent solver, runtime and licences. A plain `cargo run --manifest-path src-tauri/Cargo.toml` builds the smaller editor for recorded studies.
 
 Audio files are read locally. Export writes a new MP4 and refuses to overwrite an existing file. Rendering and encoding speed depends on the device and composition.
 

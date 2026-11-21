@@ -14,6 +14,9 @@ $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (!$BinaryDirectory) { $BinaryDirectory = Join-Path $repo 'src-tauri/target/release' }
 $bin = (Resolve-Path -LiteralPath $BinaryDirectory).Path
+if (!$LiveSolverDirectory -and (Test-Path -LiteralPath (Join-Path $bin 'tss-slide-solver.exe'))) {
+    $LiveSolverDirectory = $bin
+}
 $out = [IO.Directory]::CreateDirectory($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputDirectory)).FullName
 $name = "The-Sacred-Swirls-$Tag-Windows-x64.zip"
 $target = Join-Path $out $name

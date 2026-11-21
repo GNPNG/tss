@@ -3,13 +3,13 @@ RUSTUP_TOOLCHAIN = "1.88.0"
 
 [tasks.dev]
 description = "Run The Sacred Swirls desktop application"
-depends = ["performer:dev"]
-run = "cargo run --locked --manifest-path src-tauri/Cargo.toml"
+run = "sh scripts/desktop-build.sh dev"
+run_windows = "powershell -NoProfile -File scripts/desktop-build.ps1 dev"
 
 [tasks.build]
 description = "Build The Sacred Swirls desktop application"
-depends = ["performer:release"]
-run = "cargo build --locked --release --features tauri/custom-protocol --manifest-path src-tauri/Cargo.toml"
+run = "sh scripts/desktop-build.sh build"
+run_windows = "powershell -NoProfile -File scripts/desktop-build.ps1 build"
 
 [tasks.test]
 description = "Run Rust tests"
