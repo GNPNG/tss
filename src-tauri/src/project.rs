@@ -25,7 +25,7 @@ pub(crate) fn project_media_sibling(app: &tauri::AppHandle, name: &str) -> Optio
     sibling_file(selected.as_ref()?, name)
 }
 
-fn sibling_file(dir: &Path, name: &str) -> Option<PathBuf> {
+pub(super) fn sibling_file(dir: &Path, name: &str) -> Option<PathBuf> {
     let component = Path::new(name);
     if !matches!(
         component.components().collect::<Vec<_>>().as_slice(),

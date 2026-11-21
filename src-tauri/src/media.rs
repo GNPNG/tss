@@ -322,20 +322,29 @@ pub async fn resolve_visual_media(
     let root = cache(&app)?;
     let sibling = crate::project::project_media_sibling(&app, &name);
     tauri::async_runtime::spawn_blocking(move || {
-        let dir = root.join(&sha256);
-        if dir.is_dir() {
-            let index = prepare::load(&dir)?;
-            return register(dir, index, name, sha256).map(Some);
-        }
-        if let Some(path) = sibling {
-            if crate::project::digest_file(&path).map_err(ioerr)? == sha256 {
-                return import(&root, &path, Some(&sha256)).map(Some);
-            }
-        }
-        Ok(None)
+        resolve_cached_or_sibling(&root, sibling.as_deref(), name, sha256)
     })
     .await
     .map_err(ioerr)?
+}
+
+fn resolve_cached_or_sibling(
+    root: &Path,
+    sibling: Option<&Path>,
+    name: String,
+    sha256: String,
+) -> MediaResult<Option<Grant>> {
+    let dir = root.join(&sha256);
+    if dir.is_dir() {
+        let index = prepare::load(&dir)?;
+        return register(dir, index, name, sha256).map(Some);
+    }
+    if let Some(path) = sibling {
+        if crate::project::digest_file(path).map_err(ioerr)? == sha256 {
+            return import(root, path, Some(&sha256)).map(Some);
+        }
+    }
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -550,5 +559,73 @@ mod animated_tests {
             frame_at(g.id, 0).unwrap().rgba,
             frame_at(g.id, g.duration_us - 1).unwrap().rgba
         );
+    }
+}
+
+#[cfg(test)]
+mod project_fixture {
+    use super::*;
+    use sha2::{Digest, Sha256};
+
+    #[test]
+    #[ignore = "set TSS_STAR_APERTURE_PROJECT to the packaged Star Aperture.tss file"]
+    fn cold_project_siblings_decode_as_independent_native_sources() {
+        let project = PathBuf::from(
+            std::env::var_os("TSS_STAR_APERTURE_PROJECT").expect("supply the packaged project"),
+        );
+        let doc: serde_json::Value =
+            serde_json::from_reader(File::open(&project).unwrap()).unwrap();
+        let layers = doc["layers"].as_array().unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        assert_eq!(std::fs::read_dir(cache.path()).unwrap().count(), 0);
+        let mut grants = Vec::new();
+        for name in ["star-green.mp4", "moving-matte.mov"] {
+            let media = layers
+                .iter()
+                .map(|l| &l["media"])
+                .find(|m| m["name"] == name)
+                .unwrap();
+            let hash = media["sha256"].as_str().unwrap();
+            let sibling = crate::project::sibling_file(project.parent().unwrap(), name).unwrap();
+            assert!(
+                resolve_cached_or_sibling(cache.path(), None, name.into(), hash.into())
+                    .unwrap()
+                    .is_none()
+            );
+            let grant =
+                resolve_cached_or_sibling(cache.path(), Some(&sibling), name.into(), hash.into())
+                    .unwrap()
+                    .unwrap();
+            assert_eq!(grant.sha256, hash);
+            assert_eq!(
+                (grant.width, grant.height, grant.duration_us, grant.still),
+                (960, 540, 3_000_000, false)
+            );
+            let index = prepare::load(&cache.path().join(hash)).unwrap();
+            assert_eq!(index.master.samples.len(), 72);
+            grants.push(grant);
+        }
+        assert_ne!(grants[0].id, grants[1].id);
+        let mut images = std::collections::BTreeSet::new();
+        for (source, t) in [(0, 250_000), (1, 1_750_000), (0, 1_750_000), (1, 250_000)] {
+            let grant = &grants[source];
+            let frame = frame_at(grant.id, t).unwrap();
+            assert_eq!(
+                (frame.id, frame.pts_us, frame.width, frame.height),
+                (grant.id, t, 960, 540)
+            );
+            let proxy = frame_for_preview(grant.id, t).unwrap();
+            assert_eq!(frame.pts_us, proxy.pts_us);
+            assert!(frame.rgba == proxy.rgba);
+            let transparent = frame.rgba.chunks_exact(4).filter(|p| p[3] == 0).count();
+            assert_eq!(transparent > 0, source == 1);
+            let digest = format!("{:x}", Sha256::digest(&frame.rgba));
+            println!(
+                "{} at {} us: {} transparent pixels, native RGBA SHA-256 {}",
+                grant.name, t, transparent, digest
+            );
+            assert!(images.insert(digest));
+        }
+        assert_eq!(std::fs::read_dir(cache.path()).unwrap().count(), 2);
     }
 }

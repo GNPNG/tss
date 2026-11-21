@@ -19,3 +19,7 @@ To repeat, generate the fixture, set `TSS_PROOF_MEDIA` to the absolute path of `
 ## Opening the packaged example
 
 The executable built from `224df17` opened the delivered **Star Aperture.tss** through the editor's **Open project** button and Windows file picker on an isolated private desktop. The editor enabled **Play**, showed **two-slide-cues.m4a** at **00:02**, and restored the artwork, hidden moving matte, Violet / Blue wheel, and both named gesture macros. The Windows machine already had the two visual sources in its prepared-media cache. [Observed editor controls](project-open.json)
+
+A separate CPU test opened the delivered project document (SHA-256 `c46a4604ee40db05e9038a833617d07c5ba2e0f32d80a368be84211511698ac1`) with an empty temporary media cache. The production resolver matched the two sibling files to their project hashes and prepared 72 independently seekable frames per source. Interleaved requests at 0.250 and 1.750 s returned four distinct native RGBA images at those exact timestamps. The star had zero fully transparent pixels at both times. The matte had 379,830 and 379,857, respectively. Preview and export returned identical image bytes at 960 × 540.
+
+To repeat, set `TSS_STAR_APERTURE_PROJECT` to the delivered `Star Aperture.tss` and run `cargo test --locked --manifest-path src-tauri/Cargo.toml cold_project_siblings_decode_as_independent_native_sources -- --ignored --nocapture`.
