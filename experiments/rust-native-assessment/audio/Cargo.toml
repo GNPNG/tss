@@ -1,0 +1,9 @@
+[package]
+name = "tss-symphonia-comparison"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+publish = false
+
+[dependencies]
+symphonia = { version = "=0.6.1", default-features = false, features = ["mp3", "isomp4", "aac", "alac", "id3v2", "opt-simd"] }

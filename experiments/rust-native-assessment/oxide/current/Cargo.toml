@@ -1,0 +1,18 @@
+[package]
+name = "tss-oxide-probe-check"
+edition = "2024"
+version = "0.1.1"
+rust-version = "1.95"
+publish = false
+
+[[bin]]
+name = "tss-oxide-probe-check"
+path = "../src/main.rs"
+
+[dependencies]
+oxideav-core = "=0.1.43"
+oxideav-mp4 = "=0.0.11"
+serde_json = "1"
+sha2 = "0.10"
+
+[workspace]

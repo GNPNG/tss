@@ -1,0 +1,23 @@
+Intel macOS x86_64, Symphonia 0.6.1, FFmpeg 9.0.1 reference
+input=../../../experiments/slide-look-study/approval/windows-live/gesture-controls/export/two-slide-cues.m4a
+sample_rate=48000 channels=2 symphonia_frames=97280 ffmpeg_frames=96000 elapsed_ms=3.672
+skip_symphonia_frames=0 compared_frames=96000 snr_db=-0.289 peak_abs_error=0.27588178 rms_error=0.04298406
+skip_symphonia_frames=1024 compared_frames=96000 snr_db=132.031 peak_abs_error=0.00000010 rms_error=0.00000001
+input=derived.mp3
+sample_rate=48000 channels=2 symphonia_frames=96000 ffmpeg_frames=96000 elapsed_ms=3.667
+skip_symphonia_frames=0 compared_frames=96000 snr_db=124.571 peak_abs_error=0.00000037 rms_error=0.00000002
+input=derived-alac.m4a
+sample_rate=48000 channels=2 symphonia_frames=96000 ffmpeg_frames=96000 elapsed_ms=4.797
+skip_symphonia_frames=0 compared_frames=96000 snr_db=inf peak_abs_error=0.00000000 rms_error=0.00000000
+
+Windows x86_64, Symphonia 0.6.1, same FFmpeg 9.0.1 references
+input=two-slide-cues.m4a
+sample_rate=48000 channels=2 symphonia_frames=97280 ffmpeg_frames=96000 elapsed_ms=9.122
+skip_symphonia_frames=0 compared_frames=96000 snr_db=-0.289 peak_abs_error=0.27588178 rms_error=0.04298406
+skip_symphonia_frames=1024 compared_frames=96000 snr_db=132.031 peak_abs_error=0.00000010 rms_error=0.00000001
+input=derived.mp3
+sample_rate=48000 channels=2 symphonia_frames=96000 ffmpeg_frames=96000 elapsed_ms=10.013
+skip_symphonia_frames=0 compared_frames=96000 snr_db=124.571 peak_abs_error=0.00000037 rms_error=0.00000002
+input=derived-alac.m4a
+sample_rate=48000 channels=2 symphonia_frames=96000 ffmpeg_frames=96000 elapsed_ms=10.955
+skip_symphonia_frames=0 compared_frames=96000 snr_db=inf peak_abs_error=0.00000000 rms_error=0.00000000

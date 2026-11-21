@@ -1,0 +1,22 @@
+{
+  "host": "Intel Mac, macOS 15.3.1 (24D70); Intel UHD Graphics 630 and AMD Radeon Pro 5300M",
+  "toolchain": "rustc 1.88.0, Apple SDK 15.5",
+  "candidate": "oxideav-videotoolbox 0.0.4 + read-only post-flush observation",
+  "candidate_sha256": "84caf65b030a415bf2ce791917390bc415e7c70194a100907a49109af948e650",
+  "profile": {
+    "codec": "H.264", "geometry": [320, 180], "input_frames": 3, "input_layout": "I420",
+    "frame_rate": [30, 1], "api": "oxideav_videotoolbox::encoder::make_h264_encoder",
+    "hardware": "require", "session_limit_seconds": 45
+  },
+  "guard_result": "exited", "exit_code": 1,
+  "error": "VTCompressionSessionCreate (codec_type 0x61766331): OSStatus -12903 (kVTInvalidSessionErr)",
+  "phase": "compression session creation, before frames or callback",
+  "using_hardware_property": null, "encoder_id": null, "output_bytes": 0, "output_packets": 0,
+  "ioreg_sample": {
+    "intel_device_utilization_percent_before": 66, "intel_device_utilization_percent_after": 60,
+    "radeon_utilization": null,
+    "note": "Accelerator enumeration included AMD; sampled percentages apply to the Intel accelerator and do not measure the hardware video encoder."
+  },
+  "recovery": "Guard reported nonzero process exit. Process group was empty, 0-byte output, accelerator services enumerated. Guard released using the documented release command.",
+  "benchmark": null
+}

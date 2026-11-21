@@ -1,0 +1,15 @@
+[package]
+name = "tss-oxide-vt-smoke"
+edition = "2021"
+rust-version = "1.88"
+version = "0.1.0"
+publish = false
+
+[dependencies]
+oxideav-core = "=0.1.41"
+oxideav-videotoolbox = "=0.0.4"
+
+[build-dependencies]
+cc = "1"
+
+[workspace]

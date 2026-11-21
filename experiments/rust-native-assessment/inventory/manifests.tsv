@@ -1,0 +1,32 @@
+manifest	dependency	requirement	kind	target	default features	explicit features
+the-sacred-swirls	base64	^0.22	normal	all	true	-
+the-sacred-swirls	objc2	^0.6	normal	cfg(target_os = "macos")	true	-
+the-sacred-swirls	objc2-app-kit	^0.3	normal	cfg(target_os = "macos")	false	NSEvent,NSGraphicsContext,NSResponder,NSView,NSWindow,objc2-quartz-core
+the-sacred-swirls	objc2-foundation	^0.3	normal	cfg(target_os = "macos")	false	NSGeometry,NSObject
+the-sacred-swirls	objc2-quartz-core	^0.3	normal	cfg(target_os = "macos")	false	CALayer,CAMetalLayer,objc2-core-foundation
+the-sacred-swirls	png	=0.18.1	normal	all	true	-
+the-sacred-swirls	pollster	^0.3	normal	cfg(any(windows, target_os = "macos"))	true	-
+the-sacred-swirls	process-wrap	^10.0.1	normal	all	false	std,process-group,job-object
+the-sacred-swirls	raw-window-handle	^0.6	normal	cfg(windows)	true	-
+the-sacred-swirls	reqwest	^0.13	normal	all	false	json
+the-sacred-swirls	serde	^1	normal	all	true	derive
+the-sacred-swirls	serde_json	^1	normal	all	true	preserve_order
+the-sacred-swirls	sha2	^0.10	normal	all	true	-
+the-sacred-swirls	tauri	^2	normal	all	true	-
+the-sacred-swirls	tauri-build	^2	build	all	true	-
+the-sacred-swirls	tauri-plugin-dialog	^2	normal	all	true	-
+the-sacred-swirls	tempfile	^3	normal	all	true	-
+the-sacred-swirls	tss-live-wheel	*	normal	cfg(any(windows, target_os = "macos"))	true	-
+the-sacred-swirls	windows-sys	^0.59	normal	cfg(windows)	true	Win32_Foundation,Win32_Graphics_Gdi,Win32_System_LibraryLoader,Win32_System_SystemInformation,Win32_UI_WindowsAndMessaging,Win32_UI_Input_KeyboardAndMouse
+tss-live-wheel	bytemuck	^1	normal	all	true	derive
+tss-live-wheel	flate2	^1	normal	all	true	-
+tss-live-wheel	lcms2	=6.3.0	normal	all	true	static
+tss-live-wheel	pdf-writer	=0.15.0	normal	all	true	-
+tss-live-wheel	png	=0.18.1	normal	all	true	-
+tss-live-wheel	pollster	^0.3	dev	all	true	-
+tss-live-wheel	serde	^1	normal	all	true	derive
+tss-live-wheel	serde_json	^1	normal	all	true	-
+tss-live-wheel	sha2	^0.10	normal	all	true	-
+tss-live-wheel	tiff	=0.11.3	normal	all	false	lzw
+tss-live-wheel	ttf-parser	=0.25.1	normal	all	false	std
+tss-live-wheel	wgpu	=0.19.4	normal	all	true	spirv

@@ -1,0 +1,13 @@
+--- a/src/encoder.rs
++++ b/src/encoder.rs
+@@ -1404,6 +1404,10 @@
+                 status,
+             ));
+         }
++        unsafe extern "C" {
++            fn tss_observe_session(session: sys::VTCompressionSessionRef);
++        }
++        unsafe { tss_observe_session(self.session) };
+         let mut guard = self
+             .state
+             .lock()

@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-21",
+  "host": "x86_64-apple-darwin, macOS 15.3.1",
+  "toolchain": "rustc 1.100.0",
+  "tss_commit": "6ca9c32083b8",
+  "rff_cli_crate": "0.4.6",
+  "rff_cli_crate_sha256": "506ee4c539f6779047fca8f7a48feccd64749ef58657cb1700f4ce1ef699d68e",
+  "rff_cli_commit": "482d511adfc5b323370367eb7f9e04b986c096ec",
+  "library_test": {
+    "crate": "rusty_h264-encoder 0.16.0",
+    "source": "experiments/desktop-rc1/macos/coral-4k.mp4",
+    "source_sha256": "afe8a533d47bb54b7c4b1088023c9fe8fc6a784d8a7011051e9c530d9e616202",
+    "preparation": "FFmpeg 9.0.1 software decode and scale, YUV420P 160x90",
+    "source_yuv_sha256": "bd5e80b4aee4809631f64fa520c0a9512c96bb248c0da4d8eeee77e9963cda05",
+    "frames": 60,
+    "qp": 22,
+    "preset": "Fast",
+    "annex_b_bytes": 64086,
+    "annex_b_sha256": "9d46d177bef90b3a05a97d318df223ec67dd51b5e084b152c011b09e9f6f22ee",
+    "independent_decoder": "FFmpeg 9.0.1 -xerror",
+    "decoded_frames": 60,
+    "decoded_yuv_sha256": "db13b0306919f53e6cd640fcfd5e9801c4596d26fdf987d09c902398b9f15997",
+    "average_psnr_db": 41.747067,
+    "min_frame_psnr_db": 39.394234
+  },
+  "cli_export": {
+    "status": "unrun",
+    "reason": "Compilation was stopped after available disk space fell below 1.5 GiB."
+  }
+}

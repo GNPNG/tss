@@ -1,0 +1,379 @@
+package	version	declared license	x86_64-apple-darwin	x86_64-pc-windows-msvc
+adler2	2.0.1	0BSD OR MIT OR Apache-2.0	transitive	transitive
+ahash	0.8.12	MIT OR Apache-2.0	-	transitive
+aho-corasick	1.1.5	Unlicense OR MIT	transitive	transitive
+alloc-no-stdlib	2.0.4	BSD-3-Clause	transitive	transitive
+alloc-stdlib	0.2.4	BSD-3-Clause	transitive	transitive
+allocator-api2	0.2.21	MIT OR Apache-2.0	-	transitive
+anyhow	1.0.104	MIT OR Apache-2.0	transitive	transitive
+arrayvec	0.7.8	MIT OR Apache-2.0	transitive	transitive
+ash	0.37.3+1.3.251	MIT OR Apache-2.0	-	transitive
+atomic-waker	1.1.2	Apache-2.0 OR MIT	transitive	transitive
+autocfg	1.5.1	Apache-2.0 OR MIT	build/proc-macro	build/proc-macro
+base64	0.21.7	MIT OR Apache-2.0	build/proc-macro	-
+base64	0.22.1	MIT OR Apache-2.0	direct	direct
+base64	0.23.1	MIT OR Apache-2.0	transitive	transitive
+bit-set	0.5.3	MIT/Apache-2.0	transitive	transitive
+bit-set	0.8.0	Apache-2.0 OR MIT	build/proc-macro	build/proc-macro
+bit-vec	0.6.3	MIT/Apache-2.0	transitive	transitive
+bit-vec	0.8.0	Apache-2.0 OR MIT	build/proc-macro	build/proc-macro
+bitflags	1.3.2	MIT/Apache-2.0	transitive	build/proc-macro
+bitflags	2.13.2	MIT OR Apache-2.0	transitive	transitive
+block	0.1.6	MIT	transitive	-
+block-buffer	0.10.4	MIT OR Apache-2.0	transitive	transitive
+block2	0.6.2	MIT	transitive	-
+brotli	8.0.4	BSD-3-Clause AND MIT	transitive	transitive
+brotli-decompressor	5.0.3	BSD-3-Clause/MIT	transitive	transitive
+bytemuck	1.25.2	Zlib OR Apache-2.0 OR MIT	transitive	transitive
+bytemuck_derive	1.12.1	Zlib OR Apache-2.0 OR MIT	build/proc-macro	build/proc-macro
+byteorder	1.5.0	Unlicense OR MIT	transitive	transitive
+bytes	1.12.2	MIT	transitive	transitive
+camino	1.2.6	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+cargo-platform	0.1.9	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+cargo_metadata	0.19.2	MIT	build/proc-macro	build/proc-macro
+cargo_toml	0.22.3	Apache-2.0 OR MIT	build/proc-macro	build/proc-macro
+cc	1.11.2	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+cfb	0.7.3	MIT	transitive	transitive
+cfg-if	1.0.5	MIT OR Apache-2.0	transitive	transitive
+cfg_aliases	0.1.1	MIT	build/proc-macro	build/proc-macro
+cfg_aliases	0.2.2	MIT	build/proc-macro	-
+codespan-reporting	0.11.1	Apache-2.0	transitive	transitive
+com	0.6.0	MIT	-	transitive
+com_macros	0.6.0	MIT	-	build/proc-macro
+com_macros_support	0.6.0	MIT	-	build/proc-macro
+cookie	0.18.2	MIT OR Apache-2.0	transitive	transitive
+core-foundation	0.10.1	MIT OR Apache-2.0	transitive	-
+core-foundation	0.9.4	MIT OR Apache-2.0	transitive	-
+core-foundation-sys	0.8.7	MIT OR Apache-2.0	transitive	-
+core-graphics	0.25.0	MIT OR Apache-2.0	transitive	-
+core-graphics-types	0.1.3	MIT OR Apache-2.0	transitive	-
+core-graphics-types	0.2.0	MIT OR Apache-2.0	transitive	-
+cpufeatures	0.2.17	MIT OR Apache-2.0	transitive	transitive
+crc32fast	1.5.5	MIT OR Apache-2.0	transitive	transitive
+crossbeam-channel	0.5.17	MIT OR Apache-2.0	transitive	transitive
+crossbeam-utils	0.8.23	MIT OR Apache-2.0	transitive	transitive
+crypto-common	0.1.7	MIT OR Apache-2.0	transitive	transitive
+cssparser	0.36.0	MPL-2.0	build/proc-macro	build/proc-macro
+cssparser-macros	0.6.1	MPL-2.0	build/proc-macro	build/proc-macro
+ctor	0.8.0	Apache-2.0 OR MIT	transitive	transitive
+ctor-proc-macro	0.0.7	Apache-2.0 OR MIT	build/proc-macro	build/proc-macro
+d3d12	0.19.0	MIT OR Apache-2.0	-	transitive
+darling	0.24.1	MIT	build/proc-macro	build/proc-macro
+darling_core	0.24.1	MIT	build/proc-macro	build/proc-macro
+darling_macro	0.24.1	MIT	build/proc-macro	build/proc-macro
+deranged	0.5.9	MIT OR Apache-2.0	transitive	transitive
+derive_more	2.1.1	MIT	build/proc-macro	build/proc-macro
+derive_more-impl	2.1.1	MIT	build/proc-macro	build/proc-macro
+digest	0.10.7	MIT OR Apache-2.0	transitive	transitive
+dirs	6.0.0	MIT OR Apache-2.0	transitive	transitive
+dirs-sys	0.5.0	MIT OR Apache-2.0	transitive	transitive
+dispatch2	0.3.1	Zlib OR Apache-2.0 OR MIT	transitive	-
+displaydoc	0.2.7	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+dom_query	0.27.0	MIT	build/proc-macro	build/proc-macro
+dpi	0.1.2	Apache-2.0 AND MIT	transitive	transitive
+dtoa	1.0.11	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+dtoa-short	0.3.5	MPL-2.0	build/proc-macro	build/proc-macro
+dunce	1.0.5	CC0-1.0 OR MIT-0 OR Apache-2.0	transitive	transitive
+dyn-clone	1.0.20	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+embed-resource	3.0.12	MIT	build/proc-macro	build/proc-macro
+embed_plist	1.2.2	MIT OR Apache-2.0	transitive	-
+equivalent	1.0.3	Apache-2.0 OR MIT	transitive	transitive
+erased-serde	0.4.11	MIT OR Apache-2.0	transitive	transitive
+errno	0.3.15	MIT OR Apache-2.0	transitive	-
+fastrand	2.5.0	Apache-2.0 OR MIT	transitive	transitive
+fdeflate	0.3.7	MIT OR Apache-2.0	transitive	transitive
+find-msvc-tools	0.1.15	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+fixedbitset	0.4.2	MIT/Apache-2.0	transitive	transitive
+flate2	1.1.11	MIT OR Apache-2.0	transitive	transitive
+fnv	1.0.7	Apache-2.0 / MIT	transitive	transitive
+foldhash	0.2.0	Zlib	transitive	transitive
+foreign-types	0.5.0	MIT/Apache-2.0	transitive	transitive
+foreign-types-macros	0.2.4	MIT/Apache-2.0	build/proc-macro	build/proc-macro
+foreign-types-shared	0.3.1	MIT/Apache-2.0	transitive	transitive
+form_urlencoded	1.2.2	MIT OR Apache-2.0	transitive	transitive
+futures-channel	0.3.34	MIT OR Apache-2.0	transitive	transitive
+futures-core	0.3.34	MIT OR Apache-2.0	transitive	transitive
+futures-task	0.3.34	MIT OR Apache-2.0	transitive	transitive
+futures-util	0.3.34	MIT OR Apache-2.0	transitive	transitive
+generic-array	0.14.7	MIT	transitive	transitive
+getrandom	0.3.4	MIT OR Apache-2.0	transitive	transitive
+getrandom	0.4.3	MIT OR Apache-2.0	transitive	transitive
+gl_generator	0.14.0	Apache-2.0	-	build/proc-macro
+glob	0.3.4	MIT OR Apache-2.0	transitive	transitive
+glow	0.13.1	MIT OR Apache-2.0 OR Zlib	-	transitive
+glutin_wgl_sys	0.5.0	Apache-2.0	-	transitive
+gpu-alloc	0.6.2	MIT OR Apache-2.0	-	transitive
+gpu-alloc-types	0.3.1	MIT OR Apache-2.0	-	transitive
+gpu-allocator	0.25.0	MIT OR Apache-2.0	-	transitive
+gpu-descriptor	0.2.4	MIT OR Apache-2.0	-	transitive
+gpu-descriptor-types	0.1.2	MIT OR Apache-2.0	-	transitive
+half	2.7.1	MIT OR Apache-2.0	transitive	transitive
+hashbrown	0.12.3	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+hashbrown	0.14.5	MIT OR Apache-2.0	-	transitive
+hashbrown	0.17.1	MIT OR Apache-2.0	transitive	transitive
+hassle-rs	0.11.0	MIT	-	transitive
+heck	0.5.0	MIT OR Apache-2.0	transitive	transitive
+hexf-parse	0.2.1	CC0-1.0	transitive	transitive
+html5ever	0.38.0	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+http	1.5.0	MIT OR Apache-2.0	transitive	transitive
+http-body	1.1.0	MIT	transitive	transitive
+http-body-util	0.1.5	MIT	transitive	transitive
+httparse	1.10.1	MIT OR Apache-2.0	transitive	transitive
+hyper	1.12.0	MIT	transitive	transitive
+hyper-util	0.1.21	MIT	transitive	transitive
+ico	0.5.0	MIT	build/proc-macro	build/proc-macro
+icu_collections	2.4.0	Unicode-3.0	transitive	transitive
+icu_locale_core	2.4.0	Unicode-3.0	transitive	transitive
+icu_normalizer	2.4.0	Unicode-3.0	transitive	transitive
+icu_normalizer_data	2.4.0	Unicode-3.0	transitive	transitive
+icu_properties	2.4.0	Unicode-3.0	transitive	transitive
+icu_properties_data	2.4.0	Unicode-3.0	transitive	transitive
+icu_provider	2.4.0	Unicode-3.0	transitive	transitive
+ident_case	1.0.1	MIT/Apache-2.0	build/proc-macro	build/proc-macro
+idna	1.1.0	MIT OR Apache-2.0	transitive	transitive
+idna_adapter	1.2.2	Apache-2.0 OR MIT	transitive	transitive
+indexmap	1.9.3	Apache-2.0 OR MIT	build/proc-macro	build/proc-macro
+indexmap	2.14.2	Apache-2.0 OR MIT	transitive	transitive
+infer	0.19.0	MIT	transitive	transitive
+ipnet	2.12.2	MIT OR Apache-2.0	transitive	transitive
+itoa	1.0.19	MIT OR Apache-2.0	transitive	transitive
+jobserver	0.1.35	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+json-patch	3.0.1	MIT/Apache-2.0	transitive	transitive
+jsonptr	0.6.3	MIT OR Apache-2.0	transitive	transitive
+keyboard-types	0.7.0	MIT OR Apache-2.0	transitive	transitive
+khronos-egl	6.0.0	MIT/Apache-2.0	-	transitive
+khronos_api	3.1.0	Apache-2.0	-	build/proc-macro
+lcms2	6.3.0	MIT	transitive	transitive
+lcms2-sys	4.2.0	MIT	transitive	transitive
+libc	0.2.191	MIT OR Apache-2.0	transitive	transitive
+libloading	0.7.4	ISC	-	transitive
+libloading	0.8.9	ISC	transitive	transitive
+litemap	0.8.3	Unicode-3.0	transitive	transitive
+lock_api	0.4.14	MIT OR Apache-2.0	transitive	transitive
+log	0.4.35	MIT OR Apache-2.0	transitive	transitive
+malloc_buf	0.0.6	MIT	transitive	-
+markup5ever	0.38.0	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+memchr	2.8.3	Unlicense OR MIT	transitive	transitive
+metal	0.27.0	MIT OR Apache-2.0	transitive	-
+mime	0.3.18	MIT OR Apache-2.0	transitive	transitive
+miniz_oxide	0.8.9	MIT OR Zlib OR Apache-2.0	transitive	transitive
+miniz_oxide	0.9.1	MIT OR Zlib OR Apache-2.0	transitive	transitive
+mio	1.2.5	MIT	transitive	transitive
+muda	0.19.3	Apache-2.0 OR MIT	transitive	transitive
+naga	0.19.2	MIT OR Apache-2.0	transitive	transitive
+new_debug_unreachable	1.0.6	MIT	build/proc-macro	build/proc-macro
+nix	0.31.4	MIT	transitive	-
+num-conv	0.2.2	MIT OR Apache-2.0	transitive	transitive
+num-traits	0.2.19	MIT OR Apache-2.0	transitive	transitive
+objc	0.2.7	MIT	transitive	-
+objc2	0.6.5	MIT	direct	-
+objc2-app-kit	0.3.2	Zlib OR Apache-2.0 OR MIT	direct	-
+objc2-core-foundation	0.3.2	Zlib OR Apache-2.0 OR MIT	transitive	-
+objc2-encode	4.1.0	MIT	transitive	-
+objc2-exception-helper	0.1.1	Zlib OR Apache-2.0 OR MIT	transitive	-
+objc2-foundation	0.3.2	MIT	direct	-
+objc2-quartz-core	0.3.2	Zlib OR Apache-2.0 OR MIT	direct	-
+objc2-web-kit	0.3.2	Zlib OR Apache-2.0 OR MIT	transitive	-
+objc_exception	0.1.2	MIT	transitive	-
+once_cell	1.21.4	MIT OR Apache-2.0	transitive	transitive
+option-ext	0.2.0	MPL-2.0	transitive	transitive
+parking_lot	0.12.5	MIT OR Apache-2.0	transitive	transitive
+parking_lot_core	0.9.12	MIT OR Apache-2.0	transitive	transitive
+paste	1.0.15	MIT OR Apache-2.0	build/proc-macro	-
+pdf-writer	0.15.0	MIT OR Apache-2.0	transitive	transitive
+percent-encoding	2.3.2	MIT OR Apache-2.0	transitive	transitive
+petgraph	0.6.5	MIT OR Apache-2.0	transitive	transitive
+phf	0.13.1	MIT	transitive	transitive
+phf_codegen	0.13.1	MIT	build/proc-macro	build/proc-macro
+phf_generator	0.13.1	MIT	build/proc-macro	build/proc-macro
+phf_macros	0.13.1	MIT	build/proc-macro	build/proc-macro
+phf_shared	0.13.1	MIT	transitive	transitive
+pin-project-lite	0.2.17	Apache-2.0 OR MIT	transitive	transitive
+pkg-config	0.3.34	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+plist	1.10.4	MIT	transitive	transitive
+png	0.17.16	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+png	0.18.1	MIT OR Apache-2.0	direct	direct
+pollster	0.3.0	Apache-2.0/MIT	direct	direct
+potential_utf	0.1.6	Unicode-3.0	transitive	transitive
+powerfmt	0.2.1	MIT OR Apache-2.0	transitive	transitive
+precomputed-hash	0.1.1	MIT	build/proc-macro	build/proc-macro
+presser	0.3.1	MIT OR Apache-2.0	-	transitive
+proc-macro2	1.0.107	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+process-wrap	10.0.1	Apache-2.0 OR MIT	direct	direct
+profiling	1.0.18	MIT OR Apache-2.0	transitive	transitive
+quick-error	2.0.1	MIT/Apache-2.0	transitive	transitive
+quick-xml	0.42.0	MIT	transitive	transitive
+quote	1.0.47	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+range-alloc	0.1.5	MIT OR Apache-2.0	-	transitive
+raw-window-handle	0.6.2	MIT OR Apache-2.0 OR Zlib	transitive	direct
+regex	1.13.2	MIT OR Apache-2.0	transitive	transitive
+regex-automata	0.4.19	MIT OR Apache-2.0	transitive	transitive
+regex-syntax	0.8.12	MIT OR Apache-2.0	transitive	transitive
+renderdoc-sys	1.1.0	MIT OR Apache-2.0	-	transitive
+reqwest	0.13.5	MIT OR Apache-2.0	direct	direct
+rfd	0.16.1	MIT	transitive	transitive
+rustc-hash	1.1.0	Apache-2.0/MIT	transitive	transitive
+rustc-hash	2.1.3	Apache-2.0 OR MIT	build/proc-macro	build/proc-macro
+rustc_version	0.4.1	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+rustix	1.1.6	Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT	transitive	-
+ryu	1.0.23	Apache-2.0 OR BSL-1.0	transitive	transitive
+same-file	1.0.6	Unlicense/MIT	transitive	transitive
+schemars	0.8.22	MIT	build/proc-macro	build/proc-macro
+schemars_derive	0.8.22	MIT	build/proc-macro	build/proc-macro
+scopeguard	1.2.0	MIT OR Apache-2.0	transitive	transitive
+selectors	0.36.1	MPL-2.0	build/proc-macro	build/proc-macro
+semver	1.0.28	MIT OR Apache-2.0	transitive	transitive
+serde	1.0.229	MIT OR Apache-2.0	direct	direct
+serde-untagged	0.1.9	MIT OR Apache-2.0	transitive	transitive
+serde_core	1.0.229	MIT OR Apache-2.0	transitive	transitive
+serde_derive	1.0.229	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+serde_derive_internals	0.29.1	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+serde_json	1.0.154	MIT OR Apache-2.0	direct	direct
+serde_repr	0.1.21	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+serde_spanned	1.1.3	MIT OR Apache-2.0	transitive	transitive
+serde_with	3.24.0	MIT OR Apache-2.0	transitive	transitive
+serde_with_macros	3.24.0	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+serialize-to-javascript	0.1.2	MIT OR Apache-2.0	transitive	transitive
+serialize-to-javascript-impl	0.1.2	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+servo_arc	0.4.3	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+sha2	0.10.9	MIT OR Apache-2.0	direct	direct
+shlex	2.0.1	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+simd-adler32	0.3.10	MIT	transitive	transitive
+siphasher	1.0.4	MIT OR Apache-2.0	transitive	transitive
+slab	0.4.12	MIT	transitive	transitive
+smallvec	1.16.6	MIT OR Apache-2.0	transitive	transitive
+socket2	0.6.5	MIT OR Apache-2.0	transitive	transitive
+softbuffer	0.4.8	MIT OR Apache-2.0	-	transitive
+spirv	0.3.0+sdk-1.3.268.0	Apache-2.0	transitive	transitive
+stable_deref_trait	1.2.1	MIT OR Apache-2.0	transitive	transitive
+static_assertions	1.1.0	MIT OR Apache-2.0	transitive	transitive
+string_cache	0.9.0	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+string_cache_codegen	0.6.1	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+strsim	0.11.1	MIT	build/proc-macro	build/proc-macro
+swift-rs	1.0.9	MIT OR Apache-2.0	build/proc-macro	-
+syn	1.0.109	MIT OR Apache-2.0	-	build/proc-macro
+syn	2.0.119	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+syn	3.0.10	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+sync_wrapper	1.0.2	Apache-2.0	transitive	transitive
+synstructure	0.14.0	MIT	build/proc-macro	build/proc-macro
+tao	0.35.3	Apache-2.0	transitive	transitive
+tauri	2.11.6	Apache-2.0 OR MIT	direct	direct
+tauri-build	2.6.3	Apache-2.0 OR MIT	direct build	direct build
+tauri-codegen	2.6.3	Apache-2.0 OR MIT	build/proc-macro	build/proc-macro
+tauri-macros	2.6.3	Apache-2.0 OR MIT	build/proc-macro	build/proc-macro
+tauri-plugin	2.6.3	Apache-2.0 OR MIT	build/proc-macro	build/proc-macro
+tauri-plugin-dialog	2.7.3	Apache-2.0 OR MIT	direct	direct
+tauri-plugin-fs	2.5.2	Apache-2.0 OR MIT	transitive	transitive
+tauri-runtime	2.11.3	Apache-2.0 OR MIT	transitive	transitive
+tauri-runtime-wry	2.11.4	Apache-2.0 OR MIT	transitive	transitive
+tauri-utils	2.9.3	Apache-2.0 OR MIT	transitive	transitive
+tauri-winres	0.3.7	MIT	build/proc-macro	build/proc-macro
+tempfile	3.27.0	MIT OR Apache-2.0	direct	direct
+tendril	0.5.1	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+termcolor	1.4.1	Unlicense OR MIT	transitive	transitive
+the-sacred-swirls	0.1.0	(undeclared)	app	app
+thiserror	1.0.69	MIT OR Apache-2.0	transitive	transitive
+thiserror	2.0.21	MIT OR Apache-2.0	transitive	transitive
+thiserror-impl	1.0.69	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+thiserror-impl	2.0.21	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+tiff	0.11.3	MIT	transitive	transitive
+time	0.3.55	MIT OR Apache-2.0	transitive	transitive
+time-core	0.1.9	MIT OR Apache-2.0	transitive	transitive
+time-macros	0.2.32	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+tinystr	0.8.5	Unicode-3.0	transitive	transitive
+tokio	1.54.1	MIT	transitive	transitive
+toml	0.9.12+spec-1.1.0	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+toml	1.2.1+spec-1.1.0	MIT OR Apache-2.0	transitive	transitive
+toml_datetime	0.7.5+spec-1.1.0	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+toml_datetime	1.1.3+spec-1.1.0	MIT OR Apache-2.0	transitive	transitive
+toml_parser	1.1.5+spec-1.1.0	MIT OR Apache-2.0	transitive	transitive
+toml_writer	1.2.0+spec-1.1.0	MIT OR Apache-2.0	transitive	transitive
+tower	0.5.3	MIT	transitive	transitive
+tower-http	0.6.11	MIT	transitive	transitive
+tower-layer	0.3.3	MIT	transitive	transitive
+tower-service	0.3.3	MIT	transitive	transitive
+tracing	0.1.44	MIT	transitive	transitive
+tracing-core	0.1.36	MIT	transitive	transitive
+try-lock	0.2.5	MIT	transitive	transitive
+tss-live-wheel	0.1.0	(undeclared)	direct	direct
+ttf-parser	0.25.1	MIT OR Apache-2.0	transitive	transitive
+typeid	1.0.3	MIT OR Apache-2.0	transitive	transitive
+typenum	1.20.1	MIT OR Apache-2.0	transitive	transitive
+unic-char-property	0.9.0	MIT/Apache-2.0	transitive	transitive
+unic-char-range	0.9.0	MIT/Apache-2.0	transitive	transitive
+unic-common	0.9.0	MIT/Apache-2.0	transitive	transitive
+unic-ucd-ident	0.9.0	MIT/Apache-2.0	transitive	transitive
+unic-ucd-version	0.9.0	MIT/Apache-2.0	transitive	transitive
+unicode-ident	1.0.27	(MIT OR Apache-2.0) AND Unicode-3.0	build/proc-macro	build/proc-macro
+unicode-segmentation	1.13.3	MIT OR Apache-2.0	transitive	transitive
+unicode-width	0.1.14	MIT OR Apache-2.0	transitive	transitive
+unicode-xid	0.2.6	MIT OR Apache-2.0	transitive	transitive
+url	2.5.8	MIT OR Apache-2.0	transitive	transitive
+urlpattern	0.3.0	MIT	transitive	transitive
+utf8_iter	1.1.0	Apache-2.0 OR MIT	transitive	transitive
+utf_types	1.0.0	Apache-2.0 OR MIT	transitive	transitive
+uuid	1.26.1	Apache-2.0 OR MIT	transitive	transitive
+version_check	0.9.5	MIT/Apache-2.0	build/proc-macro	build/proc-macro
+vswhom	0.1.0	MIT	-	build/proc-macro
+vswhom-sys	0.1.3	MIT	-	build/proc-macro
+walkdir	2.5.0	Unlicense/MIT	transitive	transitive
+want	0.3.2	MIT	transitive	transitive
+web_atoms	0.2.6	MIT OR Apache-2.0	build/proc-macro	build/proc-macro
+webview2-com	0.38.2	MIT	-	transitive
+webview2-com-macros	0.8.1	MIT	-	build/proc-macro
+webview2-com-sys	0.38.2	MIT	-	transitive
+weezl	0.1.12	MIT OR Apache-2.0	transitive	transitive
+wgpu	0.19.4	MIT OR Apache-2.0	transitive	transitive
+wgpu-core	0.19.4	MIT OR Apache-2.0	transitive	transitive
+wgpu-hal	0.19.5	MIT OR Apache-2.0	transitive	transitive
+wgpu-types	0.19.2	MIT OR Apache-2.0	transitive	transitive
+widestring	1.2.1	MIT OR Apache-2.0	-	transitive
+winapi	0.3.9	MIT/Apache-2.0	-	transitive
+winapi-util	0.1.11	Unlicense OR MIT	-	transitive
+window-vibrancy	0.6.0	Apache-2.0 OR MIT	transitive	transitive
+windows	0.52.0	MIT OR Apache-2.0	-	transitive
+windows	0.61.3	MIT OR Apache-2.0	-	transitive
+windows	0.62.2	MIT OR Apache-2.0	-	transitive
+windows-collections	0.2.0	MIT OR Apache-2.0	-	transitive
+windows-collections	0.3.2	MIT OR Apache-2.0	-	transitive
+windows-core	0.52.0	MIT OR Apache-2.0	-	transitive
+windows-core	0.61.2	MIT OR Apache-2.0	-	transitive
+windows-core	0.62.2	MIT OR Apache-2.0	-	transitive
+windows-future	0.2.1	MIT OR Apache-2.0	-	transitive
+windows-future	0.3.2	MIT OR Apache-2.0	-	transitive
+windows-implement	0.60.2	MIT OR Apache-2.0	-	build/proc-macro
+windows-interface	0.59.3	MIT OR Apache-2.0	-	build/proc-macro
+windows-link	0.1.3	MIT OR Apache-2.0	-	transitive
+windows-link	0.2.1	MIT OR Apache-2.0	-	transitive
+windows-numerics	0.2.0	MIT OR Apache-2.0	-	transitive
+windows-numerics	0.3.1	MIT OR Apache-2.0	-	transitive
+windows-result	0.3.4	MIT OR Apache-2.0	-	transitive
+windows-result	0.4.1	MIT OR Apache-2.0	-	transitive
+windows-strings	0.4.2	MIT OR Apache-2.0	-	transitive
+windows-strings	0.5.1	MIT OR Apache-2.0	-	transitive
+windows-sys	0.59.0	MIT OR Apache-2.0	-	direct
+windows-sys	0.60.2	MIT OR Apache-2.0	-	transitive
+windows-sys	0.61.2	MIT OR Apache-2.0	-	transitive
+windows-targets	0.52.6	MIT OR Apache-2.0	-	transitive
+windows-targets	0.53.5	MIT OR Apache-2.0	-	transitive
+windows-threading	0.1.0	MIT OR Apache-2.0	-	transitive
+windows-threading	0.2.1	MIT OR Apache-2.0	-	transitive
+windows-version	0.1.7	MIT OR Apache-2.0	-	transitive
+windows_x86_64_msvc	0.52.6	MIT OR Apache-2.0	-	transitive
+windows_x86_64_msvc	0.53.1	MIT OR Apache-2.0	-	transitive
+winnow	0.7.15	MIT	build/proc-macro	build/proc-macro
+winnow	1.0.5	MIT	transitive	transitive
+winreg	0.56.0	MIT	-	build/proc-macro
+writeable	0.6.4	Unicode-3.0	transitive	transitive
+wry	0.55.1	Apache-2.0 OR MIT	transitive	transitive
+xml-rs	0.8.29	MIT	-	build/proc-macro
+yoke	0.8.4	Unicode-3.0	transitive	transitive
+yoke-derive	0.8.4	Unicode-3.0	build/proc-macro	build/proc-macro
+zerocopy	0.8.63	BSD-2-Clause OR Apache-2.0 OR MIT	transitive	transitive
+zerocopy-derive	0.8.63	BSD-2-Clause OR Apache-2.0 OR MIT	build/proc-macro	build/proc-macro
+zerofrom	0.1.8	Unicode-3.0	transitive	transitive
+zerofrom-derive	0.1.8	Unicode-3.0	build/proc-macro	build/proc-macro
+zerotrie	0.2.5	Unicode-3.0	transitive	transitive
+zerovec	0.11.9	Unicode-3.0	transitive	transitive
+zerovec-derive	0.11.7	Unicode-3.0	build/proc-macro	build/proc-macro
+zmij	1.0.23	MIT	transitive	transitive

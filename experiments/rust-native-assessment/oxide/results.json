@@ -1,0 +1,340 @@
+[
+  {
+    "input": "experiments/desktop-rc1/macos/coral-4k.mp4",
+    "sha256": "afe8a533d47bb54b7c4b1088023c9fe8fc6a784d8a7011051e9c530d9e616202",
+    "streams": [
+      {
+        "index": 0,
+        "identifier": [
+          "h264",
+          "h264"
+        ],
+        "dimensions": [
+          [
+            3840,
+            2160
+          ],
+          [
+            3840,
+            2160
+          ]
+        ],
+        "audio": [
+          [
+            null,
+            null
+          ],
+          [
+            null,
+            null
+          ]
+        ],
+        "time_base_match": true,
+        "duration_ticks": [
+          30720,
+          30720
+        ],
+        "start_ticks": [
+          0,
+          0
+        ],
+        "color": {
+          "oxide": [
+            2,
+            2,
+            2,
+            "Unspecified"
+          ],
+          "ffprobe": [
+            "bt709",
+            "bt709",
+            "bt709",
+            "tv"
+          ]
+        },
+        "pixel_format": [
+          null,
+          "yuv420p"
+        ],
+        "packets": [
+          60,
+          60
+        ],
+        "paired_packet_differences": {
+          "payload_sha256": 0,
+          "pts": 0,
+          "dts": 0,
+          "duration": 0
+        }
+      },
+      {
+        "index": 1,
+        "identifier": [
+          "aac",
+          "aac"
+        ],
+        "dimensions": [
+          [
+            null,
+            null
+          ],
+          [
+            null,
+            null
+          ]
+        ],
+        "audio": [
+          [
+            48000,
+            2
+          ],
+          [
+            48000,
+            2
+          ]
+        ],
+        "time_base_match": true,
+        "duration_ticks": [
+          97024,
+          96000
+        ],
+        "start_ticks": [
+          0,
+          0
+        ],
+        "color": {
+          "oxide": [
+            2,
+            2,
+            2,
+            "Unspecified"
+          ],
+          "ffprobe": [
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        "pixel_format": [
+          null,
+          null
+        ],
+        "packets": [
+          95,
+          95
+        ],
+        "paired_packet_differences": {
+          "payload_sha256": 0,
+          "pts": 0,
+          "dts": 0,
+          "duration": 0
+        }
+      }
+    ]
+  },
+  {
+    "input": "experiments/desktop-rc1/windows/oil-and-star-4k.mp4",
+    "sha256": "087d3d7940d60c7e0171f38b86e23e529648bc94572341f2d3b93ea8efa8b572",
+    "streams": [
+      {
+        "index": 0,
+        "identifier": [
+          "h264",
+          "h264"
+        ],
+        "dimensions": [
+          [
+            3840,
+            2160
+          ],
+          [
+            3840,
+            2160
+          ]
+        ],
+        "audio": [
+          [
+            null,
+            null
+          ],
+          [
+            null,
+            null
+          ]
+        ],
+        "time_base_match": true,
+        "duration_ticks": [
+          30720,
+          30720
+        ],
+        "start_ticks": [
+          0,
+          0
+        ],
+        "color": {
+          "oxide": [
+            2,
+            2,
+            2,
+            "Unspecified"
+          ],
+          "ffprobe": [
+            "bt709",
+            "bt709",
+            "bt709",
+            "tv"
+          ]
+        },
+        "pixel_format": [
+          null,
+          "yuv420p"
+        ],
+        "packets": [
+          60,
+          60
+        ],
+        "paired_packet_differences": {
+          "payload_sha256": 0,
+          "pts": 0,
+          "dts": 0,
+          "duration": 0
+        }
+      },
+      {
+        "index": 1,
+        "identifier": [
+          "aac",
+          "aac"
+        ],
+        "dimensions": [
+          [
+            null,
+            null
+          ],
+          [
+            null,
+            null
+          ]
+        ],
+        "audio": [
+          [
+            48000,
+            2
+          ],
+          [
+            48000,
+            2
+          ]
+        ],
+        "time_base_match": true,
+        "duration_ticks": [
+          97024,
+          96000
+        ],
+        "start_ticks": [
+          0,
+          0
+        ],
+        "color": {
+          "oxide": [
+            2,
+            2,
+            2,
+            "Unspecified"
+          ],
+          "ffprobe": [
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        "pixel_format": [
+          null,
+          null
+        ],
+        "packets": [
+          95,
+          95
+        ],
+        "paired_packet_differences": {
+          "payload_sha256": 0,
+          "pts": 0,
+          "dts": 0,
+          "duration": 0
+        }
+      }
+    ]
+  },
+  {
+    "input": "experiments/slide-look-study/approval/windows-live/gesture-controls/export/two-slide-cues.m4a",
+    "sha256": "0342a6d244a314bca1abd0d81e160210373f23ebcb7955280a33c51ddb6a3f42",
+    "streams": [
+      {
+        "index": 0,
+        "identifier": [
+          "aac",
+          "aac"
+        ],
+        "dimensions": [
+          [
+            null,
+            null
+          ],
+          [
+            null,
+            null
+          ]
+        ],
+        "audio": [
+          [
+            48000,
+            2
+          ],
+          [
+            48000,
+            2
+          ]
+        ],
+        "time_base_match": true,
+        "duration_ticks": [
+          97024,
+          96000
+        ],
+        "start_ticks": [
+          0,
+          0
+        ],
+        "color": {
+          "oxide": [
+            2,
+            2,
+            2,
+            "Unspecified"
+          ],
+          "ffprobe": [
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        "pixel_format": [
+          null,
+          null
+        ],
+        "packets": [
+          95,
+          95
+        ],
+        "paired_packet_differences": {
+          "payload_sha256": 0,
+          "pts": 0,
+          "dts": 0,
+          "duration": 0
+        }
+      }
+    ]
+  }
+]
