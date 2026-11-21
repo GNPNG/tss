@@ -1,0 +1,14 @@
+diff --git a/2phase/lbm_solver_3d_2phase.py b/2phase/lbm_solver_3d_2phase.py
+index 8464ce0da9fd6a2a6977be5e5c8368f9f41f65ff..6e90a8b160eec0b61e89d49cf9328b74375e0303 100644
+--- a/2phase/lbm_solver_3d_2phase.py
++++ b/2phase/lbm_solver_3d_2phase.py
+@@ -605 +605 @@ def streaming3():
+-            psi[i,j,k] = rho_r[i,j,k]-rho_b[i,j,k]/(rho_r[i,j,k] + rho_b[i,j,k])
++            psi[i,j,k] = (rho_r[i,j,k] - rho_b[i,j,k])/(rho_r[i,j,k] + rho_b[i,j,k])
+diff --git a/2phase/lbm_solver_3d_2phase_sparse.py b/2phase/lbm_solver_3d_2phase_sparse.py
+index 0cd0402c0e782ccae1909fdf1edd55b36660ceb4..942815d3ac2bb8e85c0f042b647496d311acc9b8 100644
+--- a/2phase/lbm_solver_3d_2phase_sparse.py
++++ b/2phase/lbm_solver_3d_2phase_sparse.py
+@@ -606 +606 @@ def streaming3():
+-            psi[i,j,k] = rho_r[i,j,k]-rho_b[i,j,k]/(rho_r[i,j,k] + rho_b[i,j,k])
++            psi[i,j,k] = (rho_r[i,j,k] - rho_b[i,j,k])/(rho_r[i,j,k] + rho_b[i,j,k])
