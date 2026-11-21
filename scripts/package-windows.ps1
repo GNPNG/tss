@@ -3,7 +3,8 @@
 param(
     [Parameter(Mandatory)] [ValidatePattern('^v[0-9][A-Za-z0-9.-]*$')] [string] $Tag,
     [Parameter(Mandatory)] [string] $OutputDirectory,
-    [string] $BinaryDirectory = (Join-Path $PSScriptRoot '../src-tauri/target/release')
+    [string] $BinaryDirectory = (Join-Path $PSScriptRoot '../src-tauri/target/release'),
+    [ValidatePattern('^[a-fA-F0-9]{7,40}$')] [string] $DocumentationCommit
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -18,7 +19,8 @@ try {
         Copy-Item -LiteralPath (Join-Path $bin $exe) -Destination $scratch
     }
     $quickstart = Get-Content (Join-Path $repo 'docs/windows-preview.md') -Raw -Encoding UTF8
-    $base = "https://github.com/GNPNG/tss/blob/$Tag/"
+    $ref = if ($DocumentationCommit) { $DocumentationCommit } else { $Tag }
+    $base = "https://github.com/GNPNG/tss/blob/$ref/"
     $quickstart = $quickstart.Replace('](../', "]($base").Replace('](performance-surfaces.md)', '](PERFORMANCE-SURFACES.md)').Replace('](visual-media.md)', '](VISUAL-MEDIA.md)')
     $utf8 = New-Object System.Text.UTF8Encoding($false)
     [IO.File]::WriteAllText((Join-Path $scratch 'WINDOWS-QUICKSTART.md'), $quickstart, $utf8)
