@@ -36,6 +36,9 @@ async function exerciseControls(windows) {
     switch(command) {
     case 'choose_audio': return [lastSelection,'/music/two-slide-cues.m4a'];
     case 'confirm_audio': case 'clear_project_audio': case 'remember_project_audio': return;
+    case 'set_visual_audio_features':
+      check(args.fps>0 && args.frames.every(f=>f.length===4 && f.every(x=>Number.isFinite(x) && x>=0 && x<=1)), 'native audio modulation envelope');
+      return;
     case 'read_pending_audio': return lastSelection===9 ? new Uint8Array([1,2,3]) : audio.slice();
     case 'set_live_wheel': case 'forget_live_wheel_layer': case 'live_wheel_benchmark_config': return null;
     case 'live_wheel_stats': return {running:false};
@@ -139,7 +142,7 @@ async function exerciseControls(windows) {
   merged.layers[0].media=media;
   merged.layers[1].media={...media,name:'Offline.gif',sha256:'b'.repeat(64)};
   incoming=JSON.stringify(merged);click('open-project');await idle();
-  check($('app-status').textContent.includes('Offline.gif'),'offline visual source named');
+  check($('app-status').textContent.includes('Offline.gif'),'offline visual source named: '+$('app-status').textContent);
   click('save-project');await idle();const restored=JSON.parse(documentText);
   check(restored.layers[0].media.width===400 && restored.layers[1].media.width===200 &&
     !restored.layers.some(l=>l.media?.assetId!==undefined),'portable media link, offline metadata and refreshed grant');
