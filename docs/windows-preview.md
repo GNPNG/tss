@@ -1,11 +1,23 @@
-# Windows performance preview
+# The Sacred Swirls v0.1.0 RC quickstart
 
 Extract the Windows x64 portable ZIP and run `the-sacred-swirls.exe`. The native renderer uses the Windows Vulkan driver. The editor controls use the Microsoft Edge WebView2 Runtime. If the runtime is missing, install Microsoft's Evergreen Runtime. [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
 
-1. Start on **Violet / Blue**. Pick **Rear slide**, set **Mouse action** to **Material tug**, and drag on the liquid. Switch to **Rotate slide** and drag around the center. Repeat on **Front slide**. **Projector focus** pulls between the two glasses.
-2. Open an MP3 or M4A. Expand **Gesture macros**, start the song, choose **Record gesture** and drag. Choose **Finish recording**. Use **Play once** to audition. **At recording position** replays the gesture on the song timeline. Use **Trigger** to assign a repeating phrase, mute individual hits, or adjust the gain.
-3. Use **Video feedback** to enable a recursive return and adjust delay, strength, zoom and rotation. **Projector** opens the audience picture. **Projector and audio outputs** sets the direct cue, audience route, presentation delay and audio trim. The audience audio starts off. Available separate audio devices depend on what Windows exposes to the installed WebView2 runtime.
-4. With a song loaded and a live wheel selected, export the native wheel at 3840 × 2160 with the selected song and scheduled gestures. Automatic starting pose uses neutral slides for scheduled gestures and for both coral motion presets. Unscheduled **Wheel flow** uses its current pose. The existing **Export 4K preview** button renders the procedural track composition. [Native wheel guide](../live-wheel/README.md)
+On Intel macOS, open `The Sacred Swirls.app`. The app uses Metal and the same project files. On either platform, expand **FFmpeg media tools** and choose **Recheck**. If tools are missing, **Install FFmpeg and FFprobe** uses the available package manager. The example needs both tools for artwork and FFmpeg with H.264 and AAC encoding for the movie.
+
+## Open, perform and export Oil and Star
+
+1. Choose **Open project** and select `examples/Oil and Star/Oil and Star.tss`. Keep `two-slide-cues.m4a`, `star-green.mp4` and `moving-matte.mov` in the same folder as the project. It finds the matching files there. Choose **Play** to hear the two-second cue and see the keyed star over the oil. The hidden matte track shapes the star.
+2. In **TRACKS**, select **Violet / Blue**. Under **Slide motion**, choose **Wheel flow**. Change **Front film oil** from **1,000 cSt PDMS** to **20 cSt PDMS**, leaving **Rear film oil** at **Original wheel**. To inspect the front film, set **Projected films** to **Front only**. Restore **Both films** before exporting. To manipulate the front glass live, set **Mouse target** to **Front slide**, choose **Material tug** or **Rotate slide** under **Mouse action**, and drag on the liquid.
+3. On Windows, expand **Gesture macros**. To audition an existing take, choose **Pull the rear oil** under **Saved gesture** and click **Play once**. To record your own timing, click **Return to start**, **Play**, then **Record gesture**. Drag on the liquid, release, and click **Finish recording**. Leave **Macro on** checked and **Trigger** at **At recording position** to include the take in playback and export. On Mac, the native movie export includes the scheduled gestures saved in the project. The live gesture recorder and **Play once** controls are Windows features.
+4. Choose **Save project** to keep your oil and performance edits in a new `.tss` beside the three media files. To make the movie, leave **Export starting pose** on **Automatic · neutral for releases or scheduled gestures**, click **Export artwork program in 4K**, and choose an MP4 filename. Both desktop builds output the composed artwork, oil and source audio at 3840 × 2160, 30 fps, with 8-bit H.264 video and AAC audio.
+
+If a file has moved, **Relink audio** locates the original song. For a missing clip or matte, select its track, expand **Artwork settings** and choose **Relink source**. Relinking verifies the file's contents.
+
+For a 16-bit still on Windows, select **Violet / Blue**, expand **Selected wheel · production stills**, choose **4K visualizer · layered** and click **Export selected wheel · 16-bit stills**. This writes PNGs of the selected wheel and its individual films. The star and matte belong to the composed MP4. [Native wheel guide](../live-wheel/README.md)
+
+## Windows performance controls
+
+**Projector** opens the audience picture. **Projector and audio outputs** sets the direct cue, audience route, presentation delay and audio trim. The audience audio starts off. Available separate audio devices depend on what Windows exposes to the installed WebView2 runtime. **Video feedback** controls the recursive return delay, strength, zoom and rotation.
 
 **Compress a slide.** Choose **Rear slide** or **Front slide**, then **Mouse action → Press slide**. Set **Mouse pressure**, press on a boundary between colors and move the contact point. Compression pushes oil sideways, changes the optical path through the film, and changes the focus locally. Release to restore the plate gap. The mouse strength is an assigned load. The other slide can continue its own motion underneath. [Pressure model and measured transport](https://github.com/GNPNG/tss/tree/main/experiments/pressure-study)
 
