@@ -134,6 +134,21 @@
         <output id="projector-state" role="status"></output>
       </div>
     </details>
+    <details class="timeline card macro-deck" id="lyrics-deck" hidden>
+      <summary>Local lyric transcription</summary>
+      <div class="macro-controls">
+        <button class="button quiet" type="button" id="lyrics-run" disabled>Transcribe song</button>
+        <button class="button quiet" type="button" id="lyrics-cancel" hidden>Cancel transcription</button>
+        <details><summary>Tool setup</summary><p>Install GNPNG local-transcribe and its speech model. From the GNPNG local-transcribe checkout, run <code>./install.sh --test</code> on Mac or <code>pwsh .\install.ps1 -Test</code> on Windows. The installed model recognizes English. M4A decoding uses FFmpeg.</p></details>
+        <output id="lyrics-status" role="status"></output>
+      </div>
+      <div id="lyrics-review" hidden>
+        <label for="lyrics-draft">Review cue times and lyrics</label>
+        <textarea id="lyrics-draft" rows="10" spellcheck="false"></textarea>
+        <button id="lyrics-apply" class="button quiet" type="button">Replace lyric triggers</button>
+        <button id="lyrics-save" class="button quiet" type="button">Save WebVTT…</button>
+      </div>
+    </details>
     <details class="timeline card macro-deck" id="macro-deck" hidden>
       <summary>Gesture macros</summary>
       <div class="macro-controls">

@@ -2,13 +2,14 @@
 
 mod export;
 mod export_smoke;
+mod lyrics;
 mod live;
 mod performer;
 
 use export::ExportManager;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
 #[derive(Default)]
@@ -253,6 +254,12 @@ async fn cancel_export(manager: State<'_, ExportManager>) -> Result<(), String> 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(lyrics::Transcriber::default())
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                let _ = window.state::<lyrics::Transcriber>().cancel();
+            }
+        })
         .manage(SelectedPaths::default())
         .manage(ExportManager::default())
         .manage(live::Host::default())
@@ -282,6 +289,9 @@ fn main() {
             read_pending_audio,
             confirm_audio,
             read_timed_lyrics,
+            lyrics::transcribe_song,
+            lyrics::cancel_transcription,
+            lyrics::save_reviewed_lyrics,
             choose_export_path,
             start_export,
             append_export_frame,

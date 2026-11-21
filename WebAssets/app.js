@@ -1,4 +1,5 @@
 import { LiquidRenderer, LIQUID_PALETTES } from './liquid-renderer.js';
+import { installLocalLyrics } from './local-lyrics.js';
 import { analyzeAudio, featuresAt } from './audio-features.js';
 import { NativeWheelSurface, hasRelease } from './native-wheel.js';
 import { NativeWheelExport } from './native-wheel-export.js';
@@ -83,6 +84,11 @@ const macroDeck = windowsDesktop ? initMacroDeck({
   seek,
 }) : null;
 
+const localLyrics = window.__TAURI__?.core ? installLocalLyrics({
+  invoke: window.__TAURI__.core.invoke,
+  apply: macroDeck ? groups => macroDeck.applyLyricGroups(groups) : null,
+}) : null;
+
 const wheelExporter = windowsDesktop ? new NativeWheelExport({
   invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: liveSelection,
   source: () => ({audioPath: state.audioPath, duration: state.audioBuffer?.duration, proceduralBusy: state.exporting}),
@@ -108,6 +114,7 @@ function currentPosition() {
   return Math.min(state.audioBuffer.duration, state.position + state.audioContext.currentTime - state.startedAt);
 }
 function updateTransport() {
+  localLyrics?.source(state.audioPath, state.audioBuffer);
   const ready = !!state.audioBuffer;
   byId('play').disabled = !ready;
   byId('restart').disabled = !ready;

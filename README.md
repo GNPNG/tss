@@ -25,6 +25,8 @@ Windows opens on the Violet / Blue wheel. Choose a wheel and select **Rear slide
 
 Open a song, expand **Gesture macros** and select **Record gesture**. You can replay a take at its original song position or attach it to a recurring musical or lyric phrase. Each macro has an enable switch, per-occurrence mutes, amount, gain per recurrence and a ceiling. [Recording and trigger controls](experiments/phrase-triggers/README.md)
 
+Generate and review timed lyrics from the open recording with **Local lyric transcription**. [Transcription and trigger controls](docs/local-lyrics.md)
+
 The native wheel supports recursive video feedback and a separate audience window with adjustable A/V delay. The selected-wheel exporter renders 3840 × 2160 H.264/AAC from the native optics, song and scheduled gestures. [Projector and cue audio](experiments/projector-output/README.md) · [Feedback comparison](experiments/slide-look-study/approval/feedback/feedback-comparison.mp4)
 
 The GTX 1650 Ti Max-Q delivered 39.95–40.00 FPS across all seven wheels at 640 × 360 with finite-pixel optical sampling. Both Violet / Blue gesture tests ran at 40.00 FPS. All 3,843 measured presentations succeeded. The frozen-frame capture/replay test reproduced both 38-event gestures byte for byte. [Windows measurements and recordings](experiments/slide-look-study/approval/windows-live/gesture-controls/README.md)

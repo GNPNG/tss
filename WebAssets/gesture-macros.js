@@ -399,6 +399,10 @@ export function initMacroDeck({ invoke, listen, clock, selection, seek, prepare=
       previousSongTime=null;includePreviousStart=true;
       key=id;groups=audioCueGroups(analysis);restore();render();
     },
+    applyLyricGroups(reviewed) {
+      lyricGroups = reviewed;
+      render(); save();
+    },
     importSidecar(file) {
       if (!file || lyricGroups.length) return;
       const [name,text]=file;
