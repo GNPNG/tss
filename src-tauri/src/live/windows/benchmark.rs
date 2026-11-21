@@ -27,6 +27,8 @@ struct ReplayObservation {
     motion_take: u64,
     requested_ms: f64,
     first_presented_ms: Option<f64>,
+    stroke_starts: u64,
+    mouse_moves_applied: u64,
 }
 
 fn unix_ms() -> Result<u64, String> {
@@ -433,12 +435,22 @@ impl Benchmark {
             scripted_mouse(hwnd, c.rect, message, center);
             return Ok(());
         }
-        scripted_mouse(
-            hwnd,
-            c.rect,
-            WM_MOUSEMOVE,
-            [0.50 + 0.14 * phase.cos(), 0.50 + 0.21 * phase.sin()],
-        );
+        let point = [0.50 + 0.14 * phase.cos(), 0.50 + 0.21 * phase.sin()];
+        if self.settings.motion == MotionPreset::WheelWithCoralBeads {
+            if let Some(replay) = self.replays.last() {
+                if c.motion_take != replay.motion_take {
+                    return Ok(()); // The pointer left the slide to click Replay front beads.
+                }
+            }
+            if MOUSE.with(|m| m.borrow().previous.is_none()) {
+                scripted_mouse(hwnd, c.rect, WM_LBUTTONDOWN, point);
+                if let Some(replay) = self.replays.last_mut() {
+                    replay.stroke_starts += 1;
+                }
+                return Ok(());
+            }
+        }
+        scripted_mouse(hwnd, c.rect, WM_MOUSEMOVE, point);
         Ok(())
     }
 
@@ -473,14 +485,15 @@ impl Benchmark {
                 Some(unix_ms()?.saturating_sub((elapsed - WARM).as_millis() as u64));
         }
         let release = self.settings.motion != MotionPreset::WheelFlow;
+        let beads = self.settings.motion == MotionPreset::WheelWithCoralBeads;
         if release {
             let elapsed_ms = (elapsed - WARM).as_secs_f64() * 1000.;
             if let Some(replay) = self.replays.last_mut() {
-                if replay.first_presented_ms.is_none()
-                    && did_present
-                    && c.motion_take == replay.motion_take
-                {
-                    replay.first_presented_ms = Some(elapsed_ms);
+                if c.motion_take == replay.motion_take {
+                    replay.mouse_moves_applied += drags as u64;
+                    if replay.first_presented_ms.is_none() && did_present {
+                        replay.first_presented_ms = Some(elapsed_ms);
+                    }
                 }
             }
             let count = self.replays.len() as u64;
@@ -492,12 +505,19 @@ impl Benchmark {
                     .last()
                     .is_none_or(|p| p.first_presented_ms.is_some())
             {
+                if beads {
+                    if let Some(point) = MOUSE.with(|m| m.borrow().previous) {
+                        scripted_mouse(hwnd, c.rect, WM_LBUTTONUP, point.map(f64::from));
+                    }
+                }
                 app.emit("tss-benchmark-release", ())
                     .map_err(|e| e.to_string())?;
                 self.replays.push(ReplayObservation {
                     motion_take: c.motion_take + 1,
                     requested_ms: elapsed_ms,
                     first_presented_ms: None,
+                    stroke_starts: 0,
+                    mouse_moves_applied: 0,
                 });
             }
         }
@@ -514,15 +534,36 @@ impl Benchmark {
         if elapsed < WARM + PERIOD {
             return Ok(false);
         }
-        if self.intervals.is_empty() || self.drags == 0 {
-            return Err("Insufficient interactive frame samples".into());
-        }
-        if release
+        let failure = if self.intervals.is_empty() {
+            Some("Fewer than two successful surface presentations")
+        } else if self.drags == 0 {
+            Some("No native mouse moves applied during the measurement")
+        } else if release
             && (self.replays.len() != 3
                 || c.motion_take != self.initial_take + 3
                 || self.replays.iter().any(|p| p.first_presented_ms.is_none()))
         {
-            return Err("The editor did not present all three coral replays".into());
+            Some("The editor did not present all three coral replays")
+        } else if beads
+            && self
+                .replays
+                .iter()
+                .any(|p| p.stroke_starts == 0 || p.mouse_moves_applied == 0)
+        {
+            Some("A replayed front-bead take lacked a native press and drag")
+        } else {
+            None
+        };
+        if let Some(reason) = failure {
+            return Err(format!(
+                "{reason}: {}",
+                json!({
+                    "elapsedMs":(elapsed-WARM).as_millis() as u64, "presents":self.presents,
+                    "skips":self.skips,"intervals":self.intervals.len(),"mouseMovesApplied":self.drags,
+                    "initialTake":self.initial_take,"currentTake":c.motion_take,"replays":self.replays,
+                    "preview":r.preview_size(),"previewHidden":c.preview_hidden
+                })
+            ));
         }
         scripted_mouse(hwnd, c.rect, WM_LBUTTONUP, [0.5, 0.5]);
         let n = self.intervals.len() as f64;
