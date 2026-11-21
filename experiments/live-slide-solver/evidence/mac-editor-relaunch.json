@@ -1,0 +1,22 @@
+{
+  "simulationTick": 24,
+  "available": true,
+  "running": true,
+  "adapter": "AMD Radeon Pro 5300M (Metal)",
+  "width": 640,
+  "height": 360,
+  "fps": 21.580077856848842,
+  "p95Ms": 50.304246,
+  "presents": 24,
+  "drags": 1,
+  "frameLatency": 2,
+  "layerId": 1,
+  "slide": "rear",
+  "gesture": "tug",
+  "focus": null,
+  "error": null,
+  "projectorRunning": false,
+  "projectorAgeMs": null,
+  "projectorSongTime": null,
+  "projectorPresents": 0
+}
