@@ -10,6 +10,7 @@ import { ProjectorDeck } from './projector-output.js';
 import { initMacroDeck, songFingerprint } from './gesture-macros.js';
 import { PROJECT_FORMAT, layerSettings, validateProject, emptyGestures, EditHistory } from './project-file.js';
 import { audioCueGroups } from './phrase-cues.js';
+import { advisorIntervals, defaultBindings, glyphs, opacityAt, planIntervals, replaceRegion, validRange } from './timeline.js';
 
 const byId = (id) => document.getElementById(id);
 const preview = byId('preview');
@@ -33,6 +34,7 @@ const editHistory = new EditHistory();
 const retainedNativeLayers = new Set();
 let highestId = 0;
 const state = {
+  range:null, savedDuration:0, bindings:defaultBindings(),
   audioContext: null, analyser: null, audioBuffer: null, source: null,
   playing: false, startedAt: 0, position: 0, audioName: '', audioPath: null, analysis: null, fileToken: 0, playToken: 0,
   audioRef: null, audioSelectionId: null,
@@ -45,21 +47,22 @@ function liveSelection() {
   if (!windowsDesktop || !isWheel(layer) || state.exporting) return null;
   const stack = state.layers.filter(l => l.visible && isWheel(l)).reverse().map(l => ({
     layerId: l.id, wheel: l.palette, motion: l.motion, motionTake: l.motionTake,
-    visibleFilms: l.visibleFilms ?? 'both', opacity: l.opacity,
+    visibleFilms: l.visibleFilms ?? 'both', opacity: l.opacity, ...(l.envelope!=null?{envelope:l.envelope}:{}),
   }));
   if (!stack.length) return null;
-  const needsStack = stack.length > 1 || stack[0].opacity !== 1 || stack[0].layerId !== layer.id;
+  const timed = stack.some(l=>l.envelope!=null);
+  const needsStack = timed || stack.length > 1 || stack[0].opacity !== 1 || stack[0].layerId !== layer.id;
   return { ...(needsStack ? {stack} : {}), layerId: layer.id, wheel: layer.palette, slide: layer.slide, gesture: layer.gesture,
     motion: layer.motion, motionTake: layer.motionTake, visibleFilms: layer.visibleFilms ?? 'both',
     mousePressure: layer.mousePressure?.[layer.slide] ?? 0.5,
     tugResponse: layer.tugResponse[layer.slide], renderWidth: layer.renderWidth, focus: projectorFocus,
-    ...feedbackDeck.config(projectorDeck?.enabled), keepPresenting:!!projectorDeck?.enabled };
+    ...feedbackDeck.config(projectorDeck?.enabled||timed), keepPresenting:!!projectorDeck?.enabled };
 }
 const feedbackDeck = new VideoFeedbackControls(byId('video-feedback'), () => nativeSurface?.sync());
 function anchorFeedback(discontinuity = false, ended = false) {
   feedbackDeck.clock({loaded:!!state.audioBuffer, playing:state.playing, position:currentPosition(),ended},discontinuity);
   if(discontinuity) projectorDeck?.flush();
-  if(projectorDeck?.enabled) nativeSurface.sync();
+  if(projectorDeck?.enabled || state.layers.some(l=>l.envelope!=null)) nativeSurface?.sync();
 }
 
 function reportNativeStats(stats) {
@@ -265,6 +268,7 @@ async function loadAudio(file, beforeCommit = async () => {}, path = null, selec
     if (token !== state.fileToken) return false;
     await beforeCommit();
     if (token !== state.fileToken) return false;
+    if(!relinking) { state.range=null; state.savedDuration=data.decoded.duration; }
     installAudio(data, data.ref, path, selectionId, relinking ? state.position : 0);
     if (!relinking) {
       detachedGestures = emptyGestures();
@@ -479,9 +483,25 @@ function renderTimeline() {
     const clip = document.createElement('div'); clip.className = `visual-clip${layer.visible ? '' : ' hidden'}`;
     const clipName = document.createElement('span'); clipName.textContent = layer.name;
     const clipDuration = document.createElement('small'); clipDuration.textContent = state.audioBuffer ? formatTime(state.audioBuffer.duration) : 'Full track';
-    clip.append(clipName, clipDuration); lane.append(clip); lanes.append(lane);
+    if(layer.envelope==null) {clip.append(clipName, clipDuration); lane.append(clip);}
+    else for(const interval of layer.envelope) {
+      const block=document.createElement('button');block.type='button';
+      block.className=clip.className+' timed-clip';
+      const duration=timelineDuration()||interval.end;
+      block.style.left=(100*interval.start/duration)+'%';block.style.width=(100*(interval.end-interval.start)/duration)+'%';
+      block.textContent=interval.start.toFixed(2)+'–'+interval.end.toFixed(2);
+      block.setAttribute('aria-label',layer.name+' '+block.textContent+' seconds');
+      block.addEventListener('click',()=>{
+        selectLayer(layer.id); setTimeRange(interval.start,interval.end);
+        byId('wand-length').value=interval.end-interval.start;
+        byId('wand-in').value=interval.fadeIn;byId('wand-out').value=interval.fadeOut;byId('wand-level').value=interval.level;
+        byId('timeline-wand').open=true;
+      });lane.append(block);
+    }
+    lanes.append(lane);
   });
   nativeSurface?.sync();
+  refreshTimelineTools();
   byId('layer-count').textContent = `${state.layers.length} visual ${state.layers.length === 1 ? 'layer' : 'layers'}`;
   const ruler = byId('ruler'); ruler.replaceChildren();
   for (let i = 0; i <= 8; i++) {
@@ -582,7 +602,7 @@ function renderFrame(timestamp) {
         }
         const palette = layer.colors.map((color) => rotateColor(color, layer.hue));
         layer.renderer.render({time, ...features, palette, speed: layer.speed, scale: layer.scale});
-        context.globalAlpha = layer.opacity;
+        context.globalAlpha = layer.opacity * opacityAt(layer.envelope,time);
         context.drawImage(layer.canvas, 0, 0);
       }
       context.globalAlpha = 1;
@@ -643,7 +663,7 @@ async function exportVideo() {
   const audioDuration = state.audioBuffer.duration;
   const analysis = state.analysis;
   const layers = state.layers.filter((layer) => layer.visible).map((layer) => ({
-    colors: [...layer.colors], hue: layer.hue, speed: layer.speed, scale: layer.scale, opacity: layer.opacity,
+    colors: [...layer.colors], hue: layer.hue, speed: layer.speed, scale: layer.scale, opacity: layer.opacity, envelope:layer.envelope,
   }));
   const width = 3840, height = 2160, fps = 30;
   const frameCount = Math.ceil(audioDuration * fps);
@@ -682,7 +702,7 @@ async function exportVideo() {
       for (const layer of [...renderers].reverse()) {
         const palette = layer.colors.map((color) => rotateColor(color, layer.hue));
         layer.renderer.render({ time, ...featuresAt(analysis, time), palette, speed: layer.speed, scale: layer.scale });
-        output.globalAlpha = layer.opacity;
+        output.globalAlpha = layer.opacity * opacityAt(layer.envelope,time);
         output.drawImage(layer.canvas, 0, 0);
       }
       output.globalAlpha = 1;
@@ -849,12 +869,113 @@ byId('play').addEventListener('click', () => { if (state.playing) pause(); else 
 byId('restart').addEventListener('click', () => seek(0).catch((error) => status(error.message)));
 byId('stop').addEventListener('click', () => { pause(); state.position = 0; updateTransport(); status('Stopped'); });
 byId('add-layer').addEventListener('click', addLayer);
-byId('seek-area').addEventListener('click', (event) => { const rect = event.currentTarget.getBoundingClientRect(); seek((event.clientX - rect.left) / rect.width * (state.audioBuffer?.duration || 0)).catch((error) => status(error.message)); });
+const seekArea=byId('seek-area');
+let drag=null, dragged=false, selectedGlyph=glyphs[0];
+const selectionOverlay=document.createElement('div');
+selectionOverlay.className='time-selection';selectionOverlay.hidden=true;seekArea.append(selectionOverlay);
+function timelineDuration(){return state.audioBuffer?.duration||state.savedDuration||0;}
+function selectedTimeRange(){return validRange(state.range)?{...state.range}:null;}
+function setTimeRange(start,end,record=true) {
+  const range={start,end};
+  if(!validRange(range)||end>timelineDuration()+1e-8)throw Error('Select an interval within the song duration.');
+  state.range={start,end:Math.min(end,timelineDuration())};refreshTimelineTools();
+  if(record) checkpoint('Select time range');
+}
+function selectedCues(){const d=macroDeck?.projectState()??detachedGestures;return [...d.audioGroups,...d.lyricGroups];}
+function refreshTimelineTools() {
+  const duration=timelineDuration(), r=selectedTimeRange();
+  byId('range-start').value=r?.start??0;byId('range-end').value=r?.end??duration;
+  selectionOverlay.hidden=!r||!duration;
+  if(r&&duration){selectionOverlay.style.left=(100*r.start/duration)+'%';selectionOverlay.style.width=(100*(r.end-r.start)/duration)+'%';}
+  const cue=byId('wand-cue'), old=cue.value;
+  cue.replaceChildren(new Option('Choose a recurring cue',''),...selectedCues().map(c=>new Option(c.label,c.id)));
+  if([...cue.options].some(o=>o.value===old))cue.value=old;
+  byId('boundary-glyphs').replaceChildren(...glyphs.map(g=>{
+    const button=document.createElement('button');button.className='button quiet';button.type='button';
+    button.textContent=g+' '+state.bindings[g];button.setAttribute('aria-pressed',String(g===selectedGlyph));
+    button.addEventListener('click',()=>{selectedGlyph=g;refreshTimelineTools();});return button;
+  }));
+  byId('wand-mode').value=state.bindings[selectedGlyph];
+}
+const field=id=>byId('wand-'+id);
+const numeric=id=>field(id).valueAsNumber;
+function wandRule() {
+  return {mode:state.bindings[selectedGlyph],length:numeric('length'),interval:numeric('interval'),fadeIn:numeric('in'),fadeOut:numeric('out'),
+    level:numeric('level'),autoScale:field('autoscale').checked,tolerance:numeric('tolerance'),cue:field('cue').value,
+    signal:field('signal').value,threshold:numeric('threshold'),gap:numeric('gap')};
+}
+function timelineAction(label,fn) {
+  try {fn(); checkpoint(label);status(label);}catch(e){status(e.message||String(e));}
+}
+function selectedEditRange() {
+  const r=selectedTimeRange();
+  if(!r)throw Error('Select a waveform interval or choose Select all.');
+  if(!selectedLayer())throw Error('Select a visual layer first.');
+  return r;
+}
+function applyTimelineSuggestion(s) {
+  const range=selectedTimeRange();
+  if(!range || !validRange(s) || s.start<range.start || s.end>range.end)
+    throw Error('Keep the reviewed timing within the selected range.');
+  if(s.visual && s.visual!=='oil')throw Error('Choose an oil track for this action.');
+  const rule=wandRule();
+  if(s.fadeIn!==undefined)rule.fadeIn=s.fadeIn;
+  if(s.fadeOut!==undefined)rule.fadeOut=s.fadeOut;
+  const envelope=advisorIntervals({...s,signal:s.signal??'time',fit:s.fit??'elastic'},rule,selectedCues(),state.analysis);
+  const source=selectedLayer(), key=s.wheel??s.palette??source?.palette??'violet-blue';
+  if(!mathmosWheels.has(key)&&!LIQUID_PALETTES[key])throw Error('Choose a known wheel or palette.');
+  if(s.opacity!==undefined&&(!Number.isFinite(s.opacity)||s.opacity<0||s.opacity>1))throw Error('Choose an opacity between 0 and 1.');
+  const layer=makeLayer(), id=layer.id;
+  if(source)Object.assign(layer,structuredClone(layerSettings(source)));
+  if(source?.palette!==key || s.wheel || s.palette){
+    layer.palette=key;layer.colors=[...(mathmosWheels.get(key)?.colors??LIQUID_PALETTES[key])];
+    layer.customColors=false;layer.nativeLive=mathmosWheels.has(key);
+  }
+  Object.assign(layer,{id,name:s.label||s.cue||'Oil cue',visible:true,envelope,opacity:s.opacity??source?.opacity??1});
+  state.layers.unshift(layer);selectLayer(id);checkpoint('Apply reviewed oil cue');
+  return id;
+}
+function replaceSelected(rule) {
+  const r=selectedEditRange(), layer=selectedLayer();
+  const planned=rule?planIntervals(rule,r,{groups:selectedCues(),analysis:state.analysis}):[];
+  if(rule&&!planned.length)throw Error('No matches in this selection. Choose a different cue, threshold or time boundary.');
+  layer.envelope=replaceRegion(layer.envelope,r,planned,timelineDuration());
+  renderTimeline();renderControls();
+}
+field('mode').addEventListener('change',()=>timelineAction('Set boundary behavior',()=>{
+  state.bindings[selectedGlyph]=field('mode').value;refreshTimelineTools();
+}));
+byId('set-range').addEventListener('click',()=>timelineAction('Select time range',()=>{
+  setTimeRange(byId('range-start').valueAsNumber,byId('range-end').valueAsNumber,false);
+}));
+byId('select-all-time').addEventListener('click',()=>timelineAction('Select entire song',()=>setTimeRange(0,timelineDuration(),false)));
+byId('apply-wand').addEventListener('click',()=>timelineAction('Apply boundary to selected layer',()=>replaceSelected(wandRule())));
+byId('clear-region').addEventListener('click',()=>timelineAction('Clear selected layer in range',()=>replaceSelected(null)));
+function atWave(event) {
+  const rect=seekArea.getBoundingClientRect();
+  return Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width))*timelineDuration();
+}
+seekArea.addEventListener('pointerdown',event=>{
+  if(event.button!==0||!timelineDuration())return;
+  drag={id:event.pointerId,x:event.clientX,start:atWave(event),before:state.range};
+  dragged=false;seekArea.setPointerCapture(event.pointerId);
+});
+seekArea.addEventListener('pointermove',event=>{
+  if(drag?.id!==event.pointerId || (!dragged && Math.abs(event.clientX-drag.x)<4))return;
+  const t=atWave(event);if(t===drag.start)return;
+  dragged=true;setTimeRange(Math.min(t,drag.start),Math.max(t,drag.start),false);
+});
+seekArea.addEventListener('pointerup',event=>{if(drag?.id===event.pointerId){drag=null;if(dragged)checkpoint('Select time range');}});
+seekArea.addEventListener('pointercancel',()=>{if(drag)state.range=drag.before;drag=null;dragged=false;refreshTimelineTools();});
+seekArea.addEventListener('click',event=>{
+  if(!dragged)seek(atWave(event)).catch(error=>status(error.message));
+  dragged=false;
+});
 for (const id of ['hue', 'speed', 'scale', 'opacity']) {
   byId(id).addEventListener('input', (event) => { const layer = selectedLayer(); if (!layer) return; layer[id] = Number(event.target.value); renderControls(); });
 }
 function authoredState() {
-  return {layers:state.layers.map(layerSettings), selected:state.selected, nextId:state.nextId,
+  return {timeline:{range:state.range,duration:timelineDuration(),bindings:state.bindings}, layers:state.layers.map(layerSettings), selected:state.selected, nextId:state.nextId,
     focus:projectorFocus, feedback:feedbackDeck.projectState(), exportBaseline:byId('native-export-baseline').value,
     gestures:macroDeck?.projectState() ?? detachedGestures};
 }
@@ -881,13 +1002,16 @@ function restoreEdits(doc, newProject) {
   state.layers = doc.layers.map(config => {
     const existing = newProject ? null : old.get(config.id);
     if (existing) old.delete(existing.id);
-    return Object.assign(existing || {canvas:layerCanvas(), renderer:null}, layerSettings(config));
+    return Object.assign(existing || {canvas:layerCanvas(), renderer:null}, {envelope:null}, layerSettings(config));
   });
   for (const layer of old.values()) {
     layer.renderer?.dispose();
     if (!newProject && nativeSurface) retainedNativeLayers.add(layer.id);
   }
   state.nextId = doc.nextId;
+  state.range=doc.timeline?.range??null;
+  state.savedDuration=doc.timeline?.duration??0;
+  state.bindings=doc.timeline?.bindings??defaultBindings();
   state.selected = doc.selected;
   if (newProject) highestId = doc.nextId - 1;
   projectorFocus = doc.focus;

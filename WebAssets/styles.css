@@ -791,6 +791,17 @@ input[type=range].hue-slider {
   opacity: .3
 }
 
+.timeline-tools {display:flex; flex-wrap:wrap; align-items:end; gap:8px 14px; padding:10px 20px}
+.timeline-tools label {display:grid; gap:3px; font-size:12px}
+.timeline-tools input[type=number] {width:7em}
+.timeline-tools input,.timeline-tools select {padding:4px}
+.timeline-wand {border-top:1px solid #394437; padding-bottom:8px}
+.timeline-wand summary {padding:10px 20px; cursor:pointer}
+.timeline-tools [aria-pressed=true] {border-color:#dfbb74}
+.visual-lane .timed-clip {position:absolute; top:7px; overflow:hidden; white-space:nowrap; min-width:1px; padding:2px; display:block}
+.time-selection {position:absolute; inset-block:0; pointer-events:none; background:#d7b65a26; border-inline:1px solid #dfbb74}
+.wave-lane {touch-action:pan-y}
+
 .playhead {
   position: absolute;
   left: 0;

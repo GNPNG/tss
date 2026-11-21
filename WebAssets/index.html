@@ -122,6 +122,31 @@
         <div class="track-labels"><div class="ruler-label">TRACKS</div><div class="audio-label"><span class="track-symbol">♫</span><div><strong>AUDIO</strong><small>Master track</small></div></div><div id="layer-list"></div></div>
         <div class="timeline-scroll"><div class="timeline-lanes"><div id="ruler" class="ruler" aria-hidden="true"></div><div class="wave-lane" id="seek-area" title="Click to seek"><canvas id="waveform"></canvas><div class="empty-wave" id="empty-wave">YOUR AUDIO WAVEFORM WILL APPEAR HERE</div></div><div id="visual-lanes"></div><div id="playhead" class="playhead" aria-hidden="true"></div></div></div>
       </div>
+      <div class="timeline-tools" aria-label="Timeline selection">
+        <label>Start (s) <input id="range-start" type="number" min="0" step="any" value="0"></label>
+        <label>End (s) <input id="range-end" type="number" min="0" step="any" value="0"></label>
+        <button id="set-range" class="button quiet">Select range</button>
+        <button id="select-all-time" class="button quiet">Select all</button>
+        <button id="clear-region" class="button quiet">Clear selected layer in range</button>
+      </div>
+      <details class="timeline-wand" id="timeline-wand"><summary>Magic wand and track templates</summary>
+        <div class="timeline-tools" id="boundary-glyphs" role="group" aria-label="Boundary behavior"></div>
+        <div class="timeline-tools">
+          <label>Selected symbol behavior <select id="wand-mode"><option value="fixed">Fixed length</option><option value="stretch">Stretch to selection</option><option value="repeat">Repeat at interval</option><option value="recurrence">Recurring cue</option><option value="signal">Audio signal</option></select></label>
+          <label>Length (s) <input id="wand-length" type="number" step="any" min=".001" value="1"></label>
+          <label>Repeat interval (s) <input id="wand-interval" type="number" step="any" min=".001" value="1"></label>
+          <label>Fade in (s) <input id="wand-in" type="number" step="any" min="0" value="0"></label>
+          <label>Fade out (s) <input id="wand-out" type="number" step="any" min="0" value="0"></label>
+          <label>Level <input id="wand-level" type="number" step=".05" min="0" max="1" value="1"></label>
+          <label>Match <select id="wand-cue"><option value="">Choose a recurring cue</option></select></label>
+          <label>Signal <select id="wand-signal"><option value="energy">Dynamics</option><option value="onset">Energy rise</option><option value="bass">Low band</option><option value="mid">Mid band</option><option value="treble">High band</option></select></label>
+          <label>Threshold <input id="wand-threshold" type="number" step=".01" min="0" max="1" value=".25"></label>
+          <label>Bridge gaps (s) <input id="wand-gap" type="number" step="any" min="0" value=".05"></label>
+          <label><input id="wand-autoscale" type="checkbox" checked> Fit to matched duration</label>
+          <label>Stretch tolerance (%) <input id="wand-tolerance" type="number" step="1" min="0" value="100"></label>
+          <button id="apply-wand" class="button primary">Apply to selected layer in range</button>
+        </div>
+      </details>
       <div class="timeline-footer"><span>Click the waveform to seek</span><span id="app-status" role="status" aria-live="polite">Ready</span></div>
     </section>
     <details class="timeline card macro-deck" id="projector-routing" hidden>

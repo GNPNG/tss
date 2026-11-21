@@ -1,5 +1,6 @@
 // A project contains authored state. Canvas, Web Audio and native presentation objects
 // are rebuilt by the editor when the document is installed.
+import {validEnvelope,validRange,glyphs,modes} from './timeline.js';
 export const PROJECT_FORMAT = 'the-sacred-swirls';
 export const emptyGestures = () => ({macros:[], audioGroups:[], lyricGroups:[], selected:null});
 
@@ -9,7 +10,9 @@ const layerFields = [
 ];
 
 export function layerSettings(layer) {
-  return Object.fromEntries(layerFields.map(key => [key, layer[key]]));
+  const settings=Object.fromEntries(layerFields.map(key => [key, layer[key]]));
+  if(layer.envelope!=null) settings.envelope=layer.envelope;
+  return settings;
 }
 
 const flag = v => typeof v === 'boolean';
@@ -27,7 +30,7 @@ const pair = v => record(v) && num(v.front, 0, 1) && num(v.rear, 0, 1);
 const requireField = (valid, field) => { if (!valid) throw Error('Invalid project field: ' + field); };
 
 function validLayer(l, palettes) {
-  return record(l) && id(l.id) && named(l.name) && flag(l.visible) && palettes.has(l.palette) &&
+  return record(l) && validEnvelope(l.envelope) && id(l.id) && named(l.name) && flag(l.visible) && palettes.has(l.palette) &&
     Array.isArray(l.colors) && l.colors.length === 4 && l.colors.every(c => string(c) && /^#[0-9a-f]{6}$/i.test(c)) &&
     flag(l.customColors) && num(l.hue, 0, 360) && num(l.speed, 0, 2) && num(l.scale, .4, 2) && num(l.opacity, 0, 1) &&
     flag(l.nativeLive) && oneOf(l.motion, 'wheel-flow', 'coral-release', 'wheel-with-coral-beads') &&
@@ -63,6 +66,11 @@ export function validateProject(p, palettes) {
   requireField(p.audio === null || (record(p.audio) && named(p.audio.name) && !/[\\/\u0000]/.test(p.audio.name) &&
     /^[0-9a-f]{64}$/.test(p.audio.sha256)), 'audio');
   requireField(num(p.position, 0), 'position');
+  if(p.timeline !== undefined) {
+    const t=p.timeline;
+    requireField(record(t) && num(t.duration,0) && (t.range===null || (validRange(t.range) && t.range.end<=t.duration)) &&
+      record(t.bindings) && glyphs.every(g=>modes.includes(t.bindings[g])), 'timeline');
+  }
   requireField(Array.isArray(p.layers), 'layers');
   p.layers.forEach((layer, i) => requireField(validLayer(layer, palettes), 'layers[' + i + ']'));
   const ids = p.layers.map(l => l.id);
