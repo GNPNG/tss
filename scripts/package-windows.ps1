@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $bin = (Resolve-Path $BinaryDirectory).Path
-$out = [IO.Directory]::CreateDirectory($OutputDirectory).FullName
+$out = [IO.Directory]::CreateDirectory($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputDirectory)).FullName
 $name = "The-Sacred-Swirls-$Tag-Windows-x64.zip"
 $target = Join-Path $out $name
 if (Test-Path -LiteralPath $target) { throw "Archive already exists: $target" }
