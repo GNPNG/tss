@@ -420,7 +420,7 @@ pub struct BenchmarkConfig {
     focus: Option<f32>,
 }
 
-#[cfg(any(windows, test))]
+#[cfg(any(windows, target_os = "macos", test))]
 impl BenchmarkConfig {
     fn from_flags(
         pressure: bool,
@@ -475,6 +475,7 @@ impl BenchmarkConfig {
         config
     }
 
+    #[cfg(any(windows, test))]
     fn matches_optics(&self, c: &Config, preview: [u32; 2]) -> bool {
         (!self.wheel_stack
             || c.stack.len() == 2
@@ -505,6 +506,19 @@ pub fn live_wheel_benchmark_config() -> Option<BenchmarkConfig> {
         || windows::plate_verification().is_some()
     {
         return Some(BenchmarkConfig::current());
+    }
+    #[cfg(target_os = "macos")]
+    if crate::export_smoke::enabled() {
+        let flag = |name: &str| std::env::args_os().any(|arg| arg == name);
+        let mut config = BenchmarkConfig::from_flags(
+            flag("--verify-pressure-export"),
+            flag("--coral-trial"),
+            flag("--coral-beads-trial"),
+            flag("--preview-960"),
+            true,
+        );
+        config.wheel_stack = flag("--wheel-stack-trial");
+        return Some(config);
     }
     None
 }

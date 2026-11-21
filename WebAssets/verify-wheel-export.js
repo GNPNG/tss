@@ -4,7 +4,9 @@
 import { wheelMovieRequest } from './native-wheel-export.js';
 export async function verifyWheelExport(selection, duration, status, projector,performerDeck) {
   const invoke = window.__TAURI__.core.invoke;
-  const facts = {};
+  const mac = /Macintosh/i.test(navigator.userAgent);
+  const facts = {host: mac ? 'macos' : 'windows', webview: navigator.userAgent};
+  let unlisten;
   try {
     const [selectionId,audioPath,outputPath,displays,pressureExport] = await invoke('select_wheel_export_fixture');
     facts.attachedDisplays=displays;
@@ -18,6 +20,8 @@ export async function verifyWheelExport(selection, duration, status, projector,p
       maskA:l.media.maskA,maskB:l.media.maskB,durationUs:l.media.durationUs,still:l.media.still,
     }));
     facts.audioDuration=seconds;
+    facts.sourceName=el('source-name').textContent;
+    if (facts.sourceName !== audioPath.split(/[\\/]/).pop()) throw Error('The granted song was not imported');
     facts.wheelOptions=el('mathmos-wheel').options.length-1;
     facts.wheel=el('mathmos-wheel').value;
     facts.motion=el('wheel-motion').value;
@@ -25,14 +29,19 @@ export async function verifyWheelExport(selection, duration, status, projector,p
     facts.macroDeckReady=!el('macro-deck').hidden;
     facts.feedbackReady=!el('video-feedback').hidden;
     facts.projectorReady=!!projector && !el('projector').disabled;
-    facts.routingApis={ enumerateDevices:typeof navigator.mediaDevices?.enumerateDevices==='function',
-      selectAudioOutput:typeof navigator.mediaDevices?.selectAudioOutput==='function',
-      cueSink:typeof AudioContext.prototype.setSinkId==='function',
-      audienceSink:typeof HTMLMediaElement.prototype.setSinkId==='function' };
-    const devices=await navigator.mediaDevices?.enumerateDevices?.() ?? [];
-    facts.visibleAudioOutputs=devices.filter(d=>d.kind==='audiooutput' && d.deviceId && !['default','communications'].includes(d.deviceId)).length;
-    if(facts.wheelOptions!==7 || !facts.macroDeckReady || !facts.feedbackReady || !facts.projectorReady) {
+    facts.exportControlReady=!el('native-wheel-export').hidden && !el('export-native-wheel').disabled;
+    facts.documentVisibility=document.visibilityState;
+    if(facts.wheelOptions!==7 || facts.wheel!==selection.wheel || !facts.feedbackReady || !facts.exportControlReady) {
       throw Error('Editor controls failed verification');
+    }
+    if (!mac) {
+      facts.routingApis={ enumerateDevices:typeof navigator.mediaDevices?.enumerateDevices==='function',
+        selectAudioOutput:typeof navigator.mediaDevices?.selectAudioOutput==='function',
+        cueSink:typeof AudioContext.prototype.setSinkId==='function',
+        audienceSink:typeof HTMLMediaElement.prototype.setSinkId==='function' };
+      const devices=await navigator.mediaDevices?.enumerateDevices?.() ?? [];
+      facts.visibleAudioOutputs=devices.filter(d=>d.kind==='audiooutput' && d.deviceId && !['default','communications'].includes(d.deviceId)).length;
+      if (!facts.macroDeckReady || !facts.projectorReady) throw Error('Windows controls failed verification');
     }
     const layerId = selection.layerId;
     const events = [];
@@ -52,38 +61,53 @@ export async function verifyWheelExport(selection, duration, status, projector,p
     }
     stroke('front','rotate',1.10,1.60,[[.67,.50],[.64,.62],[.59,.73],[.5,.77]]);
     events.sort((a,b)=>a.time-b.time);
-    const {verifyPerformers}=await import('./verify-performers.js');
-    const performerProof=await verifyPerformers(performerDeck,layerId);
-    if(performerProof)facts.performers=performerProof;
-    status('Exporting the two-cue 4K verification sequence…');
-    await window.__TAURI__.event.listen('tss-wheel-export-progress', ({payload}) =>
-      status(`4K verification · ${payload.completed} / ${payload.total} frames`));
-    await invoke('export_native_wheel',{audioPath,outputPath,
-      request:wheelMovieRequest(selection, duration(), events, 'neutral')});
-    el('audience-sink').value='mute';
-    el('cue-sink').value='mute';
-    el('projector').click();
-    await projector.pending;
-    facts.projectorOpened=projector.enabled && el('projector').getAttribute('aria-pressed')==='true';
-    if (!facts.projectorOpened) throw Error('Projector open failed: '+el('projector-state').textContent);
-    await new Promise(resolve=>setTimeout(resolve,1600));
-    const projectorStats=await invoke('live_wheel_stats');
-    facts.projectorPresents=projectorStats.projectorPresents;
-    facts.projectorAgeMs=projectorStats.projectorAgeMs;
-    if(!(projectorStats.projectorRunning && facts.projectorPresents>0)) throw Error('Projector did not present frames');
-    facts.minimize=await invoke('verify_projector_visibility');
-    const {hiddenMs,offscreenFrames,bothHiddenMs,bothHiddenFrames}=facts.minimize;
-    if (!(hiddenMs>0 && offscreenFrames>0 && offscreenFrames<=Math.ceil(hiddenMs*60/1000)+1 &&
-          bothHiddenMs>0 && bothHiddenFrames===0)) {
-      throw Error('Unexpected presentation activity during minimize/restore verification');
+    if (mac && seconds < 2) {
+      for (const event of events) event.time *= seconds / 2;
     }
-    el('projector').click();
-    await projector.pending;
-    facts.projectorClosed=!projector.enabled && el('projector').getAttribute('aria-pressed')==='false';
-    if(!facts.projectorClosed) throw Error('Projector close failed: '+el('projector-state').textContent);
+    facts.events=events;
+    if (!mac) {
+      const {verifyPerformers}=await import('./verify-performers.js');
+      const performerProof=await verifyPerformers(performerDeck,layerId);
+      if(performerProof)facts.performers=performerProof;
+    }
+    status('Exporting the two-cue 4K verification sequence…');
+    unlisten=await window.__TAURI__.event.listen('tss-wheel-export-progress', ({payload}) => {
+      facts.progress={completed:payload.completed,total:payload.total};
+      status(`4K verification · ${payload.completed} / ${payload.total} frames`);
+    });
+    const request=wheelMovieRequest(selection, seconds, events, 'neutral');
+    facts.baseline=request.baseline;
+    await invoke('export_native_wheel',{audioPath,outputPath,request});
+    if (!mac) await verifyWindowsProjector(projector, invoke, el, facts);
     await invoke('finish_wheel_export_verification',{error:null,facts:JSON.stringify(facts)});
   } catch(error) {
     status(String(error));
     await invoke('finish_wheel_export_verification',{error:String(error),facts:JSON.stringify(facts)});
+  } finally {
+    unlisten?.();
   }
+}
+
+async function verifyWindowsProjector(projector, invoke, el, facts) {
+  el('audience-sink').value='mute';
+  el('cue-sink').value='mute';
+  el('projector').click();
+  await projector.pending;
+  facts.projectorOpened=projector.enabled && el('projector').getAttribute('aria-pressed')==='true';
+  if (!facts.projectorOpened) throw Error('Projector open failed: '+el('projector-state').textContent);
+  await new Promise(resolve=>setTimeout(resolve,1600));
+  const projectorStats=await invoke('live_wheel_stats');
+  facts.projectorPresents=projectorStats.projectorPresents;
+  facts.projectorAgeMs=projectorStats.projectorAgeMs;
+  if(!(projectorStats.projectorRunning && facts.projectorPresents>0)) throw Error('Projector did not present frames');
+  facts.minimize=await invoke('verify_projector_visibility');
+  const {hiddenMs,offscreenFrames,bothHiddenMs,bothHiddenFrames}=facts.minimize;
+  if (!(hiddenMs>0 && offscreenFrames>0 && offscreenFrames<=Math.ceil(hiddenMs*60/1000)+1 &&
+        bothHiddenMs>0 && bothHiddenFrames===0)) {
+    throw Error('Unexpected presentation activity during minimize/restore verification');
+  }
+  el('projector').click();
+  await projector.pending;
+  facts.projectorClosed=!projector.enabled && el('projector').getAttribute('aria-pressed')==='false';
+  if(!facts.projectorClosed) throw Error('Projector close failed: '+el('projector-state').textContent);
 }

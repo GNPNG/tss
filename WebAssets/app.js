@@ -383,7 +383,7 @@ async function loadWheelPresets() {
       wheelSelect.add(new Option(preset.name, preset.id));
     }
     if (nativeDesktop) {
-      const benchmark = windowsDesktop ? await window.__TAURI__.core.invoke('live_wheel_benchmark_config') : null;
+      const benchmark = await window.__TAURI__.core.invoke('live_wheel_benchmark_config');
       if (benchmark) {
         await window.__TAURI__.event.listen('tss-benchmark-release', () => byId('replay-release').click());
         await window.__TAURI__.event.listen('tss-benchmark-wheel', ({ payload }) => {
@@ -432,8 +432,13 @@ async function loadWheelPresets() {
         }
         if (benchmark?.verifyExport) {
           const { verifyWheelExport } = await import('./verify-wheel-export.js');
-          await nativeSurface.sync();
-          await verifyWheelExport(liveSelection(), () => state.audioBuffer?.duration, status, projectorDeck,performerDeck);
+          if (!windowsDesktop) nativeSurface.exporting = true;
+          try {
+            await nativeSurface.sync();
+            await verifyWheelExport(liveSelection(), () => state.audioBuffer?.duration, status, projectorDeck,performerDeck);
+          } finally {
+            if (!windowsDesktop) nativeSurface.exporting = false;
+          }
         }
       }
     }
