@@ -2,6 +2,7 @@
 //! snapshots. Basilisk and the native CImg distance transform run on a worker.
 use super::{extent, gpu, upload_frame, LiveSolverStatus};
 use std::{
+    collections::VecDeque,
     io,
     path::{Path, PathBuf},
     sync::{Arc, Condvar, Mutex},
@@ -26,8 +27,49 @@ struct Mailbox {
     target_tick: u64,
     pending: [Drive; 2],
     children: Vec<Cancellation>,
-    adjacent: Option<[Frame; 2]>,
+    frames: VecDeque<Frame>,
+    shown: f64,
+    rate: f64,
+    last_time: Option<f64>,
     error: Option<String>,
+}
+
+impl Mailbox {
+    fn set_rate(&mut self, rate: f64) {
+        if self.rate != rate && (self.rate == 0. || rate == 0.) {
+            self.last_time = None;
+            if rate == 0. {
+                self.target_tick = self.shown.ceil() as u64;
+            }
+        }
+        self.rate = rate;
+    }
+
+    fn sample(&mut self, time: f64) -> Option<([Frame; 2], f32)> {
+        let newest = self.frames.back()?.tick;
+        let dt = self
+            .last_time
+            .replace(time)
+            .map_or(0., |t| (time - t).max(0.));
+        // Discard time that the worker could not supply. Publishing late fields
+        // must never move a held image or cause a catch-up burst on the next draw.
+        self.shown = (self.shown + dt * self.rate * HZ).min(newest as f64);
+        let first = self.shown.floor() as u64;
+        let fraction = (self.shown - first as f64) as f32;
+        while self.frames.front()?.tick < first {
+            self.frames.pop_front();
+        }
+        // Keep the upper interpolation endpoint and prime the next interval.
+        // The worker can publish at most three ticks beyond the displayed one.
+        self.target_tick = if self.rate == 0. {
+            self.shown.ceil() as u64
+        } else {
+            (self.shown + 1. + self.rate.min(2.)).floor() as u64
+        };
+        let a = &self.frames[0];
+        let b = if fraction == 0. { a } else { &self.frames[1] };
+        Some(([a.clone(), b.clone()], fraction))
+    }
 }
 
 type Shared = Arc<(Mutex<Mailbox>, Condvar)>;
@@ -46,7 +88,6 @@ fn solve(executable: &Path, seed: u32, shared: &Shared) -> io::Result<()> {
     let atlas = Atlas::new(SIDE as usize)?;
     let (mut rear, mut rear_field) = start(Slide::Violet)?;
     let (mut front, mut front_field) = start(Slide::Cyan)?;
-    let mut previous: Option<Frame> = None;
     loop {
         let mut rg = vec![0; atlas.byte_len()];
         atlas.pack(&rear_field, &front_field, &mut rg)?;
@@ -59,20 +100,17 @@ fn solve(executable: &Path, seed: u32, shared: &Shared) -> io::Result<()> {
             if state.stop {
                 break;
             }
-            state.adjacent = Some([
-                previous.take().unwrap_or_else(|| current.clone()),
-                current.clone(),
-            ]);
+            let tick = current.tick;
+            state.frames.push_back(current);
             state = shared
                 .1
-                .wait_while(state, |s| !s.stop && s.target_tick <= current.tick)
+                .wait_while(state, |s| !s.stop && s.target_tick <= tick)
                 .unwrap();
             if state.stop {
                 break;
             }
             std::mem::take(&mut state.pending)
         };
-        previous = Some(current);
         rear_field = rear.step(drives[0])?;
         front_field = front.step(drives[1])?;
     }
@@ -86,9 +124,6 @@ pub(super) struct Source {
     shared: Shared,
     pub executable: PathBuf,
     pub seed: u32,
-    pub rate: f64,
-    last_time: Option<f64>,
-    desired: f64,
     latched: Option<(u64, ([u32; 2], f32))>,
 }
 
@@ -101,6 +136,7 @@ impl Source {
             ));
         }
         let shared = Shared::default();
+        shared.0.lock().unwrap().set_rate(rate);
         let thread_shared = shared.clone();
         let path = executable.to_path_buf();
         thread::Builder::new()
@@ -135,9 +171,6 @@ impl Source {
             shared,
             executable: executable.to_owned(),
             seed,
-            rate,
-            last_time: None,
-            desired: 0.,
             latched: None,
         })
     }
@@ -147,15 +180,19 @@ impl Source {
         LiveSolverStatus {
             state: if s.error.is_some() {
                 "failed"
-            } else if s.adjacent.is_none() {
+            } else if s.frames.is_empty() {
                 "starting"
             } else {
                 "ready"
             },
-            tick: s.adjacent.as_ref().map_or(0, |pair| pair[1].tick),
-            flow_rate: self.rate,
+            tick: s.frames.back().map_or(0, |frame| frame.tick),
+            flow_rate: s.rate,
             error: s.error.clone(),
         }
+    }
+
+    pub fn set_rate(&mut self, rate: f64) {
+        self.shared.0.lock().unwrap().set_rate(rate);
     }
 
     pub fn tug(&mut self, slide: usize, from: [f64; 2], to: [f64; 2], strength: f32) {
@@ -191,18 +228,13 @@ impl Source {
     }
 
     fn prepare(&mut self, q: &gpu::Queue, time: f64) -> ([u32; 2], f32) {
-        let dt = self.last_time.map_or(0., |t| (time - t).max(0.));
-        self.last_time = Some(time);
-        let pair = {
+        let (pair, fraction) = {
             let mut s = self.shared.0.lock().unwrap();
-            let Some(pair) = s.adjacent.clone() else {
+            let Some(sample) = s.sample(time) else {
                 return ([0; 2], 0.);
             };
-            // Limit latency under overload and after a transport discontinuity.
-            self.desired = (self.desired + dt * self.rate * HZ).min(pair[1].tick as f64 + 3.);
-            s.target_tick = self.desired.floor() as u64;
             self.shared.1.notify_one();
-            pair
+            sample
         };
         let slots = pair.each_ref().map(|sample| {
             let slot = (sample.tick % 2) as usize;
@@ -212,11 +244,7 @@ impl Source {
             }
             slot as u32
         });
-        // One simulation interval of latency permits continuous adjacent-state interpolation.
-        (
-            slots,
-            (self.desired - pair[1].tick as f64).clamp(0., 1.) as f32,
-        )
+        (slots, fraction)
     }
 }
 
@@ -231,6 +259,79 @@ impl Drop for Source {
         for child in children {
             child.cancel();
         }
+    }
+}
+
+#[cfg(test)]
+mod timing_tests {
+    use super::*;
+
+    fn publish(state: &mut Mailbox, tick: u64) {
+        state.frames.push_back(Frame {
+            tick,
+            rg: Arc::from([]),
+        });
+    }
+
+    fn sample(state: &mut Mailbox, time: f64) -> f64 {
+        let ([first, second], fraction) = state.sample(time).unwrap();
+        assert!(second.tick == first.tick || second.tick == first.tick + 1);
+        let phase = first.tick as f64 + (second.tick - first.tick) as f64 * f64::from(fraction);
+        assert!((phase - state.shown).abs() < 1e-6);
+        phase
+    }
+
+    #[test]
+    fn solved_fields_interpolate_at_the_requested_rate_across_tick_boundaries() {
+        for rate in [0., 0.25, 0.5, 1., 1.5, 2.] {
+            let mut state = Mailbox::default();
+            state.set_rate(rate);
+            publish(&mut state, 0);
+            for frame in 0..=240 {
+                let time = frame as f64 / 60.;
+                assert!((sample(&mut state, time) - time * HZ * rate).abs() < 1e-6);
+                // The worker delivers all requested ticks before the next draw.
+                while state.frames.back().unwrap().tick < state.target_tick {
+                    let next = state.frames.back().unwrap().tick + 1;
+                    publish(&mut state, next);
+                }
+                assert!(state.frames.len() <= 4);
+            }
+        }
+    }
+
+    #[test]
+    fn fractional_pause_survives_worker_publication_and_resumes_from_the_same_pose() {
+        let mut state = Mailbox::default();
+        state.set_rate(1.);
+        publish(&mut state, 0);
+        sample(&mut state, 0.);
+        publish(&mut state, 1);
+        assert_eq!(sample(&mut state, 0.5 / HZ), 0.5);
+        state.set_rate(0.);
+        assert_eq!(state.target_tick, 1);
+        publish(&mut state, 2); // Already in flight when the user paused.
+        for time in [0.5 / HZ, 1., 60.] {
+            assert_eq!(sample(&mut state, time), 0.5);
+        }
+        state.set_rate(1.);
+        assert_eq!(sample(&mut state, 90.), 0.5);
+        assert!((sample(&mut state, 90. + 0.25 / HZ) - 0.75).abs() < 1e-6);
+    }
+
+    #[test]
+    fn slow_worker_holds_latest_field_without_skipping_when_it_recovers() {
+        let mut state = Mailbox::default();
+        state.set_rate(2.);
+        publish(&mut state, 0);
+        sample(&mut state, 0.);
+        assert_eq!(sample(&mut state, 60.), 0.);
+        assert_eq!(state.target_tick, 3);
+        for tick in 1..=3 {
+            publish(&mut state, tick);
+        }
+        assert_eq!(sample(&mut state, 60.), 0.);
+        assert!((sample(&mut state, 60. + 1. / 60.) - 0.8).abs() < 1e-6);
     }
 }
 
@@ -283,10 +384,10 @@ fn capture_evolving_pair() -> Result<(), Box<dyn std::error::Error>> {
             renderer.end_gesture(1);
         }
         if i == 30 {
-            let before = renderer.live_solver_status(9).unwrap().tick;
+            let before = renderer.evolving[&9].shared.clone();
             renderer.set_wheel_palette("violet-blue", None)?;
             renderer.set_live_solver(9, Path::new(&worker), 83724, 1.)?;
-            assert_eq!(renderer.live_solver_status(9).unwrap().tick, before);
+            assert!(Arc::ptr_eq(&before, &renderer.evolving[&9].shared));
         }
         // Move the optical plane from the rear toward the front while the
         // cells continue to advect after the front contact is released.
@@ -295,7 +396,7 @@ fn capture_evolving_pair() -> Result<(), Box<dyn std::error::Error>> {
         // A paused or backward-seeking song must not stop physical wheel time.
         let song_time = if i < 30 { 7. } else { 1. };
         renderer.render_film_times_offscreen(t, t, song_time)?;
-        wait_for(&renderer, i)?;
+        wait_for(&renderer, i + 1)?;
         renderer.render_film_times_offscreen(t, t, song_time)?;
         let (w, h, rgba) = renderer.capture_rgba8()?;
         assert_eq!((w, h), (384, 216));
@@ -345,6 +446,39 @@ fn capture_evolving_pair() -> Result<(), Box<dyn std::error::Error>> {
     renderer.set_footprint_sampling(false);
     assert!(renderer.set_detail_scale(9, f32::NAN).is_err());
     assert_eq!(snapshot(&mut renderer)? == identity, true);
+
+    renderer.set_detail_scale(9, 0.4)?;
+    let at = |r: &mut crate::LiveWheel, time| -> Result<Vec<u8>, String> {
+        r.render_film_times_offscreen(time, time, 1.)?;
+        Ok(r.capture_rgba8()?.2)
+    };
+    let mut last_zoom = at(&mut renderer, t)?;
+    let mut changed_at_zoom = Vec::new();
+    for step in 1..=8 {
+        let time = t + step as f64 / 96.;
+        let image = at(&mut renderer, time)?;
+        let changes = image
+            .chunks_exact(4)
+            .zip(last_zoom.chunks_exact(4))
+            .filter(|(a, b)| a != b)
+            .count();
+        assert!(
+            changes > 0,
+            "identical zoomed output at quarter-tick {step}"
+        );
+        changed_at_zoom.push(changes);
+        last_zoom = image;
+        wait_for(&renderer, (time * HZ).floor() as u64 + 1)?;
+    }
+    let held_time = t + 8.5 / 96.;
+    let held = at(&mut renderer, held_time)?;
+    renderer.set_live_solver(9, Path::new(&worker), 83724, 0.)?;
+    assert_eq!(at(&mut renderer, held_time + 30.)? == held, true);
+    renderer.set_live_solver(9, Path::new(&worker), 83724, 1.)?;
+    assert_eq!(at(&mut renderer, held_time + 60.)? == held, true);
+    assert_ne!(at(&mut renderer, held_time + 60. + 1. / 96.)? == held, true);
+    println!("detail_scale=0.4 pixel_changes_per_quarter_tick={changed_at_zoom:?} paused_rgba_and_first_resumed_frame_identical=true");
+    renderer.set_detail_scale(9, 1.)?;
     renderer.clear_live_solver(9);
     assert_ne!(snapshot(&mut renderer)? == identity, true);
     renderer.set_live_solver(9, Path::new(&worker), 83724, 1.)?;

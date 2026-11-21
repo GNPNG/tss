@@ -728,7 +728,7 @@ impl LiveWheel {
                     if let Some(err) = s.status().error {
                         return Err(err);
                     }
-                    s.rate = flow_rate;
+                    s.set_rate(flow_rate);
                     return Ok(());
                 }
             }
