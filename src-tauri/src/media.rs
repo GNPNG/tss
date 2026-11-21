@@ -398,6 +398,69 @@ mod tests {
 mod animated_tests {
     use super::*;
     #[test]
+    fn prores_4444_display_rotation_and_alpha_survive_import() {
+        let dir = tempfile::tempdir().unwrap();
+        let ffmpeg = |arguments: &[&str]| {
+            let result = std::process::Command::new("ffmpeg")
+                .current_dir(dir.path())
+                .args(["-nostdin", "-loglevel", "error"])
+                .args(arguments)
+                .output()
+                .unwrap();
+            assert!(
+                result.status.success(),
+                "{}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+        };
+        ffmpeg(&[
+            "-f",
+            "lavfi",
+            "-i",
+            concat!(
+                "testsrc=size=64x32:rate=2:duration=1,format=rgba,",
+                "geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(lt(X,W/2),32,224)'"
+            ),
+            "-c:v",
+            "prores_ks",
+            "-pix_fmt",
+            "yuva444p10le",
+            "-profile:v",
+            "4",
+            "-threads:v",
+            "1",
+            "landscape.mov",
+        ]);
+        ffmpeg(&[
+            "-display_rotation",
+            "90",
+            "-i",
+            "landscape.mov",
+            "-map",
+            "0:v:0",
+            "-c",
+            "copy",
+            "portrait.mov",
+        ]);
+        let asset = import(
+            &dir.path().join("cache"),
+            &dir.path().join("portrait.mov"),
+            None,
+        )
+        .unwrap();
+        let first = frame_at(asset.id, 0).unwrap();
+        let second = frame_for_preview(asset.id, 500_000).unwrap();
+        assert_eq!(
+            (asset.width, asset.height, asset.duration_us, asset.still),
+            (32, 64, 1_000_000, false)
+        );
+        for frame in [first, second] {
+            assert!(frame.rgba[3].abs_diff(224) <= 1);
+            assert!(frame.rgba.last().unwrap().abs_diff(32) <= 1);
+        }
+    }
+
+    #[test]
     fn seek_uses_original_vfr_intervals_in_both_master_and_preview() {
         let tmp = tempfile::tempdir().unwrap();
         let colors = [[200, 40, 17, 0], [14, 91, 239, 127], [22, 175, 44, 255]];
