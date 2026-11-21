@@ -1060,15 +1060,46 @@
     "group": "Media and production",
     "name": "FFmpeg demuxers, decoders and filtergraph",
     "model": "Decode and transform prepared video, animated images and keyed layers",
-    "stack": "FFmpeg CLI, chromakey, scale, overlay and related filters",
-    "application": "Optional preprocessing for full-color animation, green-screen clips, GIF timing, alpha and rescaling",
+    "stack": "FFmpeg and FFprobe CLIs, MOV, PNG video, scale, premultiply and unpremultiply filters",
+    "application": "Precompute an indexed full-size RGBA source and a 960-pixel preview for larger footage. The editor uses the original sample clock for playback, seek and reverse scrub.",
     "platform": "External CLI on Windows/macOS; capabilities depend on local build",
-    "scope": "Unmeasured per codec, filter, resolution and pixel format.",
-    "decision": "Candidate. Retain original assets, verify decoded alpha, transfer functions, framing and timebase.",
-    "evidence": "Chroma key handles prepared backgrounds. General subject segmentation, Igor recoloring and sound-linked transforms have separate acceptance cases.",
+    "scope": "The media preparation and packet-index module is 11.4 kB of Rust. Encoded storage varies with duration and detail.",
+    "decision": "Use installed tools during source preparation. The native GPU compositor handles live keying, matte composition and re-colouring.",
+    "evidence": "Verified transparent PNG, GIF, irregular MOV timestamps, phone-style display rotation and ProRes 4444 alpha. The Windows editor projected two moving sources over a wheel and exported the result with sound.",
     "sources": [
-      "[FFmpeg filters](https://ffmpeg.org/ffmpeg-filters.html#chromakey)",
-      "[TSS dependency register](dependency-register.md)"
+      "[FFmpeg formats](https://ffmpeg.org/ffmpeg-formats.html)",
+      "[TSS source media](visual-media.md)",
+      "[Windows hardware capture](../experiments/star-aperture/windows/README.md)"
+    ]
+  },
+  {
+    "group": "Media and production",
+    "name": "png 0.18.1",
+    "model": "Lossless frame decode and encode",
+    "stack": "Rust Decoder and Reader consume samples indexed by FFprobe",
+    "application": "Decode the requested RGBA8 frame without starting a process during playback or scrub.",
+    "platform": "Native Rust library, tested on Intel macOS and Windows x64.",
+    "scope": "192 MiB decoded frame cache shared across tracks, plus one bounded prefetch worker.",
+    "decision": "Use the crate’s decoder. TSS owns media grants, packet selection and LRU eviction.",
+    "evidence": "Master and proxy selected the same packet across irregular 0.2 s and 0.6 s boundaries. A transparent colour boundary remained cyan on reduction.",
+    "sources": [
+      "[png crate documentation](https://docs.rs/png/0.18.1/png/)",
+      "[Native reader and tests](../src-tauri/src/media.rs)"
+    ]
+  },
+  {
+    "group": "Media and production",
+    "name": "Cairo image surfaces",
+    "model": "Antialiased 2D paths and coverage",
+    "stack": "C11 fixture using Cairo ARGB32 image surfaces, even-odd path fill and PNG export",
+    "application": "Generate the same moving star artwork in alpha and on green, plus a separate travelling matte to verify layer order, keying and mask coverage.",
+    "platform": "Generated on Intel macOS using Cairo 1.18.6 on CPU. The Windows editor consumes the prepared clips.",
+    "scope": "3.0 kB of fixture C. Each source contains 72 frames at 960 × 540.",
+    "decision": "Use Cairo for repeatable source art in compositor tests. It adds no runtime dependency to the shipped editor.",
+    "evidence": "An independently sampled native frame preserved the oil outside the moving matte while changing every sampled interior star point.",
+    "sources": [
+      "[Cairo image surfaces](https://www.cairographics.org/manual/cairo-Image-Surfaces.html)",
+      "[Fixture and procedure](../experiments/star-aperture/README.md)"
     ]
   },
   {
