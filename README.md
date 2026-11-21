@@ -8,6 +8,8 @@ The Sacred Swirls (TSS), EPNI-018, is a desktop liquid-light instrument. Two ind
 
 [Windows download](https://github.com/GNPNG/tss/releases/tag/v0.1.0-preview.2) · [Start performing](docs/windows-preview.md)
 
+In the source build, choose **Violet / Blue → Slide motion → Wheel with coral beads**. Small cyan drops pinch off the front slide while the original violet oil wheel moves behind the glass. **Replay front beads** starts the release again at the current rear-wheel position. [Full projection](experiments/slide-look-study/approval/coral-wheel/coral-wheel.mp4) · [Half-speed close-up](experiments/slide-look-study/approval/coral-wheel/coral-wheel-detail-half-speed.mp4)
+
 The source build adds **Slide motion → Coral release**. Watch the front film shed two drops, then pull focus through them onto the violet film behind. [Radeon capture](experiments/slide-look-study/approval/coral-release/coral-release.mp4) · [Full-size frame](experiments/slide-look-study/approval/coral-release/coral-release.png) · [How the films were solved and measured](experiments/coral-release/README.md)
 
 - Open MP3 or M4A audio and preview a waveform with synchronized liquid-light motion.

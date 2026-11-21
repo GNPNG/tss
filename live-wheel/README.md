@@ -21,6 +21,8 @@ The native viewport shows the two sealed slides on the selected track. Its fluid
 
 ## Coral release
 
+**Wheel with coral beads** pairs the original wheel's rear film with a separate front film containing smaller oil buds. Pick **Violet / Blue** for the violet rear and cyan front shown in the review. **Replay front beads** restarts the front film while the rear stays at its current phase. Once the last front droplet has detached, the rear keeps moving behind it. **Current pose and film position** preserves both film times for export. **Neutral pose and film start** takes both back to zero.
+
 **Slide motion → Coral release** selects a second pair of independently solved films. Use any of the seven color wheels. The foreground starts with buds attached to a bank of oil. The rear carries broad folds that remain visible through the intervening glass. Move **Projector focus** toward the front to follow a neck as it thins, then toward the rear to see the folds through the newly detached drops.
 
 The finite solve has 96 states at 24 Hz. Playback holds the last state at 95/24 seconds. **Replay release live** restarts the selected track in the editor and on the delayed projector, retaining its slide poses. Material tug, rotation and compression change the projection during playback. The timing and sites of pinch-off come from the stored solve. The native exporter starts **Automatic** coral exports at the beginning of the release with neutral slide poses. **Current pose and film position** starts the export at the displayed point in the take. Manual live restarts are outside the recorded gesture schedule.
@@ -33,7 +35,7 @@ To measure this preset on a Windows GPU, use the existing editor benchmark with 
 
 Open a local song, choose the live wheel, then select **Export selected wheel in 4K**. Choose a new MP4 filename. Export finishes an open gesture recording before reading the schedule. A take recorded while the song was paused can be assigned a trigger in the gesture deck. The current wheel material and focus apply throughout. Enabled gestures scheduled at a recording position, audio motif or lyric phrase replay in song order at 30 fps. **Export starting pose** offers three choices.
 
-- **Automatic** starts from neutral slides and the beginning of the fluid cache for Coral release or when the song contains scheduled events for this track. Unscheduled Wheel flow starts from its current poses and visible film position.
+- **Automatic** starts both films at zero with neutral slide poses for **Coral release**, **Wheel with coral beads**, and any track with scheduled gestures. Unscheduled **Wheel flow** starts from its current poses and visible film position.
 - **Current pose and film position** copies the two live slides, then applies the scheduled events to that copy.
 - **Neutral pose and film start** starts at cache time zero with both slide rotations and tugs cleared.
 
