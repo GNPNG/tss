@@ -88,7 +88,7 @@ async function exerciseControls(platform) {
   let documentText, incoming, linked=null, lastSelection=1, catalogFiles=[];
   const advisorRequests=[],reviewedLyrics=[],previewRequests=[],movieRequests=[];
   const listeners=new Map(), stereoRequests=[], forgotten=[];
-  let stereoFails=false, stereoFrames=0;
+  let stereoFails=false, stereoFrames=73, stereoFps=22.37, stereoPolls=0, projectorVisible;
   let scaleQuery;
   if (stereo) {
     const browserMatchMedia = window.matchMedia.bind(window);
@@ -135,11 +135,14 @@ async function exerciseControls(platform) {
       if (args.enabled && stereoFails) throw Error('No external display available');
       return args.enabled ? 'SAMSUNG' : '';
     case 'forget_live_wheel_layer': forgotten.push(args.layerId);return null;
-    case 'live_wheel_stats': return !stereo || !stereoRequests.at(-1) ? {running:false} : {
-      running:true,layerId:previewRequests.at(-1)?.layerId,adapter:'Metal',fps:30,p95Ms:34,
-      width:640,height:360,frameLatency:2,projectorRunning:true,projectorPresents:++stereoFrames,
-      trackpadPressure:.42,trackpadPressurePeak:.78,trackpadPressureEvents:17,
-    };
+    case 'live_wheel_stats':
+      if (!stereo || !stereoRequests.at(-1)) return {running:false};
+      stereoPolls++;
+      return {
+        running:true,layerId:previewRequests.at(-1)?.layerId,adapter:'Metal',fps:stereoFps,p95Ms:46,
+        width:640,height:360,frameLatency:2,projectorRunning:true,projectorPresents:stereoFrames,projectorVisible,
+        trackpadPressure:.42,trackpadPressurePeak:.78,trackpadPressureEvents:17,
+      };
     case 'read_timed_lyrics': return ['song.vtt','WEBVTT\n\n00:00.000 --> 00:00.500\nGo\n\n00:01.000 --> 00:01.500\nGo'];
     case 'save_project': documentText=args.document;return 'Headliner.tss';
     case 'transcribe_song':return [
@@ -232,8 +235,20 @@ async function exerciseControls(platform) {
     check(oldQuery!==scaleQuery,'resolution change rearms for the new monitor scale');
     Object.defineProperty(window,'devicePixelRatio',{value:scale,configurable:true});
     await until(()=>JSON.stringify(previewRequests.at(-1).rect)===JSON.stringify(pixelRect(scale)));
-    await until(()=>$('stereo-pressure-state').textContent.includes('SAMSUNG'));
-    check($('stereo-pressure-state').textContent.includes('17 pressure events'),'measured force telemetry');
+    const hud = () => $('stereo-pressure-state').textContent;
+    await until(()=>stereoPolls >= 2 && hud().includes('TV 22.4 FPS'));
+    check(hud().includes('73 stereo frames · peak 78% · 17 pressure events'),
+      'duplicate native samples retain presenter FPS, frame count and force telemetry');
+    check(!hud().includes('screen'), 'unknown TV visibility makes no visibility claim');
+    for (const fps of [0, -1, Infinity, NaN]) {
+      stereoFps = fps;
+      const before = stereoPolls;
+      await until(()=>stereoPolls > before && hud().includes('TV measuring'));
+    }
+    stereoFrames = 1; stereoFps = 30; projectorVisible = true;
+    await until(()=>hud().includes('TV measuring · 1 stereo frame') && hud().includes('TV on screen'));
+    stereoFrames = 2; projectorVisible = false;
+    await until(()=>hud().includes('TV 30.0 FPS · 2 stereo frames') && hud().includes('TV window off screen'));
     click('projector');await until(()=>!button.disabled && stereoRequests.at(-1)===false);
     check(stereoRequests.at(-1)===false && previewRequests.at(-1).layerId===original.layerId &&
       previewRequests.at(-1).simulation.seed===original.simulation.seed && $('stereo-pressure-state').hidden,'stop restores mono simulation');

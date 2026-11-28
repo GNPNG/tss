@@ -6,7 +6,6 @@ export class StereoPressureDeck {
     this.available = false;
     this.busy = false;
     this.display = '';
-    this.lastPresent = null;
     this.registration = listen('tss-stereo-closed', ({payload}) => this.disconnect(payload));
     button.addEventListener('click', () => this.toggle());
     this.refresh();
@@ -71,7 +70,6 @@ export class StereoPressureDeck {
     this.active = false;
     this.targetId = null;
     this.display = '';
-    this.lastPresent = null;
     this.output.textContent = '';
     try {
       this.change();
@@ -96,14 +94,14 @@ export class StereoPressureDeck {
 
   report(stats) {
     if (!this.active || !this.display || !stats.projectorRunning) return;
-    const now = performance.now();
     const count = stats.projectorPresents;
-    const last = this.lastPresent;
-    const cadence = last && count >= last.count && now > last.time ?
-      ((count - last.count) * 1000 / (now - last.time)).toFixed(1) + ' FPS' : 'measuring';
-    this.lastPresent = {count, time:now};
+    const cadence = count >= 2 && Number.isFinite(stats.fps) && stats.fps > 0
+      ? stats.fps.toFixed(1) + ' FPS' : 'measuring';
     this.output.textContent = this.display + ' · TV ' + cadence + ' · ' + count + ' stereo frames' +
       ' · peak ' + Math.round(100 * (stats.trackpadPressurePeak ?? 0)) + '% · ' +
       (stats.trackpadPressureEvents ?? 0) + ' pressure events';
+    if (typeof stats.projectorVisible === 'boolean') {
+      this.output.textContent += stats.projectorVisible ? ' · TV on screen' : ' · TV window off screen';
+    }
   }
 }
