@@ -62,3 +62,26 @@ A second package run automatically brought its own verification window forward. 
 At fixed 2.5× magnification (Detail Scale 0.4), eight consecutive quarter-tick steps changed 4,871–5,593 of the 82,944 pixels in the 384 × 216 Metal projection on the AMD Radeon Pro 5300M. Both cells used track seed 83724. The test performed a front-cell tug and release and completed its focus pull before measuring the magnified motion. A pause between solver ticks reproduced the entire RGBA image after 30 seconds of supplied wheel-clock time. The first resumed frame still matched, and another quarter-tick changed the image. The test waited for solved fields and read back each frame, so these are image-continuity measurements. The GPU-free timing regressions exercised 0×, 0.25×, 0.5×, 1×, 1.5× and 2× at 60 presentations per wheel-clock second, including a delayed worker and a pause with a solve in flight. [Timing regressions and Metal capture test](../../live-wheel/src/evolving.rs)
 
 The windowed Mac verifier (`--verify-mac-preview`) needs an unlocked, visible desktop. A locked console suppresses presentation even when WebKit finishes loading the editor. The offscreen Metal readbacks above exercise the film sampler without opening an editor window. Windowed FPS requires a separate visible run.
+
+### Sustained plate motion
+
+The editor starts each sealed cell with `--live-driven`. Two broad, counter-rotating patches of tangential wall velocity enter the momentum equation through the existing Couette coupling, 6μ**U**/(ρh²). The stroke centers move independently around the middle of the glass. Each seed determines their initial orientation, phase and handedness. Their opposed shear stretches the interface between them. Basilisk advects the oil and carrier, applies capillary tension and projects the flux to satisfy the closed-cell continuity equation. The strokes model continuous operator agitation. The passive `--live` mode reproduces a resting plate after its initial circulation. Both modes accept the same user tug and pressure commands.
+
+Flow Speed controls how much simulation time elapses during playback. At zero, the stroke clock stops. Press and release can still move the interface at that same time.
+
+In the normal projector crop, the 64² solver has 1,196 cell centers. For each one-second interval, the CPU check sums absolute changes in their oil coverage. A result of 1.0 represents one whole cell of oil coverage changing. The check also counts cells whose coverage changes by at least ten percentage points. At each of the 1,440 solver ticks it checks relative drift in oil and carrier volumes. [All four runs](evidence/plate-motion-64.txt)
+
+| Seed | Mean coverage change per second, resting, seconds 31–60 | Mean coverage change per second, driven, seconds 31–60 | Fewest cells changing ≥10 points in any driven second, seconds 31–60 | Max relative oil / carrier volume drift through 60 seconds, driven |
+|---|---:|---:|---:|---:|
+| 2430927455 | 5.05 | 275.70 | 363 | 0.00241% / 0.00137% |
+| 993332112 | 3.73 | 206.98 | 207 | 0.00458% / 0.00286% |
+
+A six-tick interactive tug during continuous plate motion changed 287 of 4,096 samples in the target cell at the end of the stroke. Ten steps after release, 412 samples differed from its same-seed control. An independently stepped companion cell matched its untouched control at every tick. The 60-second runs also verified that pressure can hold and release while simulation time stays fixed. [Tug and release comparison](evidence/plate-motion-tug-64.txt)
+
+Run these commands from the repository root, using a fresh output path for the executable.
+
+```sh
+experiments/live-slide-solver/build-worker.sh target/tss-worked-plate
+cargo run --locked --manifest-path experiments/live-slide-solver/Cargo.toml --example plate_motion -- target/tss-worked-plate
+cargo run --locked --manifest-path experiments/live-slide-solver/Cargo.toml --example check -- target/tss-worked-plate 6 --driven
+```

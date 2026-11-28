@@ -14,6 +14,13 @@ pub enum Slide {
     Cyan,
 }
 
+/// Tangential motion of the confining glass during a simulation step.
+#[derive(Clone, Copy, Debug)]
+pub enum PlateMotion {
+    AtRest,
+    Driven,
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Drive {
     /// Contact in normalized full-slide coordinates, top-left origin.
@@ -97,6 +104,19 @@ impl Cell {
         level: u32,
         register: impl FnOnce(Cancellation),
     ) -> io::Result<(Self, Field)> {
+        Self::start_registered_with_motion(
+            executable, slide, seed, level, PlateMotion::AtRest, register,
+        )
+    }
+
+    pub fn start_registered_with_motion(
+        executable: &Path,
+        slide: Slide,
+        seed: u32,
+        level: u32,
+        motion: PlateMotion,
+        register: impl FnOnce(Cancellation),
+    ) -> io::Result<(Self, Field)> {
         if !(5..=8).contains(&level) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -107,8 +127,12 @@ impl Cell {
             Slide::Violet => "violet",
             Slide::Cyan => "cyan",
         };
+        let mode = match motion {
+            PlateMotion::AtRest => "--live",
+            PlateMotion::Driven => "--live-driven",
+        };
         let mut child = Command::new(executable)
-            .args(["--live", name])
+            .args([mode, name])
             .arg(seed.to_string())
             .arg(level.to_string())
             .env("OMP_NUM_THREADS", "1")

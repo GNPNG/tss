@@ -39,7 +39,9 @@ static double frame_dt = 1./rate;
 /* One process owns one sealed cell. The live client submits a displacement
  * per simulation tick, so pauses in wall time do not change the trajectory. */
 static int live = 0;
+static int driven = 0;
 static coord contact, wall_velocity;
+static double stroke_phase[4], stroke_sense;
 typedef struct { coord center; double radius, load; } PlatePress;
 static PlatePress held;
 static int volume_audit;
@@ -52,6 +54,45 @@ static LiveDrop drops[24];
 static double unit_random (uint32_t * state) {
   *state = *state * UINT32_C(1664525) + UINT32_C(1013904223);
   return *state / 4294967296.;
+}
+
+/* Two broad, moving tangential tractions represent the operator slowly
+ * working different parts of a compliant plate. They act on momentum; the
+ * interface still moves by VOF advection and relaxes under surface tension. */
+typedef struct { coord center; double radius, speed; } TangentialStroke;
+
+static void seed_strokes (uint32_t seed) {
+  seed ^= slide ? UINT32_C(0x62ec52e1) : UINT32_C(0x87bf7955);
+  for (int i = 0; i < 4; ++i)
+    stroke_phase[i] = 2.*pi*unit_random(&seed);
+  stroke_sense = unit_random(&seed) < .5 ? -1. : 1.;
+}
+
+static void plate_strokes (double time, TangentialStroke strokes[2]) {
+  for (int i = 0; i < 2; ++i) {
+    double angle = stroke_phase[0] + i*pi +
+      (i ? -.094 : .12)*time + .32*sin(.19*time + stroke_phase[1+i]);
+    double arm = .17 + .032*cos(.17*time + stroke_phase[2+i]);
+    strokes[i].center = (coord){.5 + arm*cos(angle), .5 + arm*sin(angle)};
+    strokes[i].radius = i ? .43 : .48;
+    strokes[i].speed = (i ? -.14 : .17)*stroke_sense*
+      (.86 + .14*sin(.23*time + stroke_phase[2+i]));
+  }
+}
+
+static coord stroke_velocity (const TangentialStroke strokes[2], double px, double py) {
+  coord velocity = {0., 0.};
+  for (int i = 0; i < 2; ++i) {
+    double dx = (px-strokes[i].center.x)/strokes[i].radius;
+    double dy = (py-strokes[i].center.y)/strokes[i].radius;
+    double r2 = sq(dx) + sq(dy);
+    if (r2 < 1.) {
+      double omega = 4.*strokes[i].speed*sq(1.-r2);
+      velocity.x -= omega*dy;
+      velocity.y += omega*dx;
+    }
+  }
+  return velocity;
 }
 
 static void seed_drops (uint32_t seed) {
@@ -304,18 +345,20 @@ static double streamfunction (double world_x, double world_y) {
 int main (int argc, char ** argv) {
   // Coordinates and time in the solve use reference length and velocity units.
   size(1. [0]);
-  live = argc > 1 && !strcmp(argv[1],"--live");
+  driven = argc > 1 && !strcmp(argv[1],"--live-driven");
+  live = driven || (argc > 1 && !strcmp(argv[1],"--live"));
   if (live) {
     uint32_t seed, level = 5;
     if ((argc != 4 && argc != 5) || (strcmp(argv[2],"violet") && strcmp(argv[2],"cyan")) ||
         !parse_uint(argv[3],&seed) || (argc == 5 && !parse_uint(argv[4],&level)) ||
         level < 5 || level > 8) {
-      fprintf(stderr,"solver --live violet|cyan seed_u32 [level_5_to_8]\n"); return 2;
+      fprintf(stderr,"solver --live|--live-driven violet|cyan seed_u32 [level_5_to_8]\n"); return 2;
     }
     slide = !strcmp(argv[2],"cyan"); full_slide = 1; maxlevel = level;
     volume_audit = getenv("TSS_LIVE_VOLUME_AUDIT") != NULL;
     raster_height = raster_width = 1 << maxlevel;
     seed_drops(seed);
+    if (driven) seed_strokes(seed);
     if (TSS_BINARY_STDOUT() < 0) { perror("stdout binary mode"); return 3; }
   } else {
     if (argc > 1 && !strcmp(argv[argc-1], "--world")) {
@@ -394,6 +437,8 @@ event adapt (i++) {
 event acceleration (i++) {
   /* Depth-averaged no-slip plate drag -12 mu/(rho h^2) u. */
   face vector av = a;
+  TangentialStroke strokes[2];
+  if (driven) plate_strokes(t,strokes);
   foreach_face() {
     double phase = clamp((f[]+f[-1])/2.,0.,1.);
     double viscosity = phase*mu1+(1.-phase)*mu2;
@@ -403,6 +448,10 @@ event acceleration (i++) {
      * its local velocity. Pressure projection retains incompressibility. */
     if (live && (wall_velocity.x || wall_velocity.y))
       av.x[] += 6.*viscosity/(rho(phase)*sq(gap)) * brush(x,y)*wall_velocity.x;
+    if (driven) {
+      coord shear = stroke_velocity(strokes,x,y);
+      av.x[] += 6.*viscosity/(rho(phase)*sq(gap)) * shear.x;
+    }
   }
 }
 

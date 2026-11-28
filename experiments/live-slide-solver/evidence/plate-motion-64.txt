@@ -1,0 +1,24 @@
+2430927455 AtRest 1s swept_cells=108.18 half_coverage_crossings=109 changes_over_10pct=189
+2430927455 AtRest 10s swept_cells=8.68 half_coverage_crossings=10 changes_over_10pct=35
+2430927455 AtRest 30s swept_cells=7.98 half_coverage_crossings=8 changes_over_10pct=19
+2430927455 AtRest 45s swept_cells=3.22 half_coverage_crossings=5 changes_over_10pct=4
+2430927455 AtRest 60s swept_cells=2.29 half_coverage_crossings=2 changes_over_10pct=0
+2430927455 AtRest 31..60s mean_swept=5.05 min_swept=2.25 min_changes_over_10pct=0 max_relative_oil_drift=0.0000251 max_relative_carrier_drift=0.0000143
+2430927455 Driven 1s swept_cells=90.50 half_coverage_crossings=94 changes_over_10pct=166
+2430927455 Driven 10s swept_cells=163.24 half_coverage_crossings=163 changes_over_10pct=304
+2430927455 Driven 30s swept_cells=312.30 half_coverage_crossings=326 changes_over_10pct=494
+2430927455 Driven 45s swept_cells=248.49 half_coverage_crossings=253 changes_over_10pct=465
+2430927455 Driven 60s swept_cells=317.76 half_coverage_crossings=332 changes_over_10pct=512
+2430927455 Driven 31..60s mean_swept=275.70 min_swept=190.74 min_changes_over_10pct=363 max_relative_oil_drift=0.0000241 max_relative_carrier_drift=0.0000137
+993332112 AtRest 1s swept_cells=103.92 half_coverage_crossings=106 changes_over_10pct=189
+993332112 AtRest 10s swept_cells=14.99 half_coverage_crossings=18 changes_over_10pct=50
+993332112 AtRest 30s swept_cells=6.04 half_coverage_crossings=8 changes_over_10pct=20
+993332112 AtRest 45s swept_cells=3.69 half_coverage_crossings=5 changes_over_10pct=9
+993332112 AtRest 60s swept_cells=1.80 half_coverage_crossings=3 changes_over_10pct=0
+993332112 AtRest 31..60s mean_swept=3.73 min_swept=1.80 min_changes_over_10pct=0 max_relative_oil_drift=0.0000101 max_relative_carrier_drift=0.0000063
+993332112 Driven 1s swept_cells=114.10 half_coverage_crossings=117 changes_over_10pct=196
+993332112 Driven 10s swept_cells=138.65 half_coverage_crossings=142 changes_over_10pct=274
+993332112 Driven 30s swept_cells=240.66 half_coverage_crossings=248 changes_over_10pct=399
+993332112 Driven 45s swept_cells=79.31 half_coverage_crossings=84 changes_over_10pct=207
+993332112 Driven 60s swept_cells=262.35 half_coverage_crossings=265 changes_over_10pct=436
+993332112 Driven 31..60s mean_swept=206.98 min_swept=79.31 min_changes_over_10pct=207 max_relative_oil_drift=0.0000458 max_relative_carrier_drift=0.0000286

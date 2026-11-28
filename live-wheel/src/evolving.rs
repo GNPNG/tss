@@ -8,7 +8,7 @@ use std::{
     sync::{Arc, Condvar, Mutex},
     thread,
 };
-use tss_basilisk_live::{optics::Atlas, Cancellation, Cell, Drive, Slide};
+use tss_basilisk_live::{optics::Atlas, Cancellation, Cell, Drive, PlateMotion, Slide};
 
 const LEVEL: u32 = 6;
 const SIDE: u32 = 264;
@@ -109,7 +109,7 @@ type Shared = Arc<(Mutex<Mailbox>, Condvar)>;
 
 fn solve(executable: &Path, seed: u32, layout: CellLayout, shared: &Shared) -> io::Result<()> {
     let start = |slide| {
-        Cell::start_registered(executable, slide, seed, LEVEL, |child| {
+        Cell::start_registered_with_motion(executable, slide, seed, LEVEL, PlateMotion::Driven, |child| {
             let mut state = shared.0.lock().unwrap();
             if state.stop {
                 child.cancel();

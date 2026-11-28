@@ -1,5 +1,5 @@
 use std::{env, error::Error, path::Path, time::Instant};
-use tss_basilisk_live::{Cell, Drive, Field, Slide};
+use tss_basilisk_live::{Cell, Drive, Field, PlateMotion, Slide};
 
 fn changed(a: &Field, b: &Field) -> (usize, u64) {
     assert_eq!(a.coverage.len(), b.coverage.len());
@@ -21,10 +21,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         .next()
         .and_then(|v| v.to_str()?.parse().ok())
         .unwrap_or(6);
-    let (mut front, mut a) = Cell::start(Path::new(&exe), Slide::Cyan, 83724, level)?;
-    let (mut rear, mut b) = Cell::start(Path::new(&exe), Slide::Violet, 83724, level)?;
-    let (mut front_control, mut c) = Cell::start(Path::new(&exe), Slide::Cyan, 83724, level)?;
-    let (mut rear_control, mut d) = Cell::start(Path::new(&exe), Slide::Violet, 83724, level)?;
+    let motion = match args.next().as_deref() {
+        None => PlateMotion::AtRest,
+        Some(flag) if flag == "--driven" => PlateMotion::Driven,
+        _ => return Err("expected optional --driven".into()),
+    };
+    let start = |slide| {
+        Cell::start_registered_with_motion(Path::new(&exe), slide, 83724, level, motion, |_| {})
+    };
+    let (mut front, mut a) = start(Slide::Cyan)?;
+    let (mut rear, mut b) = start(Slide::Violet)?;
+    let (mut front_control, mut c) = start(Slide::Cyan)?;
+    let (mut rear_control, mut d) = start(Slide::Violet)?;
     assert_eq!(a.coverage, c.coverage);
     assert_eq!(b.coverage, d.coverage);
     assert_ne!(a.coverage, b.coverage);
