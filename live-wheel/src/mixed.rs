@@ -31,6 +31,7 @@ pub(super) struct MediaScene {
     order: Vec<u64>,
     images: HashMap<u64, MediaImage>,
     gpu: Option<MediaGpu>,
+    screen: Option<beams::ScreenSum>,
     features: [f32; 4],
 }
 struct MediaGpu {
@@ -47,6 +48,7 @@ impl MediaGpu {
     fn new(d: &gpu::Device) -> Self {
         let quad = shader(d, "Artwork quad", include_str!("vertex.wgsl"));
         let media = shader(d, "Prepared visual media", include_str!("media.wgsl"));
+        let light = shader(d, "Projector illumination", include_str!("lamp.wgsl"));
         let base = shader(
             d,
             "Program illumination and wheel mattes",
@@ -90,12 +92,29 @@ impl MediaGpu {
                 matte,
                 &[image, Binding::Sampler, Binding::Buffer],
             ),
-            lamp: pipeline(d, &quad, &base, "lamp", "Projector lamp", FIELD_FORMAT, &[]),
-            dark: pipeline(d, &quad, &base, "dark", "Unlit screen", FIELD_FORMAT, &[]),
-            params: uniform(d, "Artwork parameters", &[[0f32; 4]; 8]),
+            lamp: pipeline(d, &quad, &light, "lamp", "Projector lamp", FIELD_FORMAT, &[Binding::Buffer]),
+            dark: pipeline(d, &quad, &light, "dark", "Unlit screen", FIELD_FORMAT, &[]),
+            params: uniform(d, "Artwork parameters", &[[0f32; 4]; 10]),
             mattes: HashMap::new(),
             size: [0, 0],
         }
+    }
+    fn begin_illumination(
+        &self,
+        device: &gpu::Device,
+        queue: &gpu::Queue,
+        encoder: &mut gpu::CommandEncoder,
+        target: &gpu::TextureView,
+        has_oil: bool,
+        lamp_gain: [f32; 4],
+    ) {
+        let (pass, parameters) = if has_oil {
+            queue.write_buffer(&self.params, 0, bytemuck::bytes_of(&lamp_gain));
+            (&self.lamp, bind(device, &self.lamp, &[self.params.as_entire_binding()]))
+        } else {
+            (&self.dark, bind(device, &self.dark, &[]))
+        };
+        draw(encoder, "Initialize program illumination", target, pass, &parameters);
     }
 }
 impl LiveWheel {
@@ -250,6 +269,10 @@ impl LiveWheel {
         let m = &layer.media;
         let [w, h] = self.preview_size();
         let opacity = layer.opacity * layer.envelope.as_ref().map_or(1., |e| e.level_at(time));
+        // A photographic transparency occupies the middle of its projector's gate.
+        let blur = if self.carousel_lenses[0] {
+            lens::GateLens::for_projector(true).radius(0.5,self.focus.unwrap_or(0.5))
+        } else { 0. };
         let values = [
             [
                 time as f32,
@@ -289,6 +312,8 @@ impl LiveWheel {
                 f32::from(m.key_enabled as u8),
                 m.tunnel_speed,
             ],
+            self.lamp_gain,
+            [blur/1280.,blur/720.,0.,0.],
         ];
         self.queue
             .write_buffer(&g.params, 0, bytemuck::bytes_of(&values));
@@ -320,6 +345,159 @@ impl LiveWheel {
         );
         self.queue.submit(Some(enc.finish()));
     }
+    fn render_beam(
+        &mut self, scene: &MediaScene, g: &mut MediaGpu, s: &stack::StackGpu,
+        wheels: &[WheelLayer], order: &[u64], selected: u64, selected_times: [f64; 2], time: f64,
+    ) -> usize {
+        let size = self.preview_size();
+        let wheel_count = order.iter()
+            .filter(|id| wheels.iter().any(|w| w.id == **id))
+            .count();
+        let mut enc = self.device.create_command_encoder(&Default::default());
+        g.begin_illumination(
+            &self.device,
+            &self.queue,
+            &mut enc,
+            &s.images[0].view,
+            wheel_count > 0,
+            self.lamp_gain,
+        );
+        self.queue.submit(Some(enc.finish()));
+        let refs: HashSet<_> = scene
+            .tracks
+            .iter()
+            .filter(|l| order.contains(&l.id))
+            .flat_map(|l| [l.media.mask_a, l.media.mask_b])
+            .flatten()
+            .collect();
+        for id in refs {
+            if !wheels.iter().any(|w| w.id == id) && !scene.images.contains_key(&id) {
+                g.mattes.remove(&id);
+                continue;
+            }
+            let mask = g.mattes.remove(&id).unwrap_or_else(|| {
+                Target::new(
+                    &self.device,
+                    "Source alpha matte",
+                    size,
+                    gpu::TextureFormat::R8Unorm,
+                )
+            });
+            if let Some(w) = wheels.iter().find(|w| w.id == id) {
+                let mut mask_params = [[0.; 4]; 4];
+                mask_params[0][0] = w.opacity_at(time);
+                let single = self.film_depths.get(&id).copied();
+                if single.is_some() || self.carousel_lenses[0] {
+                    let lens=lens::GateLens::for_projector(self.carousel_lenses[0]);
+                    let index=order.iter().filter(|id| wheels.iter().any(|w|w.id==**id)).position(|key|*key==id).unwrap_or(0);
+                    let spacing=(2*wheel_count.max(1)-1) as f32;
+                    let rear=single.unwrap_or(2.*index as f32/spacing);
+                    let front=single.unwrap_or((2*index+1) as f32/spacing);
+                    mask_params[0][1] = lens.distance(rear);
+                    mask_params[0][2] = lens.distance(self.focus.unwrap_or(0.5));
+                    mask_params[0][3] = self.detail_scales.get(&id).copied().unwrap_or(1.);
+                    mask_params[2] = [lens.distance(front),lens.pupil_scale, f32::from(single.is_none() as u8),0.];
+                    if let Some(track) = self.tracks.get(&id) {
+                        for (pose,slot) in track.slides.iter().zip([1,3]) {
+                            mask_params[slot] = pose.pressure.shader(pose.angle);
+                        }
+                    }
+                }
+                self.queue
+                    .write_buffer(&g.params, 0, bytemuck::bytes_of(&mask_params));
+                self.active = id;
+                self.switch_film_sources(w.motion, w.material_motion)
+                    .expect("validated film");
+                self.slide_visibility = w.films;
+                let times = if id == selected {
+                    selected_times
+                } else {
+                    *self.stack_times.get(&id).unwrap_or(&selected_times)
+                };
+                self.render_one(
+                    None,
+                    times[0],
+                    times[1],
+                    time,
+                    Some(OpticalExposure::Mask(&g.oil_mask, &mask.view, &g.params)),
+                );
+            } else if let (Some(m), Some(src)) = (
+                scene.tracks.iter().find(|l| l.id == id),
+                scene.images.get(&id),
+            ) {
+                self.draw_media(
+                    g,
+                    m,
+                    src,
+                    &self.zero.view,
+                    &mask.view,
+                    true,
+                    time,
+                    scene.features,
+                );
+            }
+            g.mattes.insert(id, mask);
+        }
+        let mut from = 0;
+        let mut wheel_index = 0;
+        for &id in order {
+            let dest = 1 - from;
+            if let Some(w) = wheels.iter().find(|w| w.id == id) {
+                self.active = id;
+                self.wheel.clone_from(&w.wheel);
+                self.swatches = w.swatches;
+                self.active_material = self.stack_materials[&id];
+                self.switch_film_sources(w.motion, w.material_motion)
+                    .expect("validated film");
+                self.slide_visibility = w.films;
+                let times = if id == selected {
+                    selected_times
+                } else {
+                    *self.stack_times.get(&id).unwrap_or(&selected_times)
+                };
+                let spacing = (2 * wheel_count - 1) as f32;
+                let mat = self.exposure_material(
+                    -1. - w.opacity_at(time),
+                    [
+                        (2 * wheel_index) as f32 / spacing,
+                        (2 * wheel_index + 1) as f32 / spacing,
+                    ],
+                );
+                self.queue
+                    .write_buffer(&self.material_uniform, 0, bytemuck::bytes_of(&mat));
+                self.render_one(
+                    None,
+                    times[0],
+                    times[1],
+                    time,
+                    Some(OpticalExposure::Stack(stack::Exposure {
+                        gpu: s,
+                        incident: &s.images[from].view,
+                        output: &s.images[dest].view,
+                    })),
+                );
+                wheel_index += 1;
+            } else if let (Some(m), Some(src)) = (
+                scene.tracks.iter().find(|l| l.id == id),
+                scene.images.get(&id),
+            ) {
+                self.draw_media(
+                    g,
+                    m,
+                    src,
+                    &s.images[from].view,
+                    &s.images[dest].view,
+                    false,
+                    time,
+                    scene.features,
+                );
+            } else {
+                continue;
+            }
+            from = dest;
+        }
+        from
+    }
     pub(super) fn render_mixed(
         &mut self,
         out: Option<&gpu::TextureView>,
@@ -344,144 +522,36 @@ impl LiveWheel {
             g.mattes.clear();
             g.size = size;
         }
+        g.mattes.retain(|id, _| scene.tracks.iter().any(|l| l.media.mask_a == Some(*id) || l.media.mask_b == Some(*id)));
         let wheels = std::mem::take(&mut self.stack);
         let selected = self.active;
         let active_wheel = std::mem::take(&mut self.wheel);
         let selected_optics = (self.swatches, self.active_material);
         let active_motion = (self.motion, self.material_motion);
         let active_films = self.slide_visibility;
-        let wheel_count = scene
-            .order
-            .iter()
-            .filter(|id| wheels.iter().any(|w| w.id == **id))
-            .count();
-        let mut enc = self.device.create_command_encoder(&Default::default());
-        let background = if wheel_count > 0 { &g.lamp } else { &g.dark };
-        draw(
-            &mut enc,
-            "Initialize program illumination",
-            &s.images[0].view,
-            background,
-            &bind(&self.device, background, &[]),
-        );
-        self.queue.submit(Some(enc.finish()));
-        let refs: HashSet<_> = scene
-            .tracks
-            .iter()
-            .flat_map(|l| [l.media.mask_a, l.media.mask_b])
-            .flatten()
-            .collect();
-        g.mattes.retain(|id, _| refs.contains(id));
-        for id in refs {
-            if !wheels.iter().any(|w| w.id == id) && !scene.images.contains_key(&id) {
-                g.mattes.remove(&id);
-                continue;
+        let split = !self.beams.secondary_ids.is_empty() || self.primary_intensity != 1.;
+        let from = if split {
+            let (secondary, primary): (Vec<u64>, Vec<u64>) = scene.order.iter().copied().partition(|id| self.beams.secondary_ids.contains(id));
+            let mut screen = scene.screen.take().unwrap_or_else(|| beams::ScreenSum::new(&self.device, size));
+            if [screen.first.texture.width(), screen.first.texture.height()] != size {
+                screen.first = Target::new(&self.device, "First projector exposure", size, FIELD_FORMAT);
             }
-            let mask = g.mattes.remove(&id).unwrap_or_else(|| {
-                Target::new(
-                    &self.device,
-                    "Source alpha matte",
-                    size,
-                    gpu::TextureFormat::R8Unorm,
-                )
-            });
-            if let Some(w) = wheels.iter().find(|w| w.id == id) {
-                self.queue.write_buffer(
-                    &g.params,
-                    0,
-                    bytemuck::bytes_of(&[w.opacity_at(time), 0., 0., 0.]),
-                );
-                self.active = id;
-                self.switch_film_sources(w.motion, w.material_motion)
-                    .expect("validated film");
-                self.slide_visibility = w.films;
-                let times = if id == selected {
-                    selected_times
-                } else {
-                    *self.stack_times.get(&id).unwrap_or(&selected_times)
-                };
-                self.render_one(
-                    None,
-                    times[0],
-                    times[1],
-                    time,
-                    Some(OpticalExposure::Mask(&g.oil_mask, &mask.view, &g.params)),
-                );
-            } else if let (Some(m), Some(src)) = (
-                scene.tracks.iter().find(|l| l.id == id),
-                scene.images.get(&id),
-            ) {
-                self.draw_media(
-                    &g,
-                    m,
-                    src,
-                    &self.zero.view,
-                    &mask.view,
-                    true,
-                    time,
-                    scene.features,
-                );
-            }
-            g.mattes.insert(id, mask);
-        }
-        let mut from = 0;
-        let mut wheel_index = 0;
-        for &id in &scene.order {
-            let dest = 1 - from;
-            if let Some(w) = wheels.iter().find(|w| w.id == id) {
-                self.active = id;
-                self.wheel.clone_from(&w.wheel);
-                self.swatches = w.swatches;
-                self.active_material = self.stack_materials[&id];
-                self.switch_film_sources(w.motion, w.material_motion)
-                    .expect("validated film");
-                self.slide_visibility = w.films;
-                let times = if id == selected {
-                    selected_times
-                } else {
-                    *self.stack_times.get(&id).unwrap_or(&selected_times)
-                };
-                let spacing = (2 * wheel_count - 1) as f32;
-                let mut mat = self.active_material;
-                mat.lens = [
-                    self.focus.unwrap_or(-1.),
-                    -1. - w.opacity_at(time),
-                    (2 * wheel_index) as f32 / spacing,
-                    (2 * wheel_index + 1) as f32 / spacing,
-                ];
-                self.queue
-                    .write_buffer(&self.material_uniform, 0, bytemuck::bytes_of(&mat));
-                self.render_one(
-                    None,
-                    times[0],
-                    times[1],
-                    time,
-                    Some(OpticalExposure::Stack(stack::Exposure {
-                        gpu: &s,
-                        incident: &s.images[from].view,
-                        output: &s.images[dest].view,
-                    })),
-                );
-                wheel_index += 1;
-            } else if let (Some(m), Some(src)) = (
-                scene.tracks.iter().find(|l| l.id == id),
-                scene.images.get(&id),
-            ) {
-                self.draw_media(
-                    &g,
-                    m,
-                    src,
-                    &s.images[from].view,
-                    &s.images[dest].view,
-                    false,
-                    time,
-                    scene.features,
-                );
-            } else {
-                continue;
-            }
-            from = dest;
-        }
+            let a = self.render_beam(&scene, &mut g, &s, &wheels, &primary, selected, selected_times, time);
+            screen.store_first(self, &s.images[a].view);
+            let secondary_beam = self.beams.secondary.filter(|b| b.enabled && b.intensity > 0. && !secondary.is_empty());
+            let (b, intensity, offset) = if let Some(beam) = secondary_beam {
+                let saved = (self.focus, self.lamp_gain,self.carousel_lenses[0]);
+                self.focus = beam.focus;
+                self.lamp_gain = self.beams.secondary_gain;
+                self.carousel_lenses[0] = self.carousel_lenses[1];
+                let index = self.render_beam(&scene, &mut g, &s, &wheels, &secondary, selected, selected_times, time);
+                (self.focus, self.lamp_gain,self.carousel_lenses[0]) = saved;
+                (index, beam.intensity, beam.offset)
+            } else { (a, 0., [0.; 2]) };
+            screen.compose(self, &s.images[b].view, &s.images[1-b].view, intensity, offset);
+            scene.screen = Some(screen);
+            1-b
+        } else { self.render_beam(&scene, &mut g, &s, &wheels, &scene.order, selected, selected_times, time) };
         self.active = selected;
         self.wheel = active_wheel;
         (self.swatches, self.active_material) = selected_optics;
@@ -609,6 +679,88 @@ mod tests {
         assert_eq!(l.media.source_time(18., None), 1_999_999);
         l.media.still = true;
         assert_eq!(l.media.source_time(3.2, Some(&env)), 0);
+    }
+
+    #[test]
+    #[ignore = "requires a reserved discrete GPU selected with TSS_LIVE_ADAPTER"]
+    fn projector_lamp_once_per_optical_path() -> Result<(), String> {
+        let (mut r, adapter) = crate::coral_capture::discrete_renderer([128, 72])?;
+        println!("Lamp readback {} {:?}", adapter.name, adapter.backend);
+        let linear = |v: u8| {
+            let x = f32::from(v) / 255.;
+            if x <= 0.04045 { x / 12.92 } else { ((x + 0.055) / 1.055).powf(2.4) }
+        };
+        let layers: Vec<_> = (1..=3).map(|id| WheelLayer {
+            id,
+            wheel: "violet-blue".into(),
+            swatches: None,
+            motion: MotionPreset::WheelFlow,
+            material_motion: Default::default(),
+            films: [true; 2],
+            opacity: 0.65,
+            envelope: None,
+        }).collect();
+        let mut film = track(8);
+        film.opacity = 0.55;
+        for path in ["solo", "stack", "media", "mixed"] {
+            let oil = match path {
+                "stack" | "mixed" => layers.clone(),
+                _ => vec![],
+            };
+            let mut order: Vec<_> = oil.iter().map(|layer| layer.id).collect();
+            r.set_stack(oil)?;
+            let art = if matches!(path, "media" | "mixed") {
+                order.insert(0, 8);
+                vec![film.clone()]
+            } else {
+                vec![]
+            };
+            r.set_media_scene(art, order)?;
+            r.prepare_media(0., true, [0.; 4], |id, _| Ok(DecodedMediaFrame {
+                id,
+                pts_us: 0,
+                width: 1,
+                height: 1,
+                rgba: Arc::from([140, 140, 140, 255]),
+            }))?;
+            r.set_lamp_temperature(6500)?;
+            r.render_offscreen(0.)?;
+            let (_, _, base) = r.capture_rgba8()?;
+            for k in [2700, 10000] {
+                r.set_lamp_temperature(k)?;
+                r.render_offscreen(0.)?;
+                let (_, _, frame) = r.capture_rgba8()?;
+                if path == "solo" {
+                    crate::plates::check_preview_alignment(&mut r, [0.; 2], &frame)?;
+                }
+                if path == "media" {
+                    let mut movie = pollster::block_on(r.begin_movie([128, 72], false))?;
+                    movie.frame(0., 0., |pixels| {
+                        assert!(pixels == frame, "media-only export changed the projector lamp");
+                        Ok(())
+                    })?;
+                }
+                let gain = crate::lamp::linear_gain(k)?;
+                let mut residual = [0.; 3];
+                let mut count = [0; 3];
+                for (a, b) in base.chunks_exact(4).zip(frame.chunks_exact(4)) {
+                    for i in 0..3 {
+                        let expected = linear(a[i]) * gain[i];
+                        if a[i] < 248 && (0.02..0.94).contains(&expected) {
+                            residual[i] += (expected - linear(b[i])).abs();
+                            count[i] += 1;
+                        }
+                    }
+                }
+                let mae: [f32; 3] = std::array::from_fn(|i| residual[i] / count[i] as f32);
+                println!("{path} at {k} K: {count:?} samples; linear absolute error {mae:?}");
+                assert!(count.iter().all(|n| *n > 100) && mae.iter().all(|e| *e < 0.008));
+            }
+            r.set_lamp_temperature(6500)?;
+            r.render_offscreen(0.)?;
+            assert!(base == r.capture_rgba8()?.2, "6500 K restore for {path}");
+        }
+        Ok(())
     }
 
     #[test]

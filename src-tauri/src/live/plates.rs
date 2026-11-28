@@ -62,7 +62,11 @@ pub async fn preview_wheel_plates(
 #[cfg(any(windows, test))]
 impl Selection {
     pub(super) fn matches(&self, c: &super::Config) -> bool {
-        !c.uses_simulation() && c.layer_id == self.layer_id && c.detail_scale == self.detail_scale
+        !c.uses_simulation() && c.lighting.lamp_kelvin == super::neutral_kelvin()
+            && c.lighting.projector_a_intensity == 1.0
+            && c.lighting.projector_b.as_ref().is_none_or(|b| !b.enabled)
+            && !c.stack.iter().any(|l| l.layer_id == self.layer_id && l.projector == super::ProjectorId::B)
+            && c.layer_id == self.layer_id && c.detail_scale == self.detail_scale
             && c.wheel == self.wheel
             && c.swatches == self.swatches
             && c.motion == self.motion

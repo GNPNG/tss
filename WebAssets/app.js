@@ -11,6 +11,8 @@ import { NativeWheelPlates } from './native-wheel-plates.js';
 import { installVisualMedia, newMedia, programLayers } from './visual-media.js';
 import { NativeWheelExport } from './native-wheel-export.js';
 import { VideoFeedbackControls } from './video-feedback.js';
+import { installLegends } from './legends.js';
+import { installProjectionLight, effectiveLighting } from './projection-light.js';
 import { installPerformerDeck } from './performer-host.js';
 import { ProjectorDeck } from './projector-output.js';
 import { initMacroDeck, songFingerprint, songGestureEvents } from './gesture-macros.js';
@@ -31,12 +33,11 @@ const paletteNames = {
 const slidePresets = new Map();
 const isWheel = layer => isNativePalette(layer, slidePresets);
 const slideSelect = byId('slide-preset');
-const wheelStudy = byId('wheel-study');
-const wheelVideo = byId('wheel-study-video');
 const windowsDesktop = !!window.__TAURI__?.core && /Windows/i.test(navigator.userAgent);
 const nativeDesktop = windowsDesktop || (!!window.__TAURI__?.core && /Macintosh/i.test(navigator.userAgent));
 let startingNative = nativeDesktop;
 let solverAvailable = false;
+let recordedBenchmark = false;
 const newFluidSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 const liveFluidTrack = layer => layer?.simulationSeed != null && !layer.media;
 const solvingProgram = () => state.layers.some(layer => liveFluidTrack(layer) &&
@@ -46,7 +47,6 @@ const missingSolver = () => !solverAvailable && solvingProgram();
 let projectorFocus = null;
 let projectorDeck = null;
 let visualMedia = null;
-let wheelMediaRequest;
 let projectName = '', detachedGestures = emptyGestures(), savedEdits = '', projectBusy = false;
 const editHistory = new EditHistory();
 const retainedNativeLayers = new Set();
@@ -60,18 +60,42 @@ const state = {
   layers: [], selected: null, nextId: 1, renderError: null, exporting: false, exportFinalizing: false, cancelExport: false,
 };
 
+const lighting=installProjectionLight({selected:selectedLayer, changed:layout=>{
+  legends.stop();
+  if(layout) renderTimeline();
+  else for(const el of byId('layer-list').querySelectorAll('[data-projector]')) el.textContent=lighting.groupLabel(el.dataset.projector);
+  updateTransport();nativeSurface?.sync();
+}});
+const legends=installLegends({
+  layers:()=>state.layers,
+  preview:()=>{nativeSurface?.sync();updateTransport();},
+  apply:(rig,artist)=>{
+    for(const [id,beam] of rig.routes) {
+      const layer=state.layers.find(l=>l.id===id);
+      if(layer)layer.projector=beam;
+    }
+    projectorFocus=rig.focus;
+    lighting.restore(rig.fields);renderTimeline();renderControls();updateTransport();
+    checkpoint('Apply '+artist+' rig');
+    status('Applied '+artist+' rig to the current project.');
+  }
+});
+byId('legends').hidden=!nativeDesktop;
+const usesLiveProjection=()=>!!legends.audition || lighting.usesLiveOptics || state.layers.some(l=>l.projector==='b');
 function wheelGestureSelection() { return selectedLayer()?.media ? null : liveSelection(); }
 function liveSelection() {
   const layer = selectedLayer();
   if (!nativeDesktop || (startingNative && !slidePresets.size) || !layer || (!isWheel(layer) && !layer.media) || state.exporting || missingSolver()) return null;
+  const rig=legends.audition;
   const stack = programLayers(state.layers,isWheel);
+  if(rig)for(const item of stack)if(rig.routes.has(item.layerId))item.projector=rig.routes.get(item.layerId);
   if (!stack.some(l=>!l.matteOnly)) return null;
   const timed = stack.some(l=>l.envelope!=null || l.media);
-  const needsStack = timed || stack.length > 1 || stack[0].opacity !== 1 || stack[0].layerId !== layer.id;
-  return { ...(needsStack ? {stack} : {}), layerId: layer.id, wheel: layer.media?'violet-blue':layer.palette, slide: layer.slide, gesture: layer.gesture,
+  const needsStack = timed || usesLiveProjection() || stack.length > 1 || stack[0].opacity !== 1 || stack[0].layerId !== layer.id;
+  return { ...effectiveLighting(rig?.fields??lighting.fields()), ...(needsStack ? {stack} : {}), layerId: layer.id, wheel: layer.media?'violet-blue':layer.palette, slide: layer.slide, gesture: layer.gesture,
     ...paletteFields(layer), ...simulationFields(layer), ...detailScaleFields(layer), motion: layer.motion, motionTake: layer.motionTake, ...materialMotionFields(layer.media ? null : layer), visibleFilms: layer.visibleFilms ?? 'both',
     mousePressure: layer.mousePressure?.[layer.slide] ?? 0.5,
-    tugResponse: layer.tugResponse[layer.slide], renderWidth: layer.renderWidth, focus: projectorFocus,
+    tugResponse: layer.tugResponse[layer.slide], renderWidth: layer.renderWidth, focus: rig?.focus??projectorFocus,
     ...feedbackDeck.config(projectorDeck?.enabled || timed), keepPresenting:!!projectorDeck?.enabled };
 }
 const feedbackDeck = new VideoFeedbackControls(byId('video-feedback'), () => nativeSurface?.sync());
@@ -132,7 +156,7 @@ if (window.__TAURI__?.core) installVisualAdvisor({
 
 const wheelExporter = nativeDesktop ? new NativeWheelExport({
   invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: liveSelection,
-  source: () => ({audioPath: state.audioPath, duration: state.audioBuffer?.duration, proceduralBusy: state.exporting || !!plateExporter?.busy || solvingProgram()}),
+  source: () => ({audioPath: state.audioPath, duration: state.audioBuffer?.duration, proceduralBusy: state.exporting || !!plateExporter?.busy || solvingProgram() || !!legends.audition}),
   getEvents: (id, duration) => macroDeck?.exportEvents(id, duration) ?? songGestureEvents(
     detachedGestures.macros, [...detachedGestures.audioGroups, ...detachedGestures.lyricGroups], id, duration),
   finishRecording: async () => { await macroDeck?.finishPendingRecording(); },
@@ -146,7 +170,7 @@ const plateFormat = windowsDesktop ? new PlateFormatControls(byId('plate-formats
 },status,layout => window.__TAURI__.core.invoke("print_geometry",{layout})) : null;
 const plateExporter = windowsDesktop ? new NativeWheelPlates({
   button: byId('export-wheel-plates'), format: () => plateFormat.options(), invoke: window.__TAURI__.core.invoke, listen: window.__TAURI__.event.listen, selection: wheelGestureSelection,
-  busy: () => state.exporting || !!wheelExporter?.busy || solvingProgram(), prepare: prepareWheel, pause, status,
+  busy: () => state.exporting || !!wheelExporter?.busy || solvingProgram() || usesLiveProjection(), prepare: prepareWheel, pause, status,
   refresh: updateTransport,
 }) : null;
 
@@ -169,13 +193,21 @@ function currentPosition() {
   if (!state.playing) return state.position;
   return Math.min(state.audioBuffer.duration, state.position + state.audioContext.currentTime - state.startedAt);
 }
+function updateExportNote() {
+  const note=byId('live-export-note');
+  note.hidden=!nativeDesktop || !(solvingProgram() || usesLiveProjection());
+  note.textContent=solvingProgram()?'Live fluid movie and plate export are unavailable.'
+    : legends.audition?'Apply or stop the audition to export.'
+    : 'Use native movie export to include projector lighting. Individual plate export is unavailable with this lighting.';
+}
 function updateTransport() {
   localLyrics?.source(state.audioPath, state.audioBuffer);
   const ready = !!state.audioBuffer;
   byId('play').disabled = !ready;
   byId('restart').disabled = !ready;
   byId('stop').disabled = !ready;
-  byId('export').disabled = !state.exporting && (!ready || !state.audioPath || !window.__TAURI__?.core || !!plateExporter?.busy || solvingProgram());
+  updateExportNote();
+  byId('export').disabled = !state.exporting && (!ready || !state.audioPath || !window.__TAURI__?.core || !!plateExporter?.busy || solvingProgram() || usesLiveProjection());
   wheelExporter?.refresh();
   plateExporter?.refresh();
   byId('play').textContent = state.playing ? '❚❚' : '▶';
@@ -347,10 +379,20 @@ function drawWaveform() {
   }
 }
 function selectedLayer() { return state.layers.find((layer) => layer.id === state.selected); }
-function applyPalette(layer, name, colors) {
-  layer.palette = name;
-  layer.colors = [...colors];
-  layer.customColors = false;
+function applyPalette(layer, name, colors, dyes) {
+  const members = layer.presetGroup == null ? [layer] :
+    state.layers.filter(l => l.presetGroup === layer.presetGroup);
+  if (members.some(l => l.filmDepth != null && (l.dyeIndex ?? 0) >= dyes.length)) {
+    status('Choose this slide under New track to add its dye layers.');
+    renderControls();
+    return;
+  }
+  for (const member of members) {
+    member.palette = name;
+    member.colors = member.filmDepth == null ? [...colors] : [dyes[member.dyeIndex ?? 0]];
+    member.customColors = false;
+  }
+  renderTimeline();
   renderControls();
 }
 
@@ -360,12 +402,13 @@ async function loadSlidePresets() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const { version, wheels } = await response.json();
     if (version !== 1 || !Array.isArray(wheels) || wheels.length === 0) throw new Error('Invalid slide list');
-    const presets = wheels.map(({ id, name, swatches }) => {
+    const presets = wheels.map(({ id, name, swatches, dyes }) => {
       const colors = [swatches.carrier, swatches.rear, swatches.overlap, swatches.front];
-      if (!/^[a-z]+(?:-[a-z]+)+$/.test(id) || !name || colors.some((color) => !/^#[0-9a-f]{6}$/i.test(color))) {
+      if (!/^[a-z]+(?:-[a-z]+)+$/.test(id) || !name || !Array.isArray(dyes) || !dyes.length ||
+          [...colors,...dyes].some(color => !/^#[0-9a-f]{6}$/i.test(color))) {
         throw new Error('Invalid slide preset');
       }
-      return { id, name, colors };
+      return { id, name, colors, dyes };
     });
     for (const preset of presets) {
       slidePresets.set(preset.id, preset);
@@ -374,8 +417,13 @@ async function loadSlidePresets() {
     if (nativeDesktop) {
       const benchmark = await window.__TAURI__.core.invoke('live_wheel_benchmark_config');
       // Historical benchmarks replay the original recorded fields by design.
+      recordedBenchmark = !!benchmark;
       solverAvailable = !benchmark && (await window.__TAURI__.core.invoke('live_simulation_available').catch(() => false)) === true;
       byId('wheel-motion').querySelector('[value="simulated"]').disabled = !solverAvailable;
+      if (!state.layers.length) {
+        if (benchmark) addLayer();
+        else addDyeSlide(slidePresets.get('violet-blue'));
+      }
       if (benchmark) {
         await window.__TAURI__.event.listen('tss-benchmark-release', () => byId('replay-release').click());
         await window.__TAURI__.event.listen('tss-benchmark-wheel', ({ payload }) => {
@@ -387,15 +435,13 @@ async function loadSlidePresets() {
           chooseSlidePreset(payload.wheel);
         });
       }
-      // Both paths select a wheel through the same editor control.
       const layer = selectedLayer();
-      if (layer && (benchmark || (layer.id === 1 && layer.palette === 'orchid' && !layer.customColors))) {
+      if (layer && benchmark) {
         layer.slide = benchmark?.slide ?? 'rear';
         layer.gesture = benchmark?.gesture ?? 'tug';
         layer.renderWidth = benchmark?.renderWidth ?? 640;
-        if (solverAvailable) layer.simulationSeed = newFluidSeed();
-        chooseSlidePreset(benchmark?.wheel ?? 'violet-blue');
-        if (benchmark) {
+        chooseSlidePreset(benchmark.wheel ?? 'violet-blue');
+        {
           const control = byId('wheel-motion');
           control.value = benchmark.motion;
           control.dispatchEvent(new Event('change'));
@@ -439,8 +485,9 @@ async function loadSlidePresets() {
     slideSelect.options[0].textContent = 'Slide presets unavailable';
     status(`Could not read oil slides: ${error.message}`);
   } finally {
+    recordedBenchmark = false;
     startingNative = false;
-    renderControls();
+    renderTimeline(); renderControls();
   }
 }
 
@@ -454,10 +501,34 @@ function makeLayer(source) {
   const id = Math.max(state.nextId, highestId + 1);
   highestId = id;
   state.nextId = id + 1;
-  if (source) return {...structuredClone(layerSettings(source)), id};
-  return { id, name: `Liquid ${id}`, visible: true, palette: 'orchid', colors: [...LIQUID_PALETTES.orchid], customColors: false, hue: 0, speed: 1, scale: 1, opacity: state.layers.length ? 0.7 : 1, nativeLive: nativeDesktop,
-    ...(solverAvailable ? {simulationSeed:newFluidSeed()} : {}), motion: 'wheel-flow', motionTake: 0, visibleFilms: 'both',
-    slide: 'rear', gesture: 'tug', tugResponse: { rear: 0.4, front: 0.4 }, mousePressure: { rear: 0.5, front: 0.5 }, renderWidth: 640 };
+  const layer = source ? structuredClone(layerSettings(source)) : {
+    name: `Liquid ${id}`, visible: true, palette: 'orchid', colors: [...LIQUID_PALETTES.orchid], customColors: false, hue: 0, speed: 1, scale: 1, opacity: state.layers.length ? 0.7 : 1,
+    visibleFilms: 'both', slide: 'rear', gesture: 'tug', tugResponse: { rear: 0.4, front: 0.4 }, mousePressure: { rear: 0.5, front: 0.5 }, renderWidth: 640
+  };
+  if (!source && selectedLayer()?.projector==='b') layer.projector='b';
+  if (!recordedBenchmark) {
+    layer.simulationSeed ??= newFluidSeed();
+    if (layer.filmDepth == null) layer.colors = [source ? layer.colors[1] : LIQUID_PALETTES.orchid[0]];
+    layer.filmDepth ??= .5;
+    layer.visibleFilms = 'rear';
+    layer.slide = 'rear';
+    delete layer.presetGroup;
+    delete layer.dyeIndex;
+    delete layer.materialMotion;
+  }
+  return {...layer, id, nativeLive: nativeDesktop, motion:'wheel-flow', motionTake:0};
+}
+function addDyeSlide(preset, envelope = null) {
+  const presetGroup = newPrefix();
+  const layers = preset.dyes.map((color, dyeIndex) => {
+    const layer = makeLayer();
+    const depth = (dyeIndex + 1) / (preset.dyes.length + 1);
+    return {...layer, name:`Oil ${layer.id}`, palette:preset.id, colors:[color], filmDepth:depth,
+      dyeIndex, presetGroup, opacity:1, envelope:structuredClone(envelope)};
+  });
+  state.layers.unshift(...[...layers].reverse());
+  selectLayer(layers[0].id);
+  status(`Added ${preset.name} with ${layers.length} oil layers.`);
 }
 function selectLayer(id) {
   state.selected = id;
@@ -485,54 +556,71 @@ function layerButton(text, label, action, disabled = false) {
   button.addEventListener('click', (event) => { event.stopPropagation(); action(); checkpoint(label); });
   return button;
 }
+function renderTrack(layer,index,tracks,list,lanes) {
+  const row = document.createElement('div');
+  row.className = `layer-row${layer.id === state.selected ? ' selected' : ''}`;
+  row.tabIndex = 0; row.setAttribute('role', 'button'); row.setAttribute('aria-label', `Select ${layer.name}`);
+  row.addEventListener('click', () => selectLayer(layer.id));
+  row.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectLayer(layer.id); } });
+  const icon = document.createElement('span'); icon.className = 'layer-icon'; icon.textContent = '◉';
+  if (layer.filmDepth != null) icon.style.color = layer.colors[0];
+  const info = document.createElement('div'); info.className = 'layer-text';
+  const title = document.createElement('strong'); title.textContent = layer.name;
+  const subtitle = document.createElement('small'); subtitle.textContent = layer.visible ? (layer.media ? 'Artwork' : 'Liquid light') : 'Hidden';
+  info.append(title, subtitle);
+  const toggle = layerButton(layer.visible ? '●' : '○', `${layer.visible ? 'Hide' : 'Show'} ${layer.name}`, () => { layer.visible = !layer.visible; renderTimeline(); renderControls(); });
+  function swap(other) {
+    const a=state.layers.indexOf(layer),b=state.layers.indexOf(other);
+    [state.layers[a],state.layers[b]]=[other,layer];renderTimeline();
+  }
+  const up = layerButton('↑', `Move ${layer.name} up`, () => swap(tracks[index-1]), index===0);
+  const down = layerButton('↓', `Move ${layer.name} down`, () => swap(tracks[index+1]), index===tracks.length-1);
+  const remove = layerButton('×', `Remove ${layer.name}`, () => {
+    state.layers.splice(state.layers.indexOf(layer), 1);
+    state.renderError = null;
+    byId('render-error').hidden = true;
+    if (state.selected === layer.id) state.selected = state.layers[0]?.id ?? null;
+    renderTimeline(); renderControls(); status(`${layer.name} removed`);
+    if (nativeSurface) retainedNativeLayers.add(layer.id);
+  });
+  row.append(icon, info, toggle, up, down, remove); list.append(row);
+  const lane = document.createElement('div'); lane.className = 'visual-lane';
+  const clip = document.createElement('div'); clip.className = `visual-clip${layer.visible ? '' : ' hidden'}`;
+  const clipName = document.createElement('span'); clipName.textContent = layer.name;
+  const clipDuration = document.createElement('small'); clipDuration.textContent = state.audioBuffer ? formatTime(state.audioBuffer.duration) : 'Full track';
+  if(layer.envelope==null) {clip.append(clipName, clipDuration); lane.append(clip);}
+  else for(const interval of layer.envelope) {
+    const block=document.createElement('button');block.type='button';
+    block.className=clip.className+' timed-clip';
+    const duration=timelineDuration()||interval.end;
+    block.style.left=(100*interval.start/duration)+'%';block.style.width=(100*(interval.end-interval.start)/duration)+'%';
+    block.textContent=interval.start.toFixed(2)+'–'+interval.end.toFixed(2);
+    block.setAttribute('aria-label',layer.name+' '+block.textContent+' seconds');
+    block.addEventListener('click',()=>{
+      selectLayer(layer.id); setTimeRange(interval.start,interval.end);
+      if(interval.rule)restoreWandRule(interval.rule);
+      byId('wand-length').value=interval.end-interval.start;
+      byId('wand-in').value=interval.fadeIn;byId('wand-out').value=interval.fadeOut;byId('wand-level').value=interval.level;
+      byId('timeline-wand').open=true;
+    });lane.append(block);
+  }
+  lanes.append(lane);
+}
 function renderTimeline() {
   const list = byId('layer-list'), lanes = byId('visual-lanes');
   list.replaceChildren(); lanes.replaceChildren();
-  state.layers.forEach((layer, index) => {
-    const row = document.createElement('div');
-    row.className = `layer-row${layer.id === state.selected ? ' selected' : ''}`;
-    row.tabIndex = 0; row.setAttribute('role', 'button'); row.setAttribute('aria-label', `Select ${layer.name}`);
-    row.addEventListener('click', () => selectLayer(layer.id));
-    row.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectLayer(layer.id); } });
-    const icon = document.createElement('span'); icon.className = 'layer-icon'; icon.textContent = '◉';
-    const info = document.createElement('div'); info.className = 'layer-text';
-    const title = document.createElement('strong'); title.textContent = layer.name;
-    const subtitle = document.createElement('small'); subtitle.textContent = layer.visible ? (layer.media ? 'Artwork' : 'Liquid light') : 'Hidden';
-    info.append(title, subtitle);
-    const toggle = layerButton(layer.visible ? '●' : '○', `${layer.visible ? 'Hide' : 'Show'} ${layer.name}`, () => { layer.visible = !layer.visible; renderTimeline(); renderControls(); });
-    const up = layerButton('↑', `Move ${layer.name} up`, () => { [state.layers[index - 1], state.layers[index]] = [state.layers[index], state.layers[index - 1]]; renderTimeline(); }, index === 0);
-    const down = layerButton('↓', `Move ${layer.name} down`, () => { [state.layers[index + 1], state.layers[index]] = [state.layers[index], state.layers[index + 1]]; renderTimeline(); }, index === state.layers.length - 1);
-    const remove = layerButton('×', `Remove ${layer.name}`, () => {
-      state.layers.splice(index, 1);
-      state.renderError = null;
-      byId('render-error').hidden = true;
-      if (state.selected === layer.id) state.selected = state.layers[0]?.id ?? null;
-      renderTimeline(); renderControls(); status(`${layer.name} removed`);
-      if (nativeSurface) retainedNativeLayers.add(layer.id);
-    });
-    row.append(icon, info, toggle, up, down, remove); list.append(row);
-    const lane = document.createElement('div'); lane.className = 'visual-lane';
-    const clip = document.createElement('div'); clip.className = `visual-clip${layer.visible ? '' : ' hidden'}`;
-    const clipName = document.createElement('span'); clipName.textContent = layer.name;
-    const clipDuration = document.createElement('small'); clipDuration.textContent = state.audioBuffer ? formatTime(state.audioBuffer.duration) : 'Full track';
-    if(layer.envelope==null) {clip.append(clipName, clipDuration); lane.append(clip);}
-    else for(const interval of layer.envelope) {
-      const block=document.createElement('button');block.type='button';
-      block.className=clip.className+' timed-clip';
-      const duration=timelineDuration()||interval.end;
-      block.style.left=(100*interval.start/duration)+'%';block.style.width=(100*(interval.end-interval.start)/duration)+'%';
-      block.textContent=interval.start.toFixed(2)+'–'+interval.end.toFixed(2);
-      block.setAttribute('aria-label',layer.name+' '+block.textContent+' seconds');
-      block.addEventListener('click',()=>{
-        selectLayer(layer.id); setTimeRange(interval.start,interval.end);
-        if(interval.rule)restoreWandRule(interval.rule);
-        byId('wand-length').value=interval.end-interval.start;
-        byId('wand-in').value=interval.fadeIn;byId('wand-out').value=interval.fadeOut;byId('wand-level').value=interval.level;
-        byId('timeline-wand').open=true;
-      });lane.append(block);
+  const beams = lighting.grouped ? ['a','b'] : ['a'];
+  for(const projector of beams) {
+    if(lighting.grouped) {
+      const heading=document.createElement('div');heading.className='projector-heading';heading.dataset.projector=projector;
+      heading.textContent=lighting.groupLabel(projector);list.append(heading);
+      const divider=document.createElement('div');divider.className='projector-heading';divider.setAttribute('aria-hidden','true');lanes.append(divider);
     }
-    lanes.append(lane);
-  });
+    const tracks=state.layers.filter(l=>(l.projector??'a')===projector);
+    tracks.forEach((layer, index) => {
+      renderTrack(layer,index,tracks,list,lanes);
+    });
+  }
   nativeSurface?.sync();
   refreshTimelineTools();
   byId('layer-count').textContent = `${state.layers.length} visual ${state.layers.length === 1 ? 'layer' : 'layers'}`;
@@ -542,6 +630,9 @@ function renderTimeline() {
   }
 }
 function renderControls() {
+  byId('projection-light').hidden=!nativeDesktop;
+  lighting.refresh();
+  updateExportNote();
   visualMedia?.refresh();
   const layer = selectedLayer();
   byId('selected-name').textContent = layer?.name || 'No layer selected';
@@ -551,12 +642,12 @@ function renderControls() {
     button.title = paletteNames[name] || name; button.setAttribute('aria-label', paletteNames[name] || name);
     button.setAttribute('aria-pressed', String(layer?.palette === name && !layer?.customColors)); button.disabled = !layer || !!layer.media;
     colors.forEach((color) => { const swatch = document.createElement('span'); swatch.style.backgroundColor = color; button.append(swatch); });
-    button.addEventListener('click', () => { layer.nativeLive = nativeDesktop; applyPalette(layer, name, colors); }); grid.append(button);
+    button.addEventListener('click', () => { layer.nativeLive = nativeDesktop; applyPalette(layer, name, colors, colors); }); grid.append(button);
   });
   const wheel = layer && !layer.media && slidePresets.get(layer.palette);
   const paletteAvailable = !!wheel || (!!layer && !layer.media && Object.hasOwn(LIQUID_PALETTES, layer.palette));
   const live = liveSelection();
-  byId('plate-formats').hidden = !live || !!layer.media;
+  byId('plate-formats').hidden = !plateExporter || !live || !!layer.media || solvingProgram() || usesLiveProjection();
   wheelExporter?.refresh();
   plateExporter?.refresh();
   byId('video-feedback').hidden = !live;
@@ -565,8 +656,18 @@ function renderControls() {
   byId('native-wheel-controls').hidden ||= !!layer?.media;
   byId('live-wheel').checked = !!live;
   byId('live-wheel').disabled = !paletteAvailable || !layer?.visible || liveFluidTrack(layer);
-  byId('wheel-motion').value = liveFluidTrack(layer) ? 'simulated' : layer?.motion ?? 'wheel-flow';
-  byId('wheel-motion').disabled = !live && !(nativeDesktop && liveFluidTrack(layer) && missingSolver());
+  const simulated = liveFluidTrack(layer);
+  const single = layer?.filmDepth != null;
+  byId('film-depth').parentElement.hidden = !single;
+  if (single) {
+    byId('film-depth').value = Math.round(layer.filmDepth * 100);
+    byId('film-depth-value').textContent = byId('film-depth').value+'%';
+  }
+  const motionControl = byId('wheel-motion');
+  motionControl.value = simulated ? 'simulated' : layer?.motion ?? 'wheel-flow';
+  motionControl.disabled = simulated || !live;
+  motionControl.parentElement.hidden = simulated;
+  byId('rear-film-oil').closest('.native-choices').hidden = simulated;
   const coral = layer?.motion === 'coral-release', beads = layer?.motion === 'wheel-with-coral-beads';
   for (const slide of ['rear','front']) {
     const control = byId(slide+'-film-oil');
@@ -574,12 +675,13 @@ function renderControls() {
     control.disabled = !live || liveFluidTrack(layer) || coral || (beads && slide==='front');
   }
   const oilNote = byId('film-oil-note');
-  oilNote.hidden = !(coral || beads || liveFluidTrack(layer));
-  oilNote.textContent = liveFluidTrack(layer) ? 'Independent oil and carrier in each sealed cell. Live simulation uses the solver’s default fluid properties. Movie and plate export are currently available for recorded studies.'
+  oilNote.hidden = single || !(coral || beads || liveFluidTrack(layer));
+  oilNote.textContent = liveFluidTrack(layer) ? 'The front and rear cells simulate independently. Drag to move the selected material.'
     : coral ? 'Coral release supplies both films. Slide flow restores their oil selections.'
     : beads ? 'The front film uses the coral bead release. Slide flow restores its oil selection.' : '';
   byId('wheel-films').value = layer?.visibleFilms ?? 'both';
-  byId('wheel-films').disabled = !live;
+  byId('wheel-films').disabled = !live || single;
+  byId('wheel-films').closest('.native-choices').hidden = single;
   byId('replay-release').hidden = !hasRelease(layer?.motion);
   byId('replay-release').textContent = layer?.motion === 'wheel-with-coral-beads'
     ? 'Replay front beads' : 'Replay release live';
@@ -588,6 +690,8 @@ function renderControls() {
   byId('wheel-width').value = String(layer?.renderWidth ?? 640);
   byId('wheel-gesture').value = layer?.gesture ?? 'tug';
   byId('wheel-gesture').disabled = byId('wheel-slide').disabled = byId('wheel-width').disabled = !live;
+  byId('wheel-slide').disabled ||= single;
+  byId('wheel-slide').parentElement.hidden = single;
   byId('tug-response').value = String(layer?.tugResponse[layer.slide] ?? 0.4);
   byId('tug-response').disabled = !live || layer.gesture !== 'tug';
   byId('mouse-pressure-controls').hidden = !live || layer.gesture !== 'pressure';
@@ -601,10 +705,11 @@ function renderControls() {
   if (liveFluidTrack(layer) && live) byId('preview-status').textContent = 'LIVE FLUID SIMULATION';
   byId('solver-unavailable').hidden = !missingSolver();
   if (missingSolver()) byId('preview-status').textContent = 'LIVE FLUID SIMULATION UNAVAILABLE';
+  const target = single ? 'selected layer' : (layer?.slide ?? 'rear')+' slide';
   byId('native-instruction').textContent = layer?.media ? layer.media.name : layer?.gesture === 'rotate'
-    ? `Drag around the center to turn the ${layer.slide} glass slide.`
-    : layer?.gesture === 'pressure' ? `Press and hold the ${layer.slide} slide to compress it. Drag the contact point. Release to restore the gap.`
-    : `Drag to tug the material in the ${layer?.slide ?? 'rear'} slide.`;
+    ? `Drag around the center to rotate the ${target}.`
+    : layer?.gesture === 'pressure' ? `Press the ${target} to compress it. Release to restore the gap.`
+    : `Drag to tug the oil in the ${target}.`;
   byId('audio-note').hidden = !!live;
   byId('hue').disabled = !layer || !!layer.media;
   byId('speed').disabled = !layer || !!layer.media || (!!live && !liveFluidTrack(layer));
@@ -618,19 +723,18 @@ function renderControls() {
   slideSelect.disabled = !layer || !!layer.media || slidePresets.size === 0;
   slideSelect.value = wheel && !layer.customColors ? wheel.id : '';
   if (slidePresets.size) slideSelect.options[0].textContent = wheel && layer.customColors ? `Custom · ${wheel.name}` : 'Choose a slide';
-  byId('show-wheel-study').disabled = !wheel;
-  byId('pigment-heading').textContent = wheel ? 'SLIDE SWATCHES' : 'FILM PIGMENTS';
+  byId('pigment-heading').textContent = single ? 'LAYER DYE' : wheel ? 'SLIDE SWATCHES' : 'FILM PIGMENTS';
   const pigments = byId('pigment-colors'); pigments.replaceChildren();
   if (layer) layer.colors.forEach((color, index) => {
     const label = document.createElement('label');
-    const name = wheel ? ['Clear', 'Rear slide', 'Overlap', 'Front slide'][index] : ['Rear oil', 'Front oil', 'Rear rim', 'Front rim'][index];
+    const name = single ? 'Dye' : wheel ? ['Clear', 'Rear slide', 'Overlap', 'Front slide'][index] : ['Rear oil', 'Front oil', 'Rear rim', 'Front rim'][index];
     label.textContent = name;
     const picker = document.createElement('input');
     picker.type = 'color'; picker.value = color;
     picker.disabled = !!layer.media;
     picker.setAttribute('aria-label', `${name} color`);
     picker.addEventListener('input', () => { layer.colors[index] = picker.value; layer.customColors = true; nativeSurface?.sync(); });
-    picker.addEventListener('change', () => { renderControls(); checkpoint('Set film pigment'); });
+    picker.addEventListener('change', () => { renderTimeline(); renderControls(); checkpoint('Set film pigment'); });
     label.append(picker); pigments.append(label);
   });
   if (!layer) return;
@@ -642,7 +746,7 @@ function renderControls() {
 }
 function renderFrame(timestamp) {
   macroDeck?.tick();
-  if (!startingNative && !missingSolver() && !liveSelection() && !nativeSurface?.surfaceRequested &&
+  if (!startingNative && !solvingProgram() && !liveSelection() && !nativeSurface?.surfaceRequested &&
       !state.renderError && !state.exporting && !document.hidden && !document.querySelector('dialog[open]')) {
     try {
       proceduralPreview ??= new LiquidRenderer(preview, {composite:true});
@@ -704,6 +808,7 @@ if (desktopInvoke) {
 }
 
 async function exportVideo() {
+  if (usesLiveProjection() && !state.exporting) throw Error('Projector lighting and routing require live output.');
   if (solvingProgram() && !state.exporting) throw Error('Live solver trajectories are not yet supported by movie export.');
   if (state.exporting) {
     state.cancelExport = true;
@@ -822,7 +927,7 @@ byId('live-wheel').addEventListener('change', (event) => {
 });
 byId('wheel-slide').addEventListener('change', (event) => {
   const layer = selectedLayer();
-  if (layer) { layer.slide = event.target.value; renderControls(); }
+  if (layer && layer.filmDepth == null) { layer.slide = event.target.value; renderControls(); }
 });
 for (const slide of ['rear','front']) {
   byId(slide+'-film-oil').addEventListener('change', event => {
@@ -835,20 +940,25 @@ for (const slide of ['rear','front']) {
 }
 byId('wheel-films').addEventListener('change', (event) => {
   const layer = selectedLayer();
-  if (layer) { layer.visibleFilms = event.target.value; nativeSurface?.sync(); }
+  if (layer && layer.filmDepth == null) { layer.visibleFilms = event.target.value; nativeSurface?.sync(); }
 });
 byId('wheel-motion').addEventListener('change', (event) => {
   const layer = selectedLayer();
-  if (!layer) return;
+  if (!layer || liveFluidTrack(layer) || layer.media) return;
   if (event.target.value === 'simulated') {
     if (!solverAvailable) return;
-    layer.simulationSeed ??= newFluidSeed();
+    const front = layer.slide === 'front';
+    layer.colors = [layer.colors[front ? 3 : 1]];
+    layer.filmDepth = front ? 2/3 : 1/3;
+    layer.slide = layer.visibleFilms = 'rear';
+    delete layer.materialMotion;
+    layer.simulationSeed = newFluidSeed();
+    layer.nativeLive = true;
     layer.motion = 'wheel-flow';
     renderControls();
     return;
   }
-  if (!liveFluidTrack(layer) && layer.motion === event.target.value) return;
-  delete layer.simulationSeed;
+  if (layer.motion === event.target.value) return;
   layer.motion = event.target.value;
   if (hasRelease(layer.motion)) layer.motionTake++;
   renderControls();
@@ -882,13 +992,21 @@ byId('wheel-width').addEventListener('change', (event) => {
 });
 function updateFocusControl() {
   const value = Math.round(100 * (projectorFocus ?? 0.5));
-  const label = projectorFocus === null ? 'Wheel setting'
+  const hasIndependentOil = state.layers.some(l=>l.filmDepth != null);
+  const label = hasIndependentOil ? value+'%' : projectorFocus === null ? 'Wheel setting'
     : value === 0 ? 'Rear slide' : value === 100 ? 'Front slide' : `${value}% toward front`;
   byId('wheel-focus').value = value;
   byId('wheel-focus').setAttribute('aria-valuetext', label);
   byId('wheel-focus-value').textContent = label;
   byId('wheel-focus-reset').disabled = projectorFocus === null || !liveSelection();
 }
+byId('film-depth').addEventListener('input', event => {
+  const layer = selectedLayer();
+  if (layer?.filmDepth == null) return;
+  layer.filmDepth = Number(event.target.value) / 100;
+  byId('film-depth-value').textContent = event.target.value+'%';
+  nativeSurface?.sync();
+});
 byId('wheel-focus').addEventListener('input', (event) => {
   projectorFocus = Number(event.target.value) / 100;
   updateFocusControl(); nativeSurface?.sync();
@@ -900,50 +1018,15 @@ byId('wheel-focus-reset').addEventListener('click', () => {
 slideSelect.addEventListener('change', () => {
   const layer = selectedLayer();
   const preset = slidePresets.get(slideSelect.value);
-  if (layer && preset) { layer.nativeLive = nativeDesktop; applyPalette(layer, preset.id, preset.colors); }
-});
-byId('show-wheel-study').addEventListener('click', async () => {
-  const preset = slidePresets.get(selectedLayer()?.palette);
-  if (!preset) return;
-  byId('wheel-study-name').textContent = preset.name;
-  byId('wheel-study-error').hidden = true;
-  wheelStudy.showModal();
-  nativeSurface?.sync();
-  const request = new AbortController();
-  wheelMediaRequest = request;
-  try {
-    // Tauri returns bundled assets as complete responses. Give the player a
-    // seekable local blob so playback works independently of HTTP range support.
-    const path = new URL(`./assets/wheel-previews/${preset.id}.mp4`, import.meta.url);
-    const response = await fetch(path, { signal: request.signal });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const clip = await response.blob();
-    if (request.signal.aborted || !wheelStudy.open) return;
-    wheelVideo.src = URL.createObjectURL(clip);
-    // Controls remain available when the platform requires another play gesture.
-    wheelVideo.play().catch(() => {});
-  } catch {
-    if (!request.signal.aborted) byId('wheel-study-error').hidden = false;
-  }
-});
-wheelVideo.addEventListener('error', () => {
-  if (wheelStudy.open) byId('wheel-study-error').hidden = false;
-});
-byId('close-wheel-study').addEventListener('click', () => wheelStudy.close());
-wheelStudy.addEventListener('close', () => {
-  nativeSurface?.sync();
-  wheelMediaRequest?.abort();
-  wheelVideo.pause();
-  const url = wheelVideo.getAttribute('src');
-  wheelVideo.removeAttribute('src');
-  wheelVideo.load();
-  if (url) URL.revokeObjectURL(url);
+  if (layer && preset) { layer.nativeLive = nativeDesktop; applyPalette(layer, preset.id, preset.colors, preset.dyes); }
 });
 byId('play').addEventListener('click', () => { if (state.playing) pause(); else play().catch((error) => status(`Playback failed: ${error.message}`)); });
 byId('restart').addEventListener('click', () => seek(0).catch((error) => status(error.message)));
 byId('stop').addEventListener('click', () => { pause(); state.position = 0; anchorFeedback(true); macroDeck?.transportChanged(); updateTransport(); status('Stopped'); });
 byId('add-layer').addEventListener('click', () => {
-  if(byId('track-source').value==='blank')addLayer();
+  const source = byId('track-source').value;
+  if(source==='blank')addLayer();
+  else if (source.startsWith('slide:')) addDyeSlide(slidePresets.get(source.slice(6)));
   else projectOperation('Add saved or template track', addTrackFromSource);
 });
 const seekArea=byId('seek-area');
@@ -1019,7 +1102,7 @@ function applyTimelineSuggestion(s) {
   if(s.opacity!==undefined&&(!Number.isFinite(s.opacity)||s.opacity<0||s.opacity>1))throw Error('Choose an opacity between 0 and 1.');
   const layer=makeLayer(source), id=layer.id;
   if(source?.palette!==key || s.wheel || s.palette){
-    layer.palette=key;layer.colors=[...(slidePresets.get(key)?.colors??LIQUID_PALETTES[key])];
+    layer.palette=key;layer.colors=[(slidePresets.get(key)?.dyes??LIQUID_PALETTES[key])[0]];
     layer.customColors=false;layer.nativeLive=nativeDesktop;
   }
   Object.assign(layer,{id,name:s.label||s.cue||'Oil cue',visible:true,envelope,opacity:s.opacity??source?.opacity??1});
@@ -1084,7 +1167,7 @@ function authoredState() {
     visualGrants.set(sha256,{id,sha256,name,durationUs,width,height,still});
   }
   return {timeline:{range:state.range,duration:timelineDuration(),bindings:state.bindings}, layers:state.layers.map(layerSettings), selected:state.selected, nextId:state.nextId,
-    focus:projectorFocus, feedback:feedbackDeck.projectState(), exportBaseline:byId('native-export-baseline').value,
+    focus:projectorFocus, ...lighting.fields(), feedback:feedbackDeck.projectState(), exportBaseline:byId('native-export-baseline').value,
     gestures:macroDeck?.projectState() ?? detachedGestures};
 }
 function editSignature() { return JSON.stringify([state.audioRef, authoredState()]); }
@@ -1106,11 +1189,13 @@ function checkpoint(label) {
 }
 function resetHistory(label) { editHistory.reset(authoredState(), label); refreshHistory(); }
 function restoreEdits(doc, newProject) {
+  legends.stop();
   const old = new Map(state.layers.map(layer => [layer.id, layer]));
   state.layers = doc.layers.map(config => {
     const existing = newProject ? null : old.get(config.id);
     if (existing) old.delete(existing.id);
-    const layer=Object.assign(existing || {}, {envelope:null,media:undefined,materialMotion:undefined,simulationSeed:undefined}, layerSettings(config));
+    const layer=Object.assign(existing || {}, {envelope:null,media:undefined,materialMotion:undefined,simulationSeed:undefined,
+      filmDepth:undefined,presetGroup:undefined,dyeIndex:undefined,projector:undefined}, layerSettings(config));
     const grant=layer.media&&visualGrants.get(layer.media.sha256);
     if(grant)bindProjectMedia(layer,grant);
     return layer;
@@ -1125,6 +1210,7 @@ function restoreEdits(doc, newProject) {
   state.selected = doc.selected;
   if (newProject) highestId = doc.nextId - 1;
   projectorFocus = doc.focus;
+  lighting.restore(doc);
   feedbackDeck.restoreProject(doc.feedback);
   byId('native-export-baseline').value = doc.exportBaseline;
   if (macroDeck) macroDeck.restoreProject(doc.gestures, newProject);
@@ -1165,7 +1251,6 @@ function chooseReplacement() {
 const palettes = () => new Set([...Object.keys(LIQUID_PALETTES), ...slidePresets.keys()]);
 const shippedTracks = new Map([
   ['wheel',{name:'Violet / Blue slide',palette:'violet-blue',motion:'wheel-flow',rule:{glyph:'[---]',mode:'stretch',fadeIn:.25,fadeOut:.4}}],
-  ['beads',{name:'Coral bead release',palette:'violet-blue',motion:'wheel-with-coral-beads',rule:{glyph:'(---)',mode:'repeat',length:2,interval:4,fadeIn:.15,fadeOut:.4}}],
   ['lagoon',{name:'Lagoon liquid',palette:'lagoon',motion:'wheel-flow',rule:{glyph:'*---*',mode:'signal',signal:'bass',threshold:.18,fadeIn:.08,fadeOut:.2}}],
 ]);
 const libraryCache=new Map();
@@ -1185,6 +1270,9 @@ function library(kind) {
 function refreshTrackSources() {
   const menu=byId('track-source'), selected=menu.value;
   const options=[new Option('Blank liquid layer','blank')];
+  if (!recordedBenchmark) for (const preset of slidePresets.values()) {
+    options.push(new Option(preset.name+' · '+preset.dyes.length+' oils','slide:'+preset.id));
+  }
   for(const [key,s] of shippedTracks)options.push(new Option('Shipped · '+s.name,'shipped:'+key));
   try {
     for(const kind of ['song','user'])for(const entry of library(kind))options.push(new Option((kind==='song'?'Song · ':'Template · ')+entry.name,kind+':'+entry.id));
@@ -1242,7 +1330,13 @@ function mergeClips(doc,source,placements,label,applyRule=false) {
   for(const key of Object.keys(imported))gestures[key]=[...gestures[key],...imported[key]];
   gestures.selected=imported.macros[0]?.id??gestures.selected;
   const added=[...created.values()];
-  const combined={...existing,layers:[...added,...existing.layers],nextId:next,selected:ids.get(doc.selected)??added[0].id,gestures};
+  const groups = new Map();
+  for (const layer of added) if (layer.presetGroup != null) {
+    if (!groups.has(layer.presetGroup)) groups.set(layer.presetGroup,newPrefix());
+    layer.presetGroup = groups.get(layer.presetGroup);
+  }
+  const importedB=!existing.projectorB && added.some(l=>l.projector==='b') ? {projectorB:doc.projectorB} : {};
+  const combined={...existing,...importedB,layers:[...added,...existing.layers],nextId:next,selected:ids.get(doc.selected)??added[0].id,gestures};
   validateProject({...projectDocument(),...combined},palettes());
   restoreEdits(combined,false);highestId=next-1;
   checkpoint(label);status(label);
@@ -1257,10 +1351,15 @@ async function addTrackFromSource() {
     if(!range)throw Error('Select a waveform interval or choose Select all.');
     const s=shippedTracks.get(id), envelope=planIntervals(rule,range,{groups:selectedCues(),analysis:state.analysis});
     if(!envelope.length)throw Error('The boundary found no matches in this selection.');
+    const preset = slidePresets.get(s.palette);
+    if (preset) {
+      addDyeSlide(preset,envelope);
+      checkpoint('Add '+s.name);
+      return;
+    }
     const layer=makeLayer();
     layer.name=s.name;layer.motion=s.motion;layer.palette=s.palette;
-    if (s.motion !== 'wheel-flow') delete layer.simulationSeed;
-    layer.colors=[...(slidePresets.get(s.palette)?.colors??LIQUID_PALETTES[s.palette])];
+    layer.colors=[LIQUID_PALETTES[s.palette][0]];
     layer.nativeLive=nativeDesktop;
     layer.envelope=envelope;
     state.layers.unshift(layer);selectLayer(layer.id);checkpoint('Add '+s.name);status('Added '+s.name);return;
@@ -1282,6 +1381,7 @@ byId('track-source').addEventListener('change',()=>{
   const value=byId('track-source').value, colon=value.indexOf(':');
   if(colon<0)return;
   const kind=value.slice(0,colon),id=value.slice(colon+1);
+  if (kind === 'slide') return;
   const entry=kind==='shipped'?shippedTracks.get(id):library(kind).find(e=>e.id===id);
   if(entry?.rule)restoreWandRule({...wandRule(),...entry.rule});
 });
@@ -1403,7 +1503,8 @@ window.addEventListener('beforeunload', () => proceduralPreview?.dispose());
 function addArtwork(media) {
   const layer=makeLayer();
   delete layer.simulationSeed;
-  Object.assign(layer,{name:media.name,media,opacity:1});
+  delete layer.filmDepth;
+  Object.assign(layer,{name:media.name,media,opacity:1,colors:[...LIQUID_PALETTES.orchid],visibleFilms:'both'});
   state.layers.unshift(layer);
   selectLayer(layer.id);
   checkpoint('Add artwork');
@@ -1416,7 +1517,7 @@ visualMedia = nativeDesktop ? installVisualMedia({
   changed:label=>{renderTimeline();renderControls();checkpoint(label);},report:status,
 }) : null;
 byId('artwork-add').hidden=!nativeDesktop;
-addLayer();
+if (!nativeDesktop) addLayer();
 renderTimeline(); renderControls(); updateTransport(); requestAnimationFrame(renderFrame);
 const presetsReady = loadSlidePresets();
 presetsReady.then(() => { if (!editHistory.entries.length) { resetHistory('New session'); savedEdits = editSignature(); } });

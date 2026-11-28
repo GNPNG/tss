@@ -292,6 +292,8 @@ fn run(
                                 && c.swatches == job.request.swatches
                                 && c.material_motion == job.request.material_motion
                                 && c.motion == job.request.motion
+                                && c.focus == job.request.focus
+                                && c.lighting == job.request.lighting
                                 && c.stack == job.request.stack
                                 && c.motion_take == job.request.motion_take
                                 && c.visible_films == job.request.visible_films =>

@@ -7,6 +7,11 @@ export function wheelMovieRequest(selection, duration, events, baseline) {
     layerId: selection.layerId,
     wheel: selection.wheel,
     ...(selection.swatches ? {swatches:selection.swatches} : {}),
+    ...(selection.focus != null ? {focus:selection.focus} : {}),
+    ...(selection.equipmentA ? {equipmentA:structuredClone(selection.equipmentA)} : {}),
+    ...(selection.lampKelvin != null ? {lampKelvin:selection.lampKelvin} : {}),
+    ...(selection.projectorAIntensity != null ? {projectorAIntensity:selection.projectorAIntensity} : {}),
+    ...(selection.projectorB ? {projectorB:{...selection.projectorB}} : {}),
     ...materialMotionFields(selection),
     ...detailScaleFields(selection),
     ...(selection.visibleFilms ? {visibleFilms: selection.visibleFilms} : {}),
@@ -68,6 +73,9 @@ export class NativeWheelExport {
       if (current?.layerId !== selection.layerId || current.wheel !== selection.wheel ||
           JSON.stringify(current.swatches) !== JSON.stringify(selection.swatches) || current.motion !== selection.motion || current.motionTake !== selection.motionTake ||
           current.materialMotion?.rear !== selection.materialMotion?.rear || current.materialMotion?.front !== selection.materialMotion?.front ||
+          JSON.stringify(current.equipmentA)!==JSON.stringify(selection.equipmentA) ||
+          current.focus !== selection.focus || current.lampKelvin !== selection.lampKelvin ||
+          current.projectorAIntensity !== selection.projectorAIntensity || JSON.stringify(current.projectorB)!==JSON.stringify(selection.projectorB) ||
           current.visibleFilms !== selection.visibleFilms || current.detailScale !== selection.detailScale || JSON.stringify(current.stack) !== JSON.stringify(selection.stack) ||
           this.source().audioPath !== audioPath || this.source().proceduralBusy) throw Error('The selected slide, films, motion or song changed.');
       await this.finishRecording();

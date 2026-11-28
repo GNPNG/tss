@@ -241,9 +241,48 @@ pub struct FeedbackAnchor {
     #[serde(default)]
     ended: bool,
 }
+#[derive(Default, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum ProjectorId { #[default] A, B }
+fn primary(id: &ProjectorId) -> bool { *id == ProjectorId::A }
+fn neutral_kelvin() -> u32 { 6500 }
+fn full_light() -> f32 { 1.0 }
+
+#[derive(Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SecondProjector {
+    enabled: bool,
+    lamp_kelvin: u32,
+    focus: Option<f32>,
+    intensity: f32,
+    offset_x: f32,
+    offset_y: f32,
+    equipment: Option<Equipment>,
+}
+
+#[derive(Clone, PartialEq, Deserialize)]
+struct Equipment { profile: EquipmentProfile }
+#[derive(Clone, Copy, PartialEq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum EquipmentProfile {
+    Custom, LiquidOverhead, Film, #[serde(rename = "carousel-550r")] Carousel550r
+}
+#[derive(Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Lighting {
+    #[serde(default = "neutral_kelvin")]
+    lamp_kelvin: u32,
+    #[serde(default = "full_light")]
+    projector_a_intensity: f32,
+    equipment_a: Option<Equipment>,
+    projector_b: Option<SecondProjector>,
+}
+
 #[derive(Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
+    #[serde(flatten)]
+    lighting: Lighting,
     #[serde(default)]
     detail_scale: Option<f32>,
     #[serde(default)]
@@ -281,6 +320,8 @@ pub struct Config {
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct StackLayer {
+    #[serde(default, skip_serializing_if = "primary")]
+    projector: ProjectorId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     detail_scale: Option<f32>,
     layer_id: u64,
@@ -312,6 +353,10 @@ pub(super) struct StackLayer {
 struct Simulation {
     seed: u32,
     rate: f64,
+    /// A located film has one dyed cell. Older projects without a depth
+    /// retain the original paired-cell initial conditions and trajectories.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    depth: Option<f32>,
 }
 
 // Locate the sidecar in the signed application bundle or portable app directory.
@@ -362,6 +407,20 @@ impl Config {
 
     #[cfg(any(windows, target_os = "macos"))]
     fn configure_simulation(&self, renderer: &mut tss_live_wheel::LiveWheel) -> Result<(), String> {
+        let lighting = &self.lighting;
+        renderer.set_lamp_temperature(lighting.lamp_kelvin)?;
+        renderer.set_primary_intensity(lighting.projector_a_intensity)?;
+        renderer.set_projector_routing(
+            lighting.projector_b.as_ref().map(|b| tss_live_wheel::BeamSettings {
+                enabled: b.enabled, focus: b.focus, lamp_kelvin: b.lamp_kelvin,
+                intensity: b.intensity, offset: [b.offset_x, b.offset_y],
+            }),
+            self.stack.iter().filter(|t| t.projector == ProjectorId::B).map(|t| t.layer_id).collect(),
+        )?;
+        renderer.set_projector_lenses(
+            lighting.equipment_a.as_ref().is_some_and(|e| e.profile == EquipmentProfile::Carousel550r),
+            lighting.projector_b.as_ref().and_then(|b| b.equipment.as_ref()).is_some_and(|e| e.profile == EquipmentProfile::Carousel550r),
+        );
         for track in &self.stack {
             if track.layer_id != self.layer_id && track.media.is_none() {
                 renderer.set_detail_scale(track.layer_id, track.detail_scale.unwrap_or(1.0))?;
@@ -371,12 +430,17 @@ impl Config {
         #[cfg(feature = "live-solver")]
         {
             let mut apply = |id, sim: Option<Simulation>| -> Result<(), String> {
+                renderer.set_film_depth(id, sim.and_then(|s| s.depth))?;
                 if let Some(sim) = sim {
                     if !(0.0..=2.0).contains(&sim.rate) {
                         return Err("Simulation speed must be between 0 and 2".into());
                     }
                     let exe = solver_executable().ok_or("The live fluid solver is missing from this app")?;
-                    renderer.set_live_solver(id, &exe, sim.seed, sim.rate)?;
+                    if sim.depth.is_some() {
+                        renderer.set_single_cell_solver(id, &exe, sim.seed, sim.rate)?;
+                    } else {
+                        renderer.set_live_solver(id, &exe, sim.seed, sim.rate)?;
+                    }
                 } else {
                     renderer.clear_live_solver(id);
                 }

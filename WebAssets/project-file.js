@@ -1,5 +1,6 @@
 // A project contains authored state. Canvas, Web Audio and native presentation objects
 // are rebuilt by the editor when the document is installed.
+import {validEquipment} from './equipment.js';
 import {validMaterialMotion,materialMotionFields} from './material-motion.js';
 import {validEnvelope,validRange,glyphs,modes} from './timeline.js';
 import {portableMediaSettings,validMediaSettings} from './project-media.js';
@@ -15,6 +16,12 @@ export function layerSettings(layer) {
   const settings=Object.fromEntries(layerFields.map(key => [key, layer[key]]));
   Object.assign(settings,materialMotionFields(layer));
   if (layer.simulationSeed != null) settings.simulationSeed = layer.simulationSeed;
+  if (layer.projector != null) settings.projector = layer.projector;
+  if (layer.filmDepth != null) settings.filmDepth = layer.filmDepth;
+  if (layer.presetGroup != null) {
+    settings.presetGroup = layer.presetGroup;
+    settings.dyeIndex = layer.dyeIndex;
+  }
   if(layer.envelope!=null) settings.envelope=layer.envelope;
   if(layer.media)settings.media=portableMediaSettings(layer.media);
   return settings;
@@ -35,9 +42,12 @@ const pair = v => record(v) && num(v.front, 0, 1) && num(v.rear, 0, 1);
 const requireField = (valid, field) => { if (!valid) throw Error('Invalid project field: ' + field); };
 
 function validLayer(l, palettes) {
-  return record(l) && (l.simulationSeed === undefined || (index(l.simulationSeed) && l.simulationSeed <= 0xffffffff && l.motion === 'wheel-flow' && !l.media)) &&
+  return record(l) && (l.projector===undefined || oneOf(l.projector,'a','b')) && (l.simulationSeed === undefined || (index(l.simulationSeed) && l.simulationSeed <= 0xffffffff && l.motion === 'wheel-flow' && !l.media)) &&
+    (l.filmDepth === undefined || (num(l.filmDepth,0,1) && l.simulationSeed != null && l.slide==='rear' && l.visibleFilms==='rear')) &&
+    ((l.presetGroup === undefined && l.dyeIndex === undefined) ||
+      (l.filmDepth != null && named(l.presetGroup) && index(l.dyeIndex))) &&
     validMaterialMotion(l.materialMotion) && (l.media==null || validMediaSettings(l.media)) && validEnvelope(l.envelope) && id(l.id) && named(l.name) && flag(l.visible) && palettes.has(l.palette) &&
-    Array.isArray(l.colors) && l.colors.length === 4 && l.colors.every(c => string(c) && /^#[0-9a-f]{6}$/i.test(c)) &&
+    Array.isArray(l.colors) && l.colors.length === (l.filmDepth == null ? 4 : 1) && l.colors.every(c => string(c) && /^#[0-9a-f]{6}$/i.test(c)) &&
     flag(l.customColors) && num(l.hue, 0, 360) && num(l.speed, 0, 2) && num(l.scale, .4, 2) && num(l.opacity, 0, 1) &&
     flag(l.nativeLive) && oneOf(l.motion, 'wheel-flow', 'coral-release', 'wheel-with-coral-beads') &&
     index(l.motionTake) && oneOf(l.visibleFilms, 'both', 'front', 'rear', 'clear') && slide(l.slide) &&
@@ -79,9 +89,19 @@ export function validateProject(p, palettes) {
   }
   requireField(Array.isArray(p.layers), 'layers');
   p.layers.forEach((layer, i) => requireField(validLayer(layer, palettes), 'layers[' + i + ']'));
+  const slots = p.layers.filter(l=>l.presetGroup != null).map(l=>JSON.stringify([l.presetGroup,l.dyeIndex]));
+  requireField(unique(slots), 'duplicate dye index within slide');
   const ids = p.layers.map(l => l.id);
   requireField(unique(ids) && (ids.length ? ids.includes(p.selected) : p.selected === null), 'layer selection');
   requireField(id(p.nextId) && ids.every(value => value < p.nextId), 'nextId');
+  const kelvin=k=>Number.isInteger(k) && num(k,2700,10000);
+  requireField(p.lampKelvin===undefined || kelvin(p.lampKelvin), 'lampKelvin');
+  requireField(p.projectorAIntensity===undefined || num(p.projectorAIntensity,0,1), 'projectorAIntensity');
+  requireField(validEquipment(p.equipmentA),'equipmentA');
+  const b=p.projectorB;
+  requireField(b===undefined || (record(b) && validEquipment(b.equipment) && flag(b.enabled) && kelvin(b.lampKelvin) &&
+    (b.focus===null || num(b.focus,0,1)) && num(b.intensity,0,1) && num(b.offsetX,-1,1) && num(b.offsetY,-1,1)), 'projectorB');
+  requireField(b!==undefined || !p.layers.some(l=>l.projector==='b'), 'projectorB routing');
   requireField(p.focus === null || num(p.focus, 0, 1), 'focus');
   requireField(oneOf(p.exportBaseline, 'auto', 'current', 'neutral'), 'exportBaseline');
   const f = p.feedback;

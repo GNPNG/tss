@@ -11,6 +11,8 @@ pub struct Material {
     rim: [f32; 4],
     carrier: [f32; 4],
     pub lens: [f32; 4],
+    pub lamp: [f32; 4],
+    pub geometry: [f32; 4],
 }
 #[cfg(test)]
 impl Material {
@@ -23,6 +25,8 @@ impl Material {
             rim: [0.0; 4],
             carrier: [1.0, 1.0, 1.0, 0.0],
             lens: [-1.0, 0.0, 0.0, 0.0],
+            lamp: [1.; 4],
+            geometry: crate::lens::GateLens::for_projector(false).uniform(),
         }
     }
 }
@@ -72,6 +76,25 @@ fn optical_density(light: f32, carrier: f32) -> f32 {
     -(light / carrier.max(0.00001)).clamp(0.00001, 1.0).ln()
 }
 
+/// An independently exposed cell filters a neutral lamp in its own optical pass.
+/// All palette families use the rear slot for the cell's dye.
+pub(super) fn single(
+    mut profile: Material,
+    swatches: Option<[u32; 4]>,
+) -> Result<Material, String> {
+    if let Some([_, dye, _, _]) = swatches {
+        for (i, value) in srgb(dye)?.into_iter().enumerate() {
+            profile.rear[i] = optical_density(value, 1.);
+        }
+    }
+    profile.carrier[..3].fill(1.);
+    profile.joint = [0.; 4];
+    profile.front = [0.; 4];
+    profile.rim = [0.; 4];
+    profile.rear[3] = 0.;
+    Ok(profile)
+}
+
 /// Resolve dye densities once when a track is selected or edited.
 pub fn resolve(
     presets: &HashMap<String, Material>,
@@ -111,6 +134,8 @@ pub fn resolve(
     // Authored theme order: rear oil, front oil, rear meniscus, front meniscus.
     // A clear carrier transmits the projector lamp and overlapping films multiply.
     let mut m = Material::zeroed();
+    m.lamp = [1.; 4];
+    m.geometry = crate::lens::GateLens::for_projector(false).uniform();
     m.carrier = [1.; 4];
     m.lens[0] = -1.;
     for i in 0..3 {
@@ -148,6 +173,8 @@ pub fn load() -> Result<HashMap<String, Material>, String> {
             .transpose()?
             .unwrap_or(rear);
         let mut m = Material::zeroed();
+        m.lamp = [1.; 4];
+        m.geometry = crate::lens::GateLens::for_projector(false).uniform();
         m.lens[0] = -1.0;
         for i in 0..3 {
             m.rear[i] = rear[i];

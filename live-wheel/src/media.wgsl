@@ -4,7 +4,7 @@
 @group(0) @binding(3) var maskB: texture_2d<f32>;
 @group(0) @binding(4) var smp: sampler;
 struct Params { clock:vec4<f32>, key:vec4<f32>, colorA:vec4<f32>, colorB:vec4<f32>,
-    motion:vec4<f32>, masks:vec4<f32>, audio:vec4<f32>, flags:vec4<f32> };
+    motion:vec4<f32>, masks:vec4<f32>, audio:vec4<f32>, flags:vec4<f32>, lampGain:vec4<f32>, pupil:vec4<f32> };
 @group(0) @binding(5) var<uniform> cfg: Params;
 fn linear(c:vec3<f32>)->vec3<f32>{
     return select(pow((c+0.055)/1.055,vec3<f32>(2.4)),c/12.92,c<=vec3<f32>(0.04045));
@@ -85,8 +85,18 @@ fn artwork(uv:vec2<f32>)->vec4<f32>{
     }
     return col*cfg.clock.y;
 }
+fn projected(uv:vec2<f32>)->vec4<f32>{
+    if cfg.pupil.y==0. {return artwork(uv);}
+    var color=vec4<f32>(0.);
+    for(var i=0;i<12;i=i+1) {
+        let angle=0.27+f32(i)*1.941611;
+        let offset=vec2<f32>(cos(angle),sin(angle))*sqrt((f32(i)+0.5)/12.)*cfg.pupil.xy;
+        color+=artwork(uv+offset)+artwork(uv-offset);
+    }
+    return color/24.;
+}
 @fragment fn mask(@location(0) uv:vec2<f32>)->@location(0) vec4<f32>{
-    return vec4<f32>(artwork(uv).a);
+    return vec4<f32>(projected(uv).a);
 }
 @fragment fn compose(@location(0) uv:vec2<f32>)->@location(0) vec4<f32>{
     var a=textureSampleLevel(maskA,smp,uv,0.).r;
@@ -98,7 +108,8 @@ fn artwork(uv:vec2<f32>)->vec4<f32>{
         if cfg.masks.z==2. {a=max(0.,a-b);}
         if cfg.masks.z==3. {a=abs(a-b);}
     }
-    let c=artwork(uv)*a;
+    let c=projected(uv)*a;
     let under=textureSampleLevel(prior,smp,uv,0.).rgb;
-    return vec4<f32>(c.rgb+(1.-c.a)*under,1.);
+    // Only this source receives illumination here; incident light already includes its lamp.
+    return vec4<f32>(c.rgb*cfg.lampGain.rgb+(1.-c.a)*under,1.);
 }

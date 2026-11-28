@@ -1,6 +1,8 @@
 //! Live presentation of the two independently simulated Basilisk slide fields.
+mod beams;
 mod feedback;
 mod projector;
+pub use beams::BeamSettings;
 pub use projector::{ProjectorOutput, ProjectorTiming};
 #[cfg(feature = "live-solver")]
 mod evolving;
@@ -11,6 +13,8 @@ mod plates;
 pub use plates::PrintProfile;
 pub mod production;
 pub use movie::WheelMovie;
+mod lamp;
+mod lens;
 mod material;
 mod motion;
 mod preset;
@@ -107,6 +111,12 @@ pub struct LiveSolverStatus {
     pub tick: u64,
     pub flow_rate: f64,
     pub error: Option<String>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CellLayout {
+    Single,
+    Paired,
 }
 
 struct Pass {
@@ -282,6 +292,8 @@ pub struct LiveWheel {
     stack: Vec<WheelLayer>,
     stack_times: HashMap<u64, [f64; 2]>,
     stack_gpu: Option<stack::StackGpu>,
+    beams: beams::Routing,
+    primary_intensity: f32,
     mixed: mixed::MediaScene,
     zero: Target,
     interpolated: Target,
@@ -295,6 +307,10 @@ pub struct LiveWheel {
     stack_materials: HashMap<u64, Material>,
     wheel: String,
     focus: Option<f32>,
+    lamp_kelvin: u32,
+    lamp_gain: [f32; 4],
+    carousel_lenses: [bool; 2],
+    film_depths: HashMap<u64, f32>,
     slide_visibility: [bool; 2],
     field_passes: [Pass; 4],
     warp_pass: Pass,
@@ -592,6 +608,8 @@ impl LiveWheel {
             stack: Vec::new(),
             stack_times: HashMap::new(),
             stack_gpu: None,
+            beams: Default::default(),
+            primary_intensity: 1.,
             mixed: mixed::MediaScene::default(),
             zero,
             interpolated,
@@ -605,6 +623,10 @@ impl LiveWheel {
             materials,
             wheel: "violet-blue".into(),
             focus: None,
+            lamp_kelvin: lamp::REFERENCE_K,
+            lamp_gain: [1.; 4],
+            carousel_lenses: [false; 2],
+            film_depths: HashMap::new(),
             slide_visibility: [true; 2],
             field_passes,
             warp_pass,
@@ -669,7 +691,13 @@ impl LiveWheel {
         Ok(())
     }
     pub fn select_track(&mut self, id: u64) {
-        self.active = id;
+        if self.active != id {
+            self.active = id;
+            self.active_material = self
+                .layer_material(id, &self.wheel, self.swatches)
+                .expect("selected palette was previously validated");
+            self.upload_material();
+        }
     }
     /// Enable the finite-pixel optical path on deformed tracks for validation.
     pub fn set_footprint_sampling(&mut self, enabled: bool) {
@@ -688,6 +716,7 @@ impl LiveWheel {
         self.clear_live_solver(id);
         self.tracks.remove(&id);
         self.detail_scales.remove(&id);
+        self.film_depths.remove(&id);
     }
     /// Fraction of the original field of view sampled along each axis.
     /// A scale of 0.5 doubles apparent linear size about the center of the gate.
@@ -718,13 +747,35 @@ impl LiveWheel {
         seed: u32,
         flow_rate: f64,
     ) -> Result<(), String> {
+        self.configure_cells(id, executable, seed, flow_rate, CellLayout::Paired)
+    }
+
+    /// Run exactly one independently seeded oil cell for this layer.
+    pub fn set_single_cell_solver(
+        &mut self,
+        id: u64,
+        executable: &std::path::Path,
+        seed: u32,
+        flow_rate: f64,
+    ) -> Result<(), String> {
+        self.configure_cells(id, executable, seed, flow_rate, CellLayout::Single)
+    }
+
+    fn configure_cells(
+        &mut self,
+        id: u64,
+        executable: &std::path::Path,
+        seed: u32,
+        flow_rate: f64,
+        layout: CellLayout,
+    ) -> Result<(), String> {
         if !flow_rate.is_finite() || flow_rate < 0. {
             return Err("Live solver requires a finite, nonnegative rate".into());
         }
         #[cfg(feature = "live-solver")]
         {
             if let Some(s) = self.evolving.get_mut(&id) {
-                if s.executable == executable && s.seed == seed {
+                if s.executable == executable && s.seed == seed && s.layout == layout {
                     if let Some(err) = s.status().error {
                         return Err(err);
                     }
@@ -732,14 +783,14 @@ impl LiveWheel {
                     return Ok(());
                 }
             }
-            let source = evolving::Source::new(&self.device, executable, seed, flow_rate)?;
+            let source = evolving::Source::new(&self.device, executable, seed, flow_rate, layout)?;
             self.evolving.insert(id, source);
             self.reset_feedback_history();
             Ok(())
         }
         #[cfg(not(feature = "live-solver"))]
         {
-            let _ = (id, executable, seed);
+            let _ = (id, executable, seed, layout);
             Err("Live Basilisk support is disabled in this build".into())
         }
     }
@@ -782,7 +833,7 @@ impl LiveWheel {
         id: &str,
         swatches: Option<[u32; 4]>,
     ) -> Result<(), String> {
-        self.active_material = material::resolve(&self.materials, id, swatches)?;
+        self.active_material = self.layer_material(self.active, id, swatches)?;
         self.swatches = swatches;
         self.wheel = id.into();
         self.upload_material();
@@ -851,14 +902,53 @@ impl LiveWheel {
         Ok(())
     }
     fn baseline_optics(&self) -> bool {
-        self.wheel == "violet-blue" && self.swatches.is_none()
+        self.wheel == "violet-blue"
+            && self.swatches.is_none()
+            && !self.film_depths.contains_key(&self.active)
+    }
+    fn layer_material(
+        &self,
+        id: u64,
+        wheel: &str,
+        swatches: Option<[u32; 4]>,
+    ) -> Result<Material, String> {
+        let profile = material::resolve(&self.materials, wheel, swatches)?;
+        if self.film_depths.contains_key(&id) {
+            material::single(profile, swatches)
+        } else {
+            Ok(profile)
+        }
+    }
+    fn exposure_material(&self, gain: f32, pair: [f32; 2]) -> Material {
+        let mut material = self.active_material;
+        material.lamp = self.lamp_gain;
+        material.geometry = lens::GateLens::for_projector(self.carousel_lenses[0]).uniform();
+        let depth = self.film_depths.get(&self.active);
+        let [rear, front] = depth.map_or(pair, |d| [*d; 2]);
+        material.lens = [
+            self.focus
+                .unwrap_or(if depth.is_some() || self.carousel_lenses[0] {
+                    0.5
+                } else {
+                    -1.
+                }),
+            gain,
+            rear,
+            front,
+        ];
+        material
     }
     fn upload_material(&self) {
-        let mut material = self.active_material;
-        material.lens[0] = self.focus.unwrap_or(-1.0);
-        material.lens[1] = if self.feedback.is_some() { 1.0 } else { 0.0 };
+        let material =
+            self.exposure_material(if self.feedback.is_some() { 1. } else { 0. }, [0., 1.]);
         self.queue
             .write_buffer(&self.material_uniform, 0, bytemuck::bytes_of(&material));
+    }
+    pub fn set_projector_lenses(&mut self, a_carousel: bool, b_carousel: bool) {
+        if self.carousel_lenses != [a_carousel, b_carousel] {
+            self.carousel_lenses = [a_carousel, b_carousel];
+            self.upload_material();
+        }
     }
     pub fn set_feedback(&mut self, settings: Option<FeedbackSettings>) -> Result<(), String> {
         if let Some(settings) = settings {
@@ -883,12 +973,50 @@ impl LiveWheel {
             f.reset();
         }
     }
+    /// Set the constant-luminance incident projector white point.
+    pub fn set_lamp_temperature(&mut self, kelvin: u32) -> Result<(), String> {
+        if kelvin != self.lamp_kelvin {
+            self.lamp_gain = lamp::linear_gain(kelvin)?;
+            self.lamp_kelvin = kelvin;
+            self.upload_material();
+        }
+        Ok(())
+    }
     pub fn set_focus(&mut self, focus: Option<f32>) -> Result<(), String> {
         if focus.is_some_and(|f| !(0.0..=1.0).contains(&f)) {
             return Err("Focus must lie between the rear and front slide planes".into());
         }
         self.focus = focus;
         self.upload_material();
+        Ok(())
+    }
+    /// Authored distance through the gate, from rear (0) to front (1).
+    /// A single cell retains this distance when neighbouring tracks change.
+    pub fn set_film_depth(&mut self, id: u64, depth: Option<f32>) -> Result<(), String> {
+        if depth.is_some_and(|d| !(0.0..=1.0).contains(&d)) {
+            return Err("Film depth must be finite and within the projection gate [0, 1]".into());
+        }
+        let old = self.film_depths.get(&id).copied();
+        if old == depth {
+            return Ok(());
+        }
+        if let Some(d) = depth {
+            self.film_depths.insert(id, d);
+        } else {
+            self.film_depths.remove(&id);
+        }
+        if old.is_some() != depth.is_some() {
+            if let Some(l) = self.stack.iter().find(|l| l.id == id) {
+                let profile = self.layer_material(id, &l.wheel, l.swatches)?;
+                self.stack_materials.insert(id, profile);
+            }
+            if self.active == id {
+                self.active_material = self.layer_material(id, &self.wheel, self.swatches)?;
+            }
+        }
+        if self.active == id {
+            self.upload_material();
+        }
         Ok(())
     }
     pub fn swirl(&mut self, slide: u32, from: [f32; 2], to: [f32; 2]) {
@@ -1142,7 +1270,10 @@ impl LiveWheel {
         {
             self.presentation = self.presentation.wrapping_add(1);
         }
-        if !self.mixed.tracks.is_empty() {
+        if !self.mixed.tracks.is_empty()
+            || !self.beams.secondary_ids.is_empty()
+            || self.primary_intensity != 1.
+        {
             self.render_mixed(out, [rear_time, front_time], program_time);
         } else if self.stack.is_empty()
             || self.stack.len() == 1
@@ -1442,6 +1573,8 @@ impl LiveWheel {
     }
 }
 
+#[cfg(all(test, feature = "live-solver"))]
+mod beam_capture;
 #[cfg(test)]
 mod coral_capture;
 #[cfg(test)]
@@ -1450,6 +1583,8 @@ mod feedback_test;
 mod footprint_test;
 #[cfg(test)]
 mod pressure_test;
+#[cfg(all(test, feature = "live-solver"))]
+mod single_film_capture;
 #[cfg(test)]
 mod software_test;
 #[cfg(test)]

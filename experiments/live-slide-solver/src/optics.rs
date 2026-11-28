@@ -46,13 +46,23 @@ impl Atlas {
     }
 
     pub fn pack(self, rear: &Field, front: &Field, rg: &mut [u8]) -> io::Result<()> {
-        if rg.len() != self.byte_len() || rear.tick != front.tick {
+        self.pack_fields(rear, Some(front), rg)
+    }
+
+    /// A single dyed layer uses the red channel. Zero is the fully outside
+    /// signed-distance value for the unused green channel, even on buffer reuse.
+    pub fn pack_cell(self, cell: &Field, rg: &mut [u8]) -> io::Result<()> {
+        self.pack_fields(cell, None, rg)
+    }
+
+    fn pack_fields(self, rear: &Field, front: Option<&Field>, rg: &mut [u8]) -> io::Result<()> {
+        if rg.len() != self.byte_len() || front.is_some_and(|f| rear.tick != f.tick) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "atlas byte count or simultaneous cell ticks disagree",
             ));
         }
-        for (channel, field) in [rear, front].into_iter().enumerate() {
+        for (channel, field) in std::iter::once(rear).chain(front).enumerate() {
             if !(1..=256).contains(&field.width)
                 || field.width != field.height
                 || field.coverage.len() != field.width * field.height
@@ -76,6 +86,11 @@ impl Atlas {
             };
             if status != 0 {
                 return Err(io::Error::other("CImg optical distance transform failed"));
+            }
+        }
+        if front.is_none() {
+            for texel in rg.chunks_exact_mut(2) {
+                texel[1] = 0;
             }
         }
         Ok(())
@@ -114,6 +129,12 @@ mod tests {
         assert_eq!(at(150, 150), [255, 255]);
         assert!(at(87, 30)[0] < 128 && at(88, 30)[0] >= 128);
         assert!(at(30, 87)[1] < 128 && at(30, 88)[1] >= 128);
+        let paired = output.clone();
+        atlas.pack_cell(&rear, &mut output).unwrap();
+        assert!(output
+            .chunks_exact(2)
+            .zip(paired.chunks_exact(2))
+            .all(|(cell, pair)| cell[0] == pair[0] && cell[1] == 0));
         let mut uneven = front;
         uneven.tick += 1;
         assert!(atlas.pack(&rear, &uneven, &mut output).is_err());

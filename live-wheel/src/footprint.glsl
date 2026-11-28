@@ -42,8 +42,8 @@ float pressureDefocus(vec2 uv,bool front) {
     // Nominal gap 1 mm, source-side glass fixed. The optical mid-plane moves by
     // half the gap change. Convert the new conjugate to design-pixel pupil radius.
     float ds=0.5*(1.0-pressureGap(uv,front));
-    float s=front ? 51.8 : 53.4;
-    return -(8.0*1600.0*1.8)*ds/(s*(s+ds));
+    float s=mix(mat.geometry.x,mat.geometry.y,front ? mat.lens.w : mat.lens.z);
+    return -mat.geometry.z*ds/(s*(s+ds));
 }
 vec4 rayMaterial(vec2 uv, bool front) {
     vec2 atlasSize = vec2(textureSize(sampler2D(filmMaterial,fieldSampler),0));

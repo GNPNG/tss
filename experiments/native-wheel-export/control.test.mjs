@@ -13,10 +13,15 @@ test('scheduled takes use the neutral baseline and preserve explicit overrides',
 import { newMedia, programLayers } from '../../WebAssets/visual-media.js';
 test('a mixed movie carries the two oil choices on the correct wheel through the scene order', () => {
   const a={id:1,visible:true,opacity:1,palette:'violet-blue',motion:'wheel-flow',motionTake:0,materialMotion:{rear:'pdms-20',front:'pdms-1000'}};
-  const b={...a,id:2,palette:'yellow-red',materialMotion:{front:'pdms-20'}};
+  const b={...a,id:2,projector:'b',palette:'yellow-red',materialMotion:{front:'pdms-20'}};
   const art={id:3,visible:true,opacity:.8,media:newMedia({id:10,name:'Picture.png',sha256:'a'.repeat(64),width:2,height:2,durationUs:1,still:true})};
   const stack=programLayers([a,art,b],l=>!l.media);
-  const request=wheelMovieRequest({layerId:1,wheel:a.palette,materialMotion:a.materialMotion,stack},6,[],'neutral');
+  const projectorB={enabled:true,lampKelvin:3000,focus:.36,intensity:.08,offsetX:-.1,offsetY:.22};
+  const request=wheelMovieRequest({layerId:1,wheel:a.palette,materialMotion:a.materialMotion,stack,
+    focus:.8,lampKelvin:9200,projectorAIntensity:.75,projectorB},6,[],'neutral');
+  assert.deepEqual(request.projectorB,projectorB);
+  assert.deepEqual([request.focus,request.lampKelvin,request.projectorAIntensity],[.8,9200,.75]);
+  assert.deepEqual(request.stack.map(l=>l.projector??'a'),['b','a','a']);
   assert.deepEqual(request.materialMotion,a.materialMotion);
   assert.deepEqual(request.stack.map(l=>l.layerId),[2,3,1]);
   assert.deepEqual(request.stack[0].materialMotion,{rear:'wheel',front:'pdms-20'});

@@ -55,6 +55,7 @@
           <button class="button quiet" type="button" id="plate-frame">Preview current framing</button>
           <button class="button quiet" type="button" id="export-wheel-plates" title="Save the selected slide alone at full density before stack projection and video feedback" disabled>Export selected slide · 16-bit stills</button>
         </details>
+        <p id="live-export-note" hidden>Live fluid trajectories are available in the editor. Their movie and plate exports are unavailable.</p>
         <div class="stage-footer"><div class="source-info"><span class="disc">♫</span><div><strong id="source-name">No audio selected</strong><small id="source-meta">Open an MP3 or M4A to begin</small></div></div><button class="button quiet" type="button" id="relink-audio" hidden>Relink audio</button><div class="transport"><button class="icon-button" id="restart" title="Return to start" aria-label="Return to start" disabled>↤</button><button class="play-button" id="play" title="Play" aria-label="Play" disabled>▶</button><button class="icon-button" id="stop" title="Stop" aria-label="Stop" disabled>■</button></div><div class="clock"><span id="current-time">00:00</span><span class="clock-separator"> / </span><span id="total-time">00:00</span></div></div>
       </section>
 
@@ -66,7 +67,6 @@
           <label class="control-label wheel-heading" for="slide-preset">SLIDE PRESETS</label>
           <div class="wheel-controls">
             <select id="slide-preset" disabled><option value="" disabled>Choose a slide</option></select>
-            <button class="button quiet" type="button" id="show-wheel-study" aria-haspopup="dialog" disabled>Play study video</button>
           </div>
           <details id="artwork-settings" open hidden>
             <summary>Artwork settings</summary><label><input type="checkbox" data-media="keyEnabled"> Apply chroma key</label><p id="artwork-source"></p><button type="button" id="artwork-relink" class="button quiet" hidden>Relink source</button>
@@ -82,6 +82,56 @@
             <label>Mask A<select data-media="maskA"></select></label><label>Mask B<select data-media="maskB"></select></label>
             <label>Combine masks<select data-media="maskOp"><option value="intersect">Intersection</option><option value="union">Union</option><option value="subtract">A minus B</option><option value="xor">Exclusive or</option></select></label>
             </div>
+          </details>
+          <details id="projection-light" hidden>
+            <summary>Projector lighting</summary>
+            <label>Selected layer projector<select id="layer-projector"><option value="a">Projector A</option><option value="b">Projector B</option></select></label>
+            <fieldset class="beam-controls"><legend>Projector A</legend>
+                <fieldset class="source-options"><legend>Source equipment</legend><div class="equipment-grid" id="equip-a-options"></div></fieldset>
+                <p class="equipment-note" id="equip-a-compatibility"></p>
+                <div id="equip-a-carousel" class="carousel-controls" hidden>
+                  <p><strong>Ektanar 127 mm · f/3.5</strong><br>Rack-and-pinion focus. The thin-lens study assumes a 3 m throw and a 24 mm gate height.</p>
+                  <label>Lamp switch<select id="equip-a-mode"><option value="high">High</option><option value="low">Low</option></select></label>
+                  <label for="equip-a-low">Low output estimate <output id="equip-a-low-value"></output></label>
+                  <input id="equip-a-low" type="range" min="0" max="100" step="1" value="60">
+                  <a href="https://collection.sciencemuseumgroup.org.uk/objects/co205500/kodak-carousel-projector-model-550r" target="_blank" rel="noreferrer">Museum specimen record ↗</a>
+                </div>
+                <label>Lamp preset<select id="lamp-a-preset" aria-label="Projector A lamp preset"><option value="3200">Tungsten · 3200 K</option><option value="6500" selected>Neutral · 6500 K</option><option value="custom">Custom</option></select></label>
+                <label>Color temperature (K)<input type="number" id="lamp-a-kelvin" aria-label="Projector A temperature in kelvin" min="2700" max="10000" step="1" value="6500"></label>
+                <label for="lamp-a-intensity">Relative light (exposure) <output id="lamp-a-intensity-value" for="lamp-a-intensity"></output></label>
+                <input type="range" id="lamp-a-intensity" min="0" max="100" step="1">
+            <div class="focus-control">
+              <label for="wheel-focus">Projector A focus</label>
+              <output id="wheel-focus-value" for="wheel-focus">Slide setting</output>
+              <input id="wheel-focus" type="range" min="0" max="100" step="1" value="50">
+              <div class="range-ends"><span>Rear slide</span><span>Front slide</span></div>
+              <button class="button quiet" id="wheel-focus-reset" type="button">Restore slide focus</button>
+            </div>
+            </fieldset>
+            <label><input type="checkbox" id="lamp-b-enabled"> Enable projector B</label>
+            <fieldset class="beam-controls" id="lamp-b-settings" disabled><legend>Projector B</legend>
+                <fieldset class="source-options"><legend>Source equipment</legend><div class="equipment-grid" id="equip-b-options"></div></fieldset>
+                <p class="equipment-note" id="equip-b-compatibility"></p>
+                <div id="equip-b-carousel" class="carousel-controls" hidden>
+                  <p><strong>Ektanar 127 mm · f/3.5</strong><br>Rack-and-pinion focus. The thin-lens study assumes a 3 m throw and a 24 mm gate height.</p>
+                  <label>Lamp switch<select id="equip-b-mode"><option value="high">High</option><option value="low">Low</option></select></label>
+                  <label for="equip-b-low">Low output estimate <output id="equip-b-low-value"></output></label>
+                  <input id="equip-b-low" type="range" min="0" max="100" step="1" value="60">
+                  <a href="https://collection.sciencemuseumgroup.org.uk/objects/co205500/kodak-carousel-projector-model-550r" target="_blank" rel="noreferrer">Museum specimen record ↗</a>
+                </div>
+                <label>Lamp preset<select id="lamp-b-preset" aria-label="Projector B lamp preset"><option value="3200">Tungsten · 3200 K</option><option value="6500" selected>Neutral · 6500 K</option><option value="custom">Custom</option></select></label>
+                <label>Color temperature (K)<input type="number" id="lamp-b-kelvin" aria-label="Projector B temperature in kelvin" min="2700" max="10000" step="1" value="6500"></label>
+                <label for="lamp-b-focus">Focus <output id="lamp-b-focus-value" for="lamp-b-focus"></output></label>
+                <input type="range" id="lamp-b-focus" min="0" max="100" step="1">
+                <button type="button" class="button quiet" id="lamp-b-reset-focus">Restore slide focus</button>
+                <label for="lamp-b-intensity">Relative light (exposure) <output id="lamp-b-intensity-value" for="lamp-b-intensity"></output></label>
+                <input type="range" id="lamp-b-intensity" min="0" max="100" step="1">
+                <label for="lamp-b-offsetX">Horizontal offset <output id="lamp-b-offsetX-value" for="lamp-b-offsetX"></output></label>
+                <input type="range" id="lamp-b-offsetX" min="-100" max="100" step="1">
+                <label for="lamp-b-offsetY">Vertical offset <output id="lamp-b-offsetY-value" for="lamp-b-offsetY"></output></label>
+                <input type="range" id="lamp-b-offsetY" min="-100" max="100" step="1">
+                <button type="button" class="button quiet" id="lamp-b-ghost">Ghost exposure · 8%</button>
+            </fieldset>
           </details>
           <div id="native-wheel-controls" hidden>
             <label class="native-toggle"><input type="checkbox" id="live-wheel"> Preview selected slide</label>
@@ -111,12 +161,11 @@
               <input id="mouse-pressure" type="range" min="0" max="100" step="1" value="50">
             </div>
             <div class="focus-control">
-              <label for="wheel-focus">Projector focus</label>
-              <output id="wheel-focus-value" for="wheel-focus">Slide setting</output>
-              <input id="wheel-focus" type="range" min="0" max="100" step="1" value="50">
-              <div class="range-ends"><span>Rear slide</span><span>Front slide</span></div>
-              <button class="button quiet" id="wheel-focus-reset" type="button">Restore slide focus</button>
+              <label for="film-depth">Oil layer depth</label>
+              <output id="film-depth-value" for="film-depth">50%</output>
+              <input id="film-depth" type="range" min="0" max="100" step="1" value="50">
             </div>
+
             <details id="performer-deck" hidden>
               <summary>Performance surfaces</summary>
               <fieldset id="performer-config">
@@ -164,6 +213,13 @@
       </aside>
     </div>
 
+    <details class="legends card" id="legends" hidden>
+      <summary>Legends</summary>
+      <p>Audition a two-projector interpretation with your current tracks. With two or more visible tracks on one projector, the rig moves one to the other projector.</p>
+      <div id="legend-cards"></div>
+      <div class="rig-actions"><output id="legend-status" role="status"></output><button class="button quiet" id="legend-stop" type="button" hidden>Stop audition</button></div>
+      <p>For the film-overlay study, open <code>examples/fillmore-ghost.tss</code> with its companion film in the same folder.</p>
+    </details>
     <section class="timeline card" aria-label="Timeline">
       <div class="timeline-header"><div><span class="eyebrow">ARRANGEMENT</span><h2>Timeline</h2></div><div class="timeline-actions"><label>History <select id="edit-history" aria-label="Edit history"></select></label><button class="button quiet" type="button" id="undo-edit" disabled>Undo</button><button class="button quiet" type="button" id="redo-edit" disabled>Redo</button><span id="layer-count">1 visual layer</span><label>New track <select id="track-source" aria-label="New track source"><option value="blank">Blank liquid layer</option></select></label><button id="artwork-add" class="button quiet" type="button" hidden>Add artwork</button><button id="add-layer" class="button add-layer">＋ &nbsp;Add visual layer</button></div></div>
       <div class="timeline-content">
@@ -294,12 +350,6 @@
   <dialog id="project-operation" aria-labelledby="project-message"><p id="project-message" role="status"></p></dialog>
   <dialog id="replace-project" aria-labelledby="replace-prompt"><form method="dialog"><p id="replace-prompt">Open this project and discard unsaved edits to the current session?</p><button value="keep" autofocus>Keep editing</button> <button value="replace">Open project</button></form></dialog>
   <dialog id="logo-dialog" class="logo-dialog" aria-label="The Sacred Swirls project logo"><button class="button quiet" id="close-logo">Close</button><img src="assets/tss-project-logo.jpeg" alt="The Sacred Swirls project logo with a golden emblem over liquid light and illustrated landmarks"></dialog>
-  <dialog id="wheel-study" class="wheel-study" aria-labelledby="wheel-study-name" aria-describedby="wheel-study-description">
-    <header><h2 id="wheel-study-name"></h2><button type="button" class="button quiet" id="close-wheel-study">Close</button></header>
-    <p id="wheel-study-description">Recorded native render of two independently simulated liquid slides.</p>
-    <video id="wheel-study-video" controls loop muted playsinline preload="none" aria-label="Slide motion study"></video>
-    <p id="wheel-study-error" role="status" hidden>Could not play this slide’s motion study.</p>
-  </dialog>
   <script type="module" src="app.js"></script>
   <dialog id="native-wheel-export-progress" aria-labelledby="native-export-title">
     <h2 id="native-export-title">Exporting selected slide</h2>

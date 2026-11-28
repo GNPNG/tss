@@ -14,5 +14,4 @@ Each wheel uses the same pair of simulations. The stills show the slides two sec
 
 The rear and front separations each use the same lamp as the combined projection. Attenuation is calculated before applying the display transfer. For the six additional colourways, the renderer fits the carrier, the two isolated regions and their crossing to the photographed appearance. In Blue / Yellow the rear meniscus has its own blue tint. Violet / Blue uses the original material settings.
 
-Select a wheel on a visible liquid track in the Windows editor. **Live selected wheel** runs the shared projection shader on the Windows GPU and lets you swirl either slide and change focus. **View study** plays the recorded reference. The editor's MP4 export uses the procedural composition renderer. [Live wheel controls and benchmark](../../../../live-wheel/README.md)
-
+The original editor offered these reference clips through **View study**. The clips are archived in [previews](previews/). The current editor opens independently simulated oil tracks. [Current controls](../../../../README.md)

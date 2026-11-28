@@ -1,6 +1,6 @@
 //! Interactive, per-track film sources. Presentation takes only completed CPU
 //! snapshots. Basilisk and the native CImg distance transform run on a worker.
-use super::{extent, gpu, upload_frame, LiveSolverStatus};
+use super::{extent, gpu, upload_frame, CellLayout, LiveSolverStatus};
 use std::{
     collections::VecDeque,
     io,
@@ -35,6 +35,25 @@ struct Mailbox {
 }
 
 impl Mailbox {
+    fn tug(&mut self, cell: usize, from: [f64; 2], to: [f64; 2], strength: f32) {
+        let world = |v: [f64; 2]| {
+            [
+                v[0] * f64::from(VIEW[0]) + f64::from(VIEW[2]),
+                v[1] * f64::from(VIEW[1]) + f64::from(VIEW[3]),
+            ]
+        };
+        let a = world(from);
+        let b = world(to);
+        let p = &mut self.pending[cell];
+        p.x = ((a[0] + b[0]) * 0.5).clamp(0., 1.);
+        p.y = ((a[1] + b[1]) * 0.5).clamp(0., 1.);
+        // Heavy and light use the same relative response range as SlidePose.
+        let response = (0.13 + 0.29 * f64::from(strength)) / 0.42;
+        p.dx = (p.dx + (b[0] - a[0]) * response).clamp(-1., 1.);
+        p.dy = (p.dy + (b[1] - a[1]) * response).clamp(-1., 1.);
+        p.drive = 1.;
+    }
+
     fn set_rate(&mut self, rate: f64) {
         if self.rate != rate && (self.rate == 0. || rate == 0.) {
             self.last_time = None;
@@ -74,7 +93,7 @@ impl Mailbox {
 
 type Shared = Arc<(Mutex<Mailbox>, Condvar)>;
 
-fn solve(executable: &Path, seed: u32, shared: &Shared) -> io::Result<()> {
+fn solve(executable: &Path, seed: u32, layout: CellLayout, shared: &Shared) -> io::Result<()> {
     let start = |slide| {
         Cell::start_registered(executable, slide, seed, LEVEL, |child| {
             let mut state = shared.0.lock().unwrap();
@@ -87,10 +106,16 @@ fn solve(executable: &Path, seed: u32, shared: &Shared) -> io::Result<()> {
     };
     let atlas = Atlas::new(SIDE as usize)?;
     let (mut rear, mut rear_field) = start(Slide::Violet)?;
-    let (mut front, mut front_field) = start(Slide::Cyan)?;
+    let mut front = match layout {
+        CellLayout::Single => None,
+        CellLayout::Paired => Some(start(Slide::Cyan)?),
+    };
     loop {
         let mut rg = vec![0; atlas.byte_len()];
-        atlas.pack(&rear_field, &front_field, &mut rg)?;
+        match &front {
+            Some((_, field)) => atlas.pack(&rear_field, field, &mut rg)?,
+            None => atlas.pack_cell(&rear_field, &mut rg)?,
+        }
         let current = Frame {
             tick: rear_field.tick,
             rg: rg.into(),
@@ -112,7 +137,9 @@ fn solve(executable: &Path, seed: u32, shared: &Shared) -> io::Result<()> {
             std::mem::take(&mut state.pending)
         };
         rear_field = rear.step(drives[0])?;
-        front_field = front.step(drives[1])?;
+        if let Some((cell, field)) = &mut front {
+            *field = cell.step(drives[1])?;
+        }
     }
     Ok(())
 }
@@ -124,11 +151,18 @@ pub(super) struct Source {
     shared: Shared,
     pub executable: PathBuf,
     pub seed: u32,
+    pub layout: CellLayout,
     latched: Option<(u64, ([u32; 2], f32))>,
 }
 
 impl Source {
-    pub fn new(d: &gpu::Device, executable: &Path, seed: u32, rate: f64) -> Result<Self, String> {
+    pub fn new(
+        d: &gpu::Device,
+        executable: &Path,
+        seed: u32,
+        rate: f64,
+        layout: CellLayout,
+    ) -> Result<Self, String> {
         if !executable.is_file() {
             return Err(format!(
                 "Live Basilisk executable is unavailable at {}",
@@ -140,9 +174,9 @@ impl Source {
         let thread_shared = shared.clone();
         let path = executable.to_path_buf();
         thread::Builder::new()
-            .name("tss-live-slide-pair".into())
+            .name("tss-live-slide".into())
             .spawn(move || {
-                if let Err(err) = solve(&path, seed, &thread_shared) {
+                if let Err(err) = solve(&path, seed, layout, &thread_shared) {
                     let mut s = thread_shared.0.lock().unwrap();
                     if !s.stop {
                         s.error = Some(err.to_string());
@@ -171,6 +205,7 @@ impl Source {
             shared,
             executable: executable.to_owned(),
             seed,
+            layout,
             latched: None,
         })
     }
@@ -196,22 +231,11 @@ impl Source {
     }
 
     pub fn tug(&mut self, slide: usize, from: [f64; 2], to: [f64; 2], strength: f32) {
-        let world = |v: [f64; 2]| {
-            [
-                v[0] * f64::from(VIEW[0]) + f64::from(VIEW[2]),
-                v[1] * f64::from(VIEW[1]) + f64::from(VIEW[3]),
-            ]
+        let cell = match self.layout {
+            CellLayout::Single => 0,
+            CellLayout::Paired => slide,
         };
-        let a = world(from);
-        let b = world(to);
-        let mut s = self.shared.0.lock().unwrap();
-        let p = &mut s.pending[slide];
-        p.x = ((a[0] + b[0]) * 0.5).clamp(0., 1.);
-        p.y = ((a[1] + b[1]) * 0.5).clamp(0., 1.);
-        // Each displacement contributes once; event coalescing preserves net travel.
-        p.dx = (p.dx + (b[0] - a[0]) * f64::from(strength)).clamp(-1., 1.);
-        p.dy = (p.dy + (b[1] - a[1]) * f64::from(strength)).clamp(-1., 1.);
-        p.drive = 1.;
+        self.shared.0.lock().unwrap().tug(cell, from, to, strength);
     }
 
     /// Every use of a film within one presentation (including matte passes)
@@ -332,6 +356,78 @@ mod timing_tests {
         }
         assert_eq!(sample(&mut state, 60.), 0.);
         assert!((sample(&mut state, 60. + 1. / 60.) - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    #[ignore = "requires the native Basilisk executable in TSS_LIVE_SOLVER"]
+    fn independent_cells_evolve_and_a_heavy_tug_changes_only_its_cell() -> io::Result<()> {
+        use std::time::{Duration, Instant};
+        let exe = PathBuf::from(std::env::var_os("TSS_LIVE_SOLVER").expect("Set TSS_LIVE_SOLVER"));
+        let run = |seed: u32, tug: bool| -> io::Result<Vec<Frame>> {
+            let shared = Shared::default();
+            {
+                let mut state = shared.0.lock().unwrap();
+                state.target_tick = 8;
+                if tug {
+                    state.tug(0, [0.46, 0.5], [0.60, 0.56], 0.0);
+                }
+            }
+            let worker = thread::scope(|scope| {
+                let worker = scope.spawn(|| solve(&exe, seed, CellLayout::Single, &shared));
+                let start = Instant::now();
+                while !worker.is_finished() && start.elapsed() < Duration::from_secs(10) {
+                    if shared.0.lock().unwrap().frames.len() == 9 {
+                        break;
+                    }
+                    thread::sleep(Duration::from_millis(2));
+                }
+                let mut state = shared.0.lock().unwrap();
+                state.stop = true;
+                if state.frames.len() != 9 {
+                    for child in &state.children {
+                        child.cancel();
+                    }
+                }
+                shared.1.notify_one();
+                drop(state);
+                worker.join().expect("solver thread panicked")
+            });
+            worker?;
+            let mut state = shared.0.lock().unwrap();
+            assert_eq!(state.children.len(), 1, "one solver per dyed layer");
+            assert_eq!(
+                state.frames.len(),
+                9,
+                "initial field and eight solved steps"
+            );
+            let frames: Vec<_> = state.frames.drain(..).collect();
+            assert!(frames
+                .iter()
+                .all(|f| f.rg.chunks_exact(2).all(|t| t[1] == 0)));
+            assert_ne!(
+                frames[0].rg, frames[8].rg,
+                "the oil evolves without pointer input"
+            );
+            Ok(frames)
+        };
+        let seeds = [83724, 83725, 83726];
+        let mut initial = Vec::new();
+        for (index, seed) in seeds.into_iter().enumerate() {
+            let control = run(seed, false)?;
+            assert!(initial.iter().all(|other| other != &control[0].rg));
+            initial.push(control[0].rg.clone());
+            let performed = run(seed, index == 1)?;
+            assert_eq!(performed[0].rg, control[0].rg);
+            let changed = performed[8]
+                .rg
+                .iter()
+                .zip(control[8].rg.iter())
+                .filter(|(a, b)| a != b)
+                .count();
+            eprintln!("cell {index}: {changed} signed-distance samples changed at step 8");
+            assert_eq!(changed > 0, index == 1);
+        }
+        Ok(())
     }
 }
 

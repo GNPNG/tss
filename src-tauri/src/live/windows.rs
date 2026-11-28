@@ -662,6 +662,8 @@ fn run(
                     let result = match (engine.as_mut(), config.as_ref()) {
                         (Some(r), Some(c))
                             if !c.uses_simulation() && c.layer_id == job.request.layer_id
+                                && c.focus == job.request.focus
+                                && c.lighting == job.request.lighting
                                 && c.stack == job.request.stack
                                 && c.wheel == job.request.wheel
                                 && c.detail_scale == job.request.detail_scale

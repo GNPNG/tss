@@ -22,18 +22,20 @@ export function rotateColor(hex, degrees) {
 }
 
 export function isNativePalette(layer, slidePresets) {
-  return !!layer?.nativeLive && !layer.media && (Object.hasOwn(LIQUID_PALETTES, layer.palette) || slidePresets.has(layer.palette));
+  return !!layer && (layer.nativeLive || layer.simulationSeed != null) && !layer.media &&
+    (Object.hasOwn(LIQUID_PALETTES, layer.palette) || slidePresets.has(layer.palette));
 }
 
-// The original seven photographic slides use their calibrated native profiles.
-// Authored themes carry four sRGB swatches through both the solo and stack paths.
+// A single cell transmits white through its carrier and one dye through its oil.
+// Archived paired fields retain their original carrier, rear, overlap and front optics.
 export function paletteFields(layer) {
   if (!layer || layer.media) return {};
-  if (!Object.hasOwn(LIQUID_PALETTES, layer.palette) && !layer.customColors && !(layer.hue % 360)) return {};
+  if (layer.filmDepth == null && !Object.hasOwn(LIQUID_PALETTES, layer.palette) && !layer.customColors && !(layer.hue % 360)) return {};
   const swatches = layer.colors.map(color => {
     if (!layer.hue) return parseInt(color.slice(1), 16);
     const [r, g, b] = rotateColor(color, layer.hue).map(v => Math.round(v * 255));
     return (r << 16) | (g << 8) | b;
   });
+  if (layer.filmDepth != null) return {swatches:[0xffffff, swatches[0], swatches[0], 0xffffff]};
   return {swatches};
 }

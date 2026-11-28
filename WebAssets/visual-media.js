@@ -17,7 +17,7 @@ export function programLayers(layers, isWheel) {
   const result=[];
   for(const layer of [...available].reverse()){
     if (!layer.visible && !references.has(layer.id)) continue;
-    const common={layerId:layer.id,opacity:layer.opacity,...(!layer.visible?{matteOnly:true}:{}),
+    const common={layerId:layer.id,opacity:layer.opacity,...(layer.projector ? {projector:layer.projector} : {}),...(!layer.visible?{matteOnly:true}:{}),
       ...(layer.envelope!=null?{envelope:layer.envelope}:{})};
     if(!layer.media){
       result.push({...common,wheel:layer.palette,...paletteFields(layer),motion:layer.motion,motionTake:layer.motionTake,...materialMotionFields(layer),...simulationFields(layer),...detailScaleFields(layer),visibleFilms:layer.visibleFilms??'both'});

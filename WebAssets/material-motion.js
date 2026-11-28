@@ -7,7 +7,8 @@ export function detailScaleFields(layer) {
 }
 export function simulationFields(layer) {
   return layer?.simulationSeed == null || layer.media ? {} :
-    {simulation: {seed: layer.simulationSeed, rate: layer.speed}};
+    {simulation: {seed: layer.simulationSeed, rate: layer.speed,
+      ...(layer.filmDepth == null ? {} : {depth:layer.filmDepth})}};
 }
 export function validMaterialMotion(value) {
   if (value === undefined) return true;

@@ -45,10 +45,35 @@ test('independent film oil grades survive project snapshots and default missing 
   }
 });
 
+test('one, two and three independently dyed layers retain their focal planes and group slots', () => {
+  const color=['#1199aa','#ee2277','#cc9911'];
+  for (const count of [1,2,3]) {
+    const doc=fixture(), base=doc.layers[1];
+    doc.layers=Array.from({length:count},(_,i)=>({...base,id:i+1,motion:'wheel-flow',slide:'rear',visibleFilms:'rear',
+      simulationSeed:i*327+1,colors:[color[i]],filmDepth:(i+1)/(count+1),presetGroup:'slide-a',dyeIndex:i}));
+    doc.nextId=count+1;
+    assert.deepEqual(validateProject({...doc,layers:doc.layers.map(layerSettings)},palettes),doc);
+    for (const corrupt of [
+      l=>l.filmDepth=-.01,l=>l.filmDepth=1.1,l=>l.filmDepth=null,l=>delete l.simulationSeed,
+      l=>l.colors.push('#123456'),l=>l.slide='front',l=>delete l.dyeIndex,l=>l.presetGroup='',
+    ]) {
+      const bad=structuredClone(doc);corrupt(bad.layers[0]);
+      assert.throws(()=>validateProject(bad,palettes),/layers/);
+    }
+    if (count>1) {
+      doc.layers[1].dyeIndex=0;
+      assert.throws(()=>validateProject(doc,palettes),/duplicate dye/);
+    }
+  }
+});
+
 test('malformed nested fields, duplicate IDs and unknown versions fail before installation', () => {
   for (const corrupt of [
     p=>p.version=2,p=>p.audio.name='../song.m4a',p=>p.audio.sha256=null,p=>p.selected=99,p=>p.layers[1].id=7,
     p=>p.layers[0].visibleFilms='broken',p=>p.layers[0].colors[2]='orange',p=>p.layers[1].tugResponse.rear=NaN,
+    p=>p.equipmentA={profile:'imaginary'},p=>p.equipmentA={profile:'carousel-550r',lens:{focalLengthMm:10,fNumber:16}},
+    p=>p.lampKelvin=10001,p=>p.lampKelvin=2699,p=>p.projectorAIntensity=1.1,
+    p=>p.projectorB={enabled:true,lampKelvin:6500},p=>p.layers[0].projector='c',p=>p.layers[0].projector='b',
     p=>p.focus=1.1,p=>p.gestures.macros[0].events[1].point=[.5,9],p=>p.gestures.macros[0].events[1].t=3,
     p=>p.gestures.lyricGroups[0].occurrences[1].end=0
   ]) {

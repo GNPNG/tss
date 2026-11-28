@@ -10,8 +10,12 @@ layout(set=0,binding=2,std140) uniform Material {
     vec4 rim;
     vec4 carrier;
     vec4 lens;
+    vec4 lamp;
+    vec4 geometry;
 } mat;
+#define TSS_LAMP_GAIN mat.lamp.rgb
 #define TSS_LIVE_FOCUS 1
+#define TSS_FILM_PLANES 1
 #define TSS_PROGRAM_LINEAR (mat.lens.y > 0.5)
 #define liveFocus (mat.lens.x)
 #define HOOKED_tex(point) textureLod(sampler2D(field,fieldSampler),point,0.0)

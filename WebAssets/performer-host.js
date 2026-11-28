@@ -64,12 +64,27 @@ export function installPerformerDeck({invoke,listen,layers,selection,prepare}){
     const row=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent=name;row.append(legend);
     const select=(label)=>{const l=document.createElement('label'),e=document.createElement('select');l.append(label,e);row.append(l);return e;};
     const layer=select('Layer'),slide=select('Slide'),action=select('Control');
-    function refresh(){const old=layer.value||String(selection()?.layerId||'');opts(layer,layers().map(l=>[l.id,l.name]),old);}
-    refresh();layer.addEventListener('focus',refresh);
+    const mappedLayer = () => layers().find(l=>String(l.id)===layer.value);
+    function refreshSlide() {
+      const single = mappedLayer()?.filmDepth != null;
+      slide.parentElement.hidden = slide.disabled = single;
+      if (single) slide.value = 'rear';
+    }
+    function refresh() {
+      const old=layer.value||String(selection()?.layerId||'');
+      opts(layer,layers().map(l=>[l.id,l.name]),old);
+      refreshSlide();
+    }
     opts(slide,[['rear','Rear'],['front','Front']],selection()?.slide||'rear');
+    refresh();layer.addEventListener('focus',refresh);layer.addEventListener('change',refreshSlide);
     opts(action,[['auto','Pencil swirl / trackpad pressure'],['tug','Swirl material'],['pressure','Compress'],['rotate','Rotate glass']],'auto');
     find('performer-devices').append(row);
-    devices.set(source,{row,mapping:()=>{const l=layers().find(l=>String(l.id)===layer.value);return l?{layerId:l.id,slide:slide.value,mode:action.value,response:l.tugResponse?.[slide.value]??0.4}:null;}});
+    devices.set(source,{row,mapping:()=>{
+      const l=mappedLayer();
+      if (!l) return null;
+      const target=l.filmDepth != null ? 'rear' : slide.value;
+      return {layerId:l.id,slide:target,mode:action.value,response:l.tugResponse?.[target]??0.4};
+    }});
   }
   async function clear(){
     await routes.leave(null);for(const v of devices.values())v.row.remove();devices.clear();

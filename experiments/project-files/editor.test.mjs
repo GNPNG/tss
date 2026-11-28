@@ -11,7 +11,10 @@ async function exerciseControls(platform) {
   const oils = platform === 'Windows film oils';
   const windows = platform === 'Windows';
   const solver = platform === 'Windows live solver';
-  const helperAvailable = solver && location.hash !== '#missing-helper';
+  const benchmark = platform === 'Windows recorded benchmark';
+  const missing = solver && location.hash === '#missing-helper';
+  const helperAvailable = platform !== 'Linux' && !missing;
+  let resolveHelper;
   Object.defineProperty(navigator,'userAgent',{value:platform+' project controls'});
   const $ = id => document.getElementById(id);
   const check = (ok, message) => { if (!ok) throw Error(message); };
@@ -27,7 +30,7 @@ async function exerciseControls(platform) {
   const set = (id,value) => {
     const input=$(id);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
   };
-  const audio = coral || oils || (solver && !helperAvailable) ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
+  const audio = coral || oils || missing || benchmark ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
   let documentText, incoming, linked=null, lastSelection=1;
   const advisorRequests=[],reviewedLyrics=[],previewRequests=[],movieRequests=[];
   let finishInference;
@@ -49,7 +52,7 @@ async function exerciseControls(platform) {
     case 'install_media_tools':
       mediaInstalls++;
       throw Error('Package download failed.');
-    case 'live_simulation_available': return helperAvailable;
+    case 'live_simulation_available': return missing ? new Promise(resolve=>{resolveHelper=resolve;}) : helperAvailable;
     case 'choose_audio': return [lastSelection,'/music/two-slide-cues.m4a'];
     case 'choose_export_path': return '/movies/two-slide-cues.mp4';
     case 'export_native_wheel': movieRequests.push(args);return;
@@ -59,7 +62,8 @@ async function exerciseControls(platform) {
       return;
     case 'read_pending_audio': return lastSelection===9 ? new Uint8Array([1,2,3]) : audio.slice();
     case 'set_live_wheel': previewRequests.push(args.config);return null;
-    case 'set_visual_audio_features': case 'forget_live_wheel_layer': case 'live_wheel_benchmark_config': return null;
+    case 'live_wheel_benchmark_config': return benchmark ? {wheel:'violet-blue',motion:'wheel-flow',slide:'rear',gesture:'tug',renderWidth:640,wheelStack:true} : null;
+    case 'forget_live_wheel_layer': return null;
     case 'live_wheel_stats': return {running:false};
     case 'read_timed_lyrics': return ['song.vtt','WEBVTT\n\n00:00.000 --> 00:00.500\nGo\n\n00:01.000 --> 00:01.500\nGo'];
     case 'save_project': documentText=args.document;return 'Headliner.tss';
@@ -80,7 +84,20 @@ async function exerciseControls(platform) {
   // This exercises the controls and real audio decoder with the GPU renderer idle.
   window.requestAnimationFrame=()=>0;
   await import('/app.js');
+  if (missing) {
+    await until(()=>!!resolveHelper);
+    click('add-layer');
+    check(!previewRequests.some(Boolean),'an unresolved solver probe cannot present recorded motion');
+    resolveHelper(false);
+  }
   await until(()=>$('edit-history').options.length>0);
+  if (benchmark) {
+    await until(()=>previewRequests.at(-1)?.stack?.length===2);
+    const stack=previewRequests.at(-1).stack;
+    check(stack.some(l=>l.wheel==='violet-blue') && stack.some(l=>l.wheel==='yellow-red') &&
+      stack.every(l=>!l.simulation && l.motion==='wheel-flow'),'explicit benchmark preserves the historical two-slide workload');
+    return;
+  }
   if (solver) {
     const latest = () => previewRequests.at(-1);
     const save = async () => { click('save-project'); await idle(); return JSON.parse(documentText); };
@@ -93,13 +110,17 @@ async function exerciseControls(platform) {
     };
     const option=$('wheel-motion').querySelector('[value=simulated]');
     if (!helperAvailable) {
-      check(option.disabled,'missing helper disables new simulations');
+      check(!$('solver-unavailable').hidden,'fresh startup reports the unavailable solver');
+      click('add-layer');
+      const newProject=await save();
+      check(newProject.layers.length>=2 && newProject.layers.every(l=>Number.isInteger(l.simulationSeed)),
+        'new oil tracks retain their simulation seeds even when the solver is unavailable');
+      check(!previewRequests.some(Boolean),'fresh oil tracks cannot fall back to recorded native fields');
       const authored=JSON.parse(sessionStorage.getItem('seeded-project'));
       const start=previewRequests.length;
       await reopen(JSON.stringify(authored));
-      check(!$('solver-unavailable').hidden && !$('wheel-motion').disabled,'operator sees the missing helper and can explicitly choose a recorded study');
-      check(!previewRequests.slice(start).some(c=>c?.simulation || c?.stack?.some(l=>l.simulation)),
-        'missing helper does not send any seeded track to the native renderer');
+      check(!$('solver-unavailable').hidden,'operator sees the missing helper when opening a seeded project');
+      check(!previewRequests.slice(start).some(Boolean),'reopened oil cannot fall back to recorded native fields');
       const notices=['app-status','preview-status','native-frame-rate','native-instruction'].map(id=>$(id).textContent).join(' ');
       const preserved=await save();
       check(preserved.layers.every((l,i)=>l.simulationSeed===authored.layers[i].simulationSeed),
@@ -111,8 +132,30 @@ async function exerciseControls(platform) {
 
     await until(()=>latest()?.simulation!=null);
     const initial=latest(), firstSeed=initial.simulation.seed;
+    const recipes=(await (await fetch('/assets/slide-presets.json')).json()).wheels;
+    const baseCount=recipes.find(r=>r.id===initial.wheel).dyes.length;
+    const baseSeeds=initial.stack.map(l=>l.simulation.seed);
+    check(baseSeeds.length===baseCount && new Set(baseSeeds).size===baseCount,'one independent initial seed per physical dye');
+    check($('pigment-colors').querySelectorAll('input').length===1 && $('wheel-slide').disabled,
+      'selected physical layer exposes one dye and one gesture target');
+    set('film-depth','23');await until(()=>latest()?.simulation?.depth===.23);
+    const depths=latest().stack.map(l=>l.simulation.depth);
     check(Number.isInteger(firstSeed) && !option.disabled && $('wheel-motion').value==='simulated' &&
       !$('speed').disabled && !$('scale').disabled,'ordinary desktop startup uses a live physical track');
+    check(previewRequests.filter(Boolean).every(c=>c.simulation),'all ordinary startup requests use a live solve');
+    check($('wheel-motion').disabled || $('wheel-motion').hidden ||
+      [...$('wheel-motion').options].every(o=>o.value==='simulated'||o.disabled||o.hidden),
+      'recorded motion is not offered when authoring an oil track');
+    const presets=[...$('slide-preset').options].map(o=>o.value).filter(Boolean);
+    check(presets.length===7,'seven calibrated slide palettes');
+    for (const name of presets) {
+      set('slide-preset',name);
+      await until(()=>latest()?.wheel===name);
+      const dyes=recipes.find(r=>r.id===name).dyes.map(s=>parseInt(s.slice(1),16));
+      check(latest().stack.length===dyes.length && latest().stack.every((l,i)=>l.simulation.seed===baseSeeds[i] &&
+        l.simulation.depth===depths[i] && l.visibleFilms==='rear' && l.swatches.join() === [0xffffff,dyes[i],dyes[i],0xffffff].join()),
+        'choosing '+name+' assigns one dye per cell and preserves seeds and optics');
+    }
     for (const [i,name] of ['orchid','lagoon','ember','twilight','sunrise','meadow'].entries()) {
       $('palette-grid').querySelectorAll('button')[i].click();
       await until(()=>latest()?.wheel===name);
@@ -122,7 +165,7 @@ async function exerciseControls(platform) {
     set('speed','0');await until(()=>latest()?.simulation?.rate===0);
     set('speed','1.65');set('scale','.55');set('opacity','.41');
     await until(()=>latest()?.simulation?.rate===1.65 && latest()?.detailScale===.55 && latest()?.stack?.[0].opacity===.41);
-    click('add-layer');await until(()=>latest()?.stack?.length===2);
+    click('add-layer');await until(()=>latest()?.stack?.length===baseCount+1);
     const secondSeed=latest().simulation.seed;
     check(secondSeed!==firstSeed,'independent initial conditions on the second track');
     set('speed','.3');set('scale','1.7');set('opacity','.69');
@@ -130,30 +173,109 @@ async function exerciseControls(platform) {
     const other=latest().stack.find(l=>l.simulation.seed===firstSeed);
     check(other.wheel==='meadow' && other.simulation.rate===1.65 && other.detailScale===.55 && other.opacity===.41,
       'editing the second track preserves the first track physics, optics and opacity');
+    const picker=$('pigment-colors').querySelector('input');
+    picker.value='#ff5522';picker.dispatchEvent(new Event('input'));picker.dispatchEvent(new Event('change',{bubbles:true}));
+    await until(()=>latest().swatches[1]===0xff5522);
+    check(latest().stack.find(l=>l.simulation.seed===firstSeed).swatches[1]===other.swatches[1], 'editing a blank dye leaves the group independent');
+    set('wheel-focus','74');await until(()=>latest().focus===.74);
+    check(latest().stack.find(l=>l.simulation.seed===firstSeed).simulation.depth===.23,'global focus and layer depth are independent');
     const authored=await save();sessionStorage.setItem('seeded-project',JSON.stringify(authored));
-    set('wheel-motion','wheel-with-coral-beads');
-    await until(()=>latest()?.motion==='wheel-with-coral-beads' && !latest().simulation);
-    check(latest().stack.find(l=>l.layerId===latest().layerId).simulation===undefined &&
-      latest().stack.some(l=>l.simulation?.seed===firstSeed),'switching one track to a recorded study preserves its neighbour');
-    const recorded=await save();
-    check(!Object.hasOwn(recorded.layers.find(l=>l.id===latest().layerId),'simulationSeed'),'saved recorded study has no solver seed');
-    await window.tssImportAudio();
-    set('range-start','.25');set('range-end','1.25');click('set-range');
-    set('advice-direction','Copy the coral motion');click('advice-suggest');
-    await until(()=>advisorRequests.length>0);
-    finishInference();await until(()=>!$('advice-review').hidden);
-    set('advice-visual','oil');set('advice-signal','time');set('advice-fit','elastic');
-    set('advice-cue','Coral cue');click('advice-apply');
-    await until(()=>$('selected-name').textContent==='Coral cue');
-    check($('wheel-motion').value==='wheel-with-coral-beads' && !latest()?.simulation,
-      'a reviewed cue copied from a recorded study must keep its motion source');
-    const cue=(await save()).layers[0];
-    check(cue.motion==='wheel-with-coral-beads' && cue.simulationSeed===undefined,'the copied coral cue can be saved and reopened');
+    const group=authored.layers.find(l=>l.simulationSeed===firstSeed).presetGroup;
+    check(authored.layers.filter(l=>l.presetGroup===group).length===baseCount &&
+      !Object.hasOwn(authored.layers.find(l=>l.simulationSeed===secondSeed),'presetGroup'),'blank oil is independent of slide recall');
+    await reopen(JSON.stringify(authored));
+    await until(()=>latest().stack?.some(l=>l.simulation?.depth===.23));
+    set('track-source','slide:blue-green');click('add-layer');
+    await until(()=>latest().stack?.length===authored.layers.length+recipes.find(r=>r.id==='blue-green').dyes.length);
+    const addedSlide=await save();
+    check(addedSlide.layers.every(l=>l.simulationSeed!=null) && new Set(addedSlide.layers.map(l=>l.simulationSeed)).size===addedSlide.layers.length,
+      'adding a slide fills a new group of independently seeded cells');
+    set('slide-preset','yellow-red');await until(()=>latest().wheel==='yellow-red');
+    const recolored=await save();
+    check(authored.layers.every(l=>JSON.stringify(l)===JSON.stringify(recolored.layers.find(o=>l.id===o.id))),
+      'changing a separate slide preserves all authored fields of earlier groups and blank oil');
+    const firstAdded=recolored.layers.find(l=>l.id===recolored.selected);
+    const sibling=recolored.layers.find(l=>l.presetGroup===firstAdded.presetGroup && l.id!==firstAdded.id);
+    $('layer-list').querySelector('[aria-label="Hide '+sibling.name+'"]').click();
+    await until(()=>latest().stack?.every(l=>l.layerId!==sibling.id));
+    check(latest().stack.find(l=>l.layerId===firstAdded.id).simulation.depth===firstAdded.filmDepth,'hiding a neighboring layer preserves absolute depth');
+    set('lamp-a-preset','3200');set('lamp-a-intensity','63');set('layer-projector','b');
+    set('lamp-b-kelvin','4675');set('lamp-b-focus','82');click('lamp-b-ghost');
+    set('lamp-b-offsetX','15');set('lamp-b-offsetY','-9');
+    await until(()=>latest().projectorB?.offsetY===-.09);
+    const b=latest().projectorB;
+    check(latest().lampKelvin===3200 && latest().projectorAIntensity===.63 && b.lampKelvin===4675 && b.focus===.82 &&
+      b.intensity===.08 && b.offsetX===.15 && latest().focus===.74,'independent beam light, exposure, focus and translation');
+    check(latest().stack.find(l=>l.layerId===firstAdded.id).projector==='b' &&
+      latest().stack.filter(l=>l.layerId!==firstAdded.id).every(l=>!l.projector),'selected film alone routes to the second projector');
+    const headings=() => [...$('layer-list').querySelectorAll('[data-projector]')].map(e=>e.textContent);
+    check(headings().join('|')==='Projector A · Tungsten · 3200 K|Projector B · 4675 K','group headings reflect each optical source');
+    click('lamp-b-enabled');await until(()=>latest().projectorB?.enabled===false);
+    check(latest().projectorB.intensity===.08 && latest().stack.some(l=>l.projector==='b'),'muting retains beam B settings and assignments');
+    const twoBeams=await save();await reopen(JSON.stringify(twoBeams));
+    await until(()=>latest()?.projectorB?.enabled===false);
+    check(JSON.stringify(await save())===JSON.stringify(twoBeams),'projector optics and routing round trip');
+    click('lamp-b-enabled');await until(()=>latest().projectorB.enabled);
+    set('lamp-b-preset','3200');await until(()=>latest().projectorB.lampKelvin===latest().lampKelvin);
+    check(headings().length===2 && latest().stack.filter(l=>l.projector==='b').length===1,'identical lamp types remain independent projector groups');
+    $('equip-a-options').querySelector('[value=carousel-550r]').click();
+    set('equip-a-mode','low');set('equip-a-low','40');
+    await until(()=>latest()?.equipmentA?.lampMode==='low' && Math.abs(latest().projectorAIntensity-.63*.4)<1e-8);
+    check(latest().equipmentA.lens.focalLengthMm===127 && latest().equipmentA.lens.fNumber===3.5 && !$('equip-a-carousel').hidden,
+      'model selection exposes the fitted optical geometry and an effective low lamp mode');
+    const beforeAudition=await save();
+    check(beforeAudition.projectorAIntensity===.63 && beforeAudition.equipmentA.lowIntensity===.4,'authored exposure and low-lamp estimate are independently preserved');
+    $('legend-cards').querySelector('[data-audition=joshua]').click();
+    await until(()=>latest()?.equipmentA?.profile==='liquid-overhead' && latest().projectorB?.equipment?.profile==='film');
+    check(JSON.stringify(await save())===JSON.stringify(beforeAudition),'rig audition leaves the project untouched');
+    click('legend-stop');await until(()=>latest()?.equipmentA?.profile==='carousel-550r');
+    $('legend-cards').querySelector('[data-apply=ham]').click();
+    await until(()=>latest()?.projectorB?.equipment?.profile==='liquid-overhead');
+    check((await save()).layers.every((l,i)=>l.simulationSeed===beforeAudition.layers[i].simulationSeed),'applying a historical rig preserves existing oil');
+    click('undo-edit');await idle();
+    check(JSON.stringify(await save())===JSON.stringify(beforeAudition),'applied historical rig is one undoable operation');
+    const normalRequests=previewRequests.filter(Boolean);
+    check(normalRequests.every(c=>c.simulation && (!c.stack || c.stack.every(l=>l.simulation))),
+      'every normal palette and new blank track draws solved fields');
     const legacy=await (await fetch('/coral-wheel.tss')).text();
     await reopen(legacy);
     await until(()=>latest()?.motion==='wheel-with-coral-beads' && !latest().stack);
     check(!latest().simulation && $('wheel-motion').value==='wheel-with-coral-beads','legacy recorded motion survives opening with a solver installed');
     check(JSON.stringify(await save())===JSON.stringify(JSON.parse(legacy)),'legacy project content survives round trip');
+    await window.tssImportAudio();
+    set('range-start','.25');set('range-end','1.25');click('set-range');
+    set('advice-direction','Add an oil cue above the coral study');click('advice-suggest');
+    await until(()=>advisorRequests.length>0);
+    finishInference();await until(()=>!$('advice-review').hidden);
+    set('advice-visual','oil');set('advice-signal','time');set('advice-fit','elastic');
+    set('advice-cue','Coral cue');click('advice-apply');
+    await until(()=>$('selected-name').textContent==='Coral cue');
+    await until(()=>Number.isInteger(latest()?.simulation?.seed));
+    const cue=(await save()).layers[0];
+    check(cue.motion==='wheel-flow' && Number.isInteger(cue.simulationSeed) && cue.palette==='violet-blue',
+      'an authored oil cue inherits the palette of the selected legacy study and saves its own live seed');
+    check(latest().stack.some(l=>l.motion==='wheel-with-coral-beads' && !l.simulation) &&
+      latest().stack.some(l=>l.simulation?.seed===cue.simulationSeed),'the original recorded layer survives adding the new live oil cue');
+    click('advice-suggest');await until(()=>advisorRequests.length===2);finishInference();await until(()=>!$('advice-review').hidden);
+    set('advice-visual','oil');set('advice-signal','time');set('advice-fit','elastic');set('advice-cue','Second oil cue');click('advice-apply');
+    await until(()=>$('selected-name').textContent==='Second oil cue');
+    check((await save()).layers[0].simulationSeed===cue.simulationSeed,'an oil cue based on a seeded layer retains its source seed');
+
+    const templates=[...$('track-source').options].map(o=>o.value).filter(v=>v.startsWith('shipped:'));
+    check(templates.includes('shipped:wheel') && templates.includes('shipped:lagoon') &&
+      !templates.includes('shipped:beads'),'normal oil authoring offers the live shipped templates');
+    const usedSeeds=new Set([cue.simulationSeed]);
+    for (const template of templates) {
+      set('track-source',template);set('wand-mode','stretch');click('add-layer');await idle();
+      const added=(await save()).layers[0];
+      check(Number.isInteger(added.simulationSeed) && !usedSeeds.has(added.simulationSeed),
+        template+' creates independent simulated oil');
+      usedSeeds.add(added.simulationSeed);
+    }
+
+    await reopen(legacy);
+    set('wheel-motion','simulated');await until(()=>Number.isInteger(latest()?.simulation?.seed));
+    check((await save()).layers[0].simulationSeed===latest().simulation.seed,'an explicit legacy-to-live conversion persists its new seed');
 
     // Restart the real editor with a separate capability response and reopen its saved live project.
     location.hash='missing-helper';location.reload();
@@ -203,9 +325,8 @@ async function exerciseControls(platform) {
       check(rear.value==='pdms-20' && front.value==='pdms-1000' && front.disabled,'normal reopen restores both oils and source override');
       set('wheel-motion','wheel-flow');click('add-layer');set('slide-preset','yellow-red');
       await until(()=>previewRequests.at(-1)?.stack?.length===2);
-      check(rear.value==='wheel' && front.value==='wheel','new wheel starts with original motion');
-      set('front-film-oil','pdms-20');
-      await until(()=>previewRequests.at(-1)?.stack?.some(l=>l.wheel==='yellow-red' && l.materialMotion?.front==='pdms-20'));
+      check(rear.disabled && front.disabled && Number.isInteger(previewRequests.at(-1).simulation?.seed),
+        'the added yellow/red layer uses the independent live solver');
       const layers=previewRequests.at(-1).stack;
       check(layers.some(l=>l.wheel==='violet-blue' && l.materialMotion.rear==='pdms-20' && l.materialMotion.front==='pdms-1000'),
         'stack keeps the first wheel independent of selected wheel');
@@ -228,20 +349,31 @@ async function exerciseControls(platform) {
     const preview=previewRequests.at(-1);
     check(preview.renderWidth===640 && preview.rect.width>0 && preview.rect.height>0,'Mac uses live wheel and device pixel viewport');
     check(!$('native-wheel-controls').hidden && !$('artwork-add').hidden,'Mac exposes live optics and media controls');
-    set('wheel-films','front');await until(()=>previewRequests.at(-1)?.visibleFilms==='front');
+    set('film-depth','82');await until(()=>previewRequests.at(-1)?.simulation?.depth===.82);
     set('wheel-focus','68');await until(()=>previewRequests.at(-1)?.focus===.68);
     click('show-logo');await until(()=>previewRequests.at(-1)===null);
     $('logo-dialog').close();await until(()=>previewRequests.at(-1)?.wheel==='violet-blue');
+    check(Number.isInteger(previewRequests.at(-1).simulation?.seed),'Mac desktop defaults to live oil');
+    incoming=await (await fetch('/coral-wheel.tss')).text();
+    click('open-project');await until(()=>$('replace-project').open);
+    $('replace-project').querySelector('[value=replace]').click();await idle();
+    set('wheel-films','front');
+    set('layer-projector','b');set('lamp-a-preset','3200');set('lamp-b-intensity','19');
+    $('equip-b-options').querySelector('[value=carousel-550r]').click();set('equip-b-mode','low');
     await window.tssImportAudio();
     await until(()=>!$('export-native-wheel').disabled);
     click('export-native-wheel');
     await until(()=>movieRequests.length===1 && !$('native-wheel-export-progress').open);
     const movie=movieRequests[0];
+    check(movie.request.lampKelvin===3200 && movie.request.stack?.[0].projector==='b' &&
+      movie.request.projectorB.equipment?.profile==='carousel-550r' && Math.abs(movie.request.projectorB.intensity-.19*.6)<1e-8,
+      'native recorded-field movie receives the auditioned light settings, fitted lens and the effective relative output');
     check(movie.request.visibleFilms==='front' && movie.request.wheel==='violet-blue' &&
       movie.request.duration>1.9 && movie.audioPath.endsWith('two-slide-cues.m4a') &&
       movie.outputPath.endsWith('.mp4'),'Mac movie command carries selected film, decoded duration and chosen paths');
     return;
   }
+  const tracks=()=>parseInt($('layer-count').textContent,10), initialTracks=tracks();
   await window.tssImportAudio();
   $('advice-panel').open=true;
   set('advice-direction','Violet at the downbeat');click('advice-suggest');
@@ -257,7 +389,7 @@ async function exerciseControls(platform) {
   set('range-end','1.1');click('set-range');finishInference();
   await until(()=>!$('advice-suggest').disabled);
   check($('advice-review').hidden && $('advice-status').textContent.includes('selection changed') &&
-    $('layer-count').textContent.startsWith('1'),'pending inference on a stale range cannot alter the arrangement');
+    tracks()===initialTracks,'pending inference on a stale range cannot alter the arrangement');
   set('range-end','1.25');click('set-range');click('advice-lyrics');click('advice-suggest');
   await until(()=>advisorRequests.length===2);
   check(advisorRequests[1].direction==='Violet at the downbeat\nLyric excerpt: Reviewed lyric' && advisorRequests[1].port===18081,
@@ -267,32 +399,33 @@ async function exerciseControls(platform) {
     $('advice-range').textContent==='0.25–1.25 s','review precedes any track change');
   set('advice-visual','oil');set('advice-signal','time');set('advice-fit','elastic');set('advice-cue','Reviewed blue oil');
   click('advice-apply');await until(()=>$('advice-status').textContent.includes('Added the reviewed oil layer'));
-  check($('layer-count').textContent.startsWith('2') && $('selected-name').textContent==='Reviewed blue oil','edited suggestion adds a real selected track');
+  check(tracks()===initialTracks+1 && $('selected-name').textContent==='Reviewed blue oil','edited suggestion adds a real selected track');
   click('save-project');await idle();
   const applied=JSON.parse(documentText).layers[0];
   check(applied.name==='Reviewed blue oil' && applied.envelope.length===1 && applied.envelope[0].start===.25 &&
     applied.envelope[0].end===1.25 && applied.envelope[0].rule.mode==='stretch','granted range and edited fit persisted');
   click('undo-edit');await idle();
-  check($('layer-count').textContent.startsWith('1') && $('selected-name').textContent!=='Reviewed blue oil','advisor track is undoable');
+  check(tracks()===initialTracks && $('selected-name').textContent!=='Reviewed blue oil','advisor track is undoable');
   click('deselect-time');click('advice-lyrics');
   if (windows) {
-    set('wheel-motion','wheel-with-coral-beads');set('wheel-films','front');set('wheel-focus','71');
-    set('wheel-slide','front');set('wheel-gesture','pressure');set('mouse-pressure','81');
+    set('film-depth','21');set('wheel-focus','71');
+    set('wheel-gesture','pressure');set('mouse-pressure','81');
     set('native-export-baseline','neutral');
   }
   click('add-layer'); set('speed','1.8'); click('save-project');await idle();
   const saved=JSON.parse(documentText);
-  check(saved.layers.length===2 && saved.layers[0].speed===1.8 && saved.audio.sha256.length===64,'save controls');
-  if (windows) check(saved.layers[1].visibleFilms==='front' && saved.focus===.71 && saved.layers[1].mousePressure.front===.81 &&
+  check(saved.layers.length===initialTracks+1 && saved.layers[0].speed===1.8 && saved.audio.sha256.length===64,'save controls');
+  const first=saved.layers.find(l=>l.id===1);
+  if (windows) check(first.visibleFilms==='rear' && first.filmDepth===.21 && saved.focus===.71 && first.mousePressure.rear===.81 &&
     saved.gestures.macros[0].name==='Pulse' && saved.gestures.lyricGroups[0].occurrences.length===2 && saved.exportBaseline==='neutral','native controls');
   click('undo-edit');await idle();check($('speed').value==='1','undo');
   click('redo-edit');await idle();check($('speed').value==='1.8','redo');
   incoming=JSON.stringify({...saved,version:2});click('open-project');await idle();
-  check($('app-status').textContent.includes('Unsupported') && $('layer-count').textContent.startsWith('2'),'invalid open preserves session');
+  check($('app-status').textContent.includes('Unsupported') && tracks()===initialTracks+1,'invalid open preserves session');
   incoming=documentText;click('add-layer');click('open-project');await until(()=>$('replace-project').open);
-  $('replace-project').querySelector('[value=keep]').click();await idle();check($('layer-count').textContent.startsWith('3'),'cancel replacement');
+  $('replace-project').querySelector('[value=keep]').click();await idle();check(tracks()===initialTracks+2,'cancel replacement');
   click('open-project');await until(()=>$('replace-project').open);$('replace-project').querySelector('[value=replace]').click();await idle();
-  check(!$('relink-audio').hidden && $('play').disabled && $('layer-count').textContent.startsWith('2'),'offline project');
+  check(!$('relink-audio').hidden && $('play').disabled && tracks()===initialTracks+1,'offline project');
   lastSelection=9;await window.tssImportAudio(undefined,true);check($('play').disabled && $('app-status').textContent.includes('does not match'),'wrong song');
   lastSelection=2;await window.tssImportAudio(undefined,true);check(!$('play').disabled && $('relink-audio').hidden,'relink');
   linked=[2,'/other/two-slide-cues.m4a'];click('open-project');await idle();click('save-project');await idle();
@@ -307,20 +440,24 @@ async function exerciseControls(platform) {
   set('template-name','Verse fold');click('save-song-track');await idle();click('save-user-template');await idle();
   check([...$('track-source').options].some(o=>o.text==='Song · Verse fold') &&
     [...$('track-source').options].some(o=>o.text==='Template · Verse fold'),'song and reusable libraries');
-  click('add-layer');await idle();check($('layer-count').textContent.startsWith('3'),'add template track');
+  click('add-layer');await idle();check(tracks()===initialTracks+2,'add template track');
   click('clear-region');await idle();click('save-project');await idle();
   check(JSON.parse(documentText).layers[0].envelope.length===0,'regional clear');
   click('undo-edit');await idle();
   click('merge-region-project');await idle();click('save-project');await idle();
   const merged=JSON.parse(documentText);
-  check(merged.layers.length===5 && new Set(merged.layers.map(l=>l.id)).size===5 && merged.layers[0].envelope[0].start===.25,'regional merge');
-  if(windows)check(merged.gestures.macros.length===2 && merged.gestures.macros[1].events[0].layerId===merged.layers[1].id,'regional gesture remap');
+  check(merged.layers.length===2*initialTracks+3 && new Set(merged.layers.map(l=>l.id)).size===merged.layers.length && merged.layers[0].envelope[0].start===.25,'regional merge');
+  if(windows)check(merged.gestures.macros.length===2 && merged.gestures.macros[1].events[0].layerId===merged.layers.slice(0,saved.layers.length).find(l=>l.name===first.name).id,'regional gesture remap');
   const media={name:'Plate.gif',sha256:'a'.repeat(64),width:200,height:120,durationUs:800000,still:false,
     offsetUs:0,rate:1,loop:true,mode:'color',keyEnabled:false,keyColor:'#00FF00',keyThreshold:.2,keySoftness:.1,
     gradientA:'#000000',gradientB:'#FFFFFF',gradientRate:0,blur:0,distortion:0,bounce:0,maskA:null,maskB:null,
     maskOp:'union',shape:'none',assetId:999};
   merged.layers[0].media=media;
   merged.layers[1].media={...media,name:'Offline.gif',sha256:'b'.repeat(64)};
+  for(const layer of merged.layers.slice(0,2)){
+    delete layer.simulationSeed;delete layer.filmDepth;delete layer.presetGroup;delete layer.dyeIndex;
+    layer.colors=['#ffffff','#aa88aa','#335533','#aaff00'];
+  }
   incoming=JSON.stringify(merged);click('open-project');await idle();
   check($('app-status').textContent.includes('Offline.gif'),'offline visual source named: '+$('app-status').textContent);
   click('save-project');await idle();const restored=JSON.parse(documentText);
@@ -335,6 +472,7 @@ const editorCases=[
   ['Macintosh','Mac desktop native wheel selection, optics and modal visibility'],
   ['Windows coral project','Open and replay the standalone coral capture project without audio'],
   ['Windows live solver','Desktop live solver lifecycle, independent pigments and seed-preserving offline reopen'],
+  ['Windows recorded benchmark','Explicit two-track recorded benchmark remains reproducible'],
   ['Windows film oils','Independent slide oil selection, release overrides, undo, save, reopen and stack'],
 ];
 for (const [platform,title] of editorCases) test(title,
@@ -347,6 +485,9 @@ for (const [platform,title] of editorCases) test(title,
     const server=createServer(async(req,res)=>{
       try {
         if(req.url==='/report') {let body='';for await(const part of req)body+=part;res.end();report(body);return;}
+        if(req.url.startsWith('/assets/wheel-previews/') || /\.mp4(?:\?|$)/.test(req.url)){
+          res.writeHead(404);res.end();report('Unexpected video fetch: '+req.url);return;
+        }
         if(req.url==='/') {
           const html=(await readFile(new URL('index.html',web),'utf8')).replace('<script type="module" src="app.js"></script>',
             '<script type="module">('+exerciseControls.toString()+')('+JSON.stringify(platform)+').then(()=>fetch("/report",{method:"POST",body:"pass"})).catch(e=>fetch("/report",{method:"POST",body:e.stack}));</script>');

@@ -1,6 +1,6 @@
 struct PlateMaterial {
     rear: vec4<f32>, front: vec4<f32>, joint: vec4<f32>,
-    rim: vec4<f32>, carrier: vec4<f32>, lens: vec4<f32>,
+    rim: vec4<f32>, carrier: vec4<f32>, lens: vec4<f32>, lamp: vec4<f32>, geometry: vec4<f32>,
     // Scale and origin in the native 16:9 optical gate.
     gate: vec4<f32>,
 }

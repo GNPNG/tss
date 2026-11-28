@@ -41,6 +41,9 @@ pub struct Event {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Request {
+    #[serde(flatten)]
+    pub(super) lighting: super::Lighting,
+    pub(super) focus: Option<f32>,
     #[serde(default)]
     pub(super) detail_scale: Option<f32>,
     #[serde(default)]
@@ -238,6 +241,8 @@ mod tests {
     }
     fn request(events: Vec<Event>) -> Request {
         Request {
+            lighting: serde_json::from_str("{}").unwrap(),
+            focus: None,
             detail_scale: None,
             stack: Vec::new(),
             visible_films: super::super::VisibleFilms::Both,

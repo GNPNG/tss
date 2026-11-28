@@ -118,12 +118,7 @@ impl LiveWheel {
         }
         let materials = layers
             .iter()
-            .map(|l| {
-                Ok((
-                    l.id,
-                    material::resolve(&self.materials, &l.wheel, l.swatches)?,
-                ))
-            })
+            .map(|l| Ok((l.id, self.layer_material(l.id, &l.wheel, l.swatches)?)))
             .collect::<Result<HashMap<_, _>, String>>()?;
         let saved = (self.motion, self.material_motion);
         let result = layers
@@ -187,13 +182,14 @@ impl LiveWheel {
             self.switch_film_sources(layer.motion, layer.material_motion)
                 .expect("stack geometry validated at selection");
             self.slide_visibility = layer.films;
-            let mut material = self.active_material;
-            material.lens = [
-                self.focus.unwrap_or(-1.),
-                layer.opacity_at(program_time),
-                (2 * index) as f32 / intervals,
-                (2 * index + 1) as f32 / intervals,
-            ];
+            let gain = layer.opacity_at(program_time);
+            let material = self.exposure_material(
+                if index == 0 { gain } else { -1. - gain },
+                [
+                    (2 * index) as f32 / intervals,
+                    (2 * index + 1) as f32 / intervals,
+                ],
+            );
             self.queue
                 .write_buffer(&self.material_uniform, 0, bytemuck::bytes_of(&material));
             let times = if layer.id == selected {
