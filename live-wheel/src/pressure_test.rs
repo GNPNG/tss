@@ -18,6 +18,71 @@ fn write_ppm(path: &Path, size: [u32; 2], rgba: &[u8]) {
     }
 }
 
+#[cfg(feature = "live-solver")]
+#[test]
+#[ignore = "requires a live Basilisk executable and an isolated CPU Vulkan ICD"]
+fn a_stationary_press_transports_only_the_selected_live_oil() {
+    use std::time::{Duration, Instant};
+    let size = [640, 360];
+    let mut r = crate::feedback_test::fixture(size);
+    let exe = std::env::var_os("TSS_LIVE_SOLVER").expect("live solver path");
+    r.select_track(7);
+    r.set_live_solver(7, Path::new(&exe), 83724, 0.).unwrap();
+    r.set_wheel("yellow-red").unwrap();
+    r.set_preview_width(size[0]).unwrap();
+    r.set_footprint_sampling(true);
+    let wait_tick = |r: &LiveWheel, tick| {
+        let start = Instant::now();
+        loop {
+            let s = r.live_solver_status(7).unwrap();
+            assert!(s.error.is_none(), "{:?}", s.error);
+            if s.state == "ready" && s.tick >= tick { break; }
+            assert!(start.elapsed() < Duration::from_secs(8), "missing squeeze tick {tick}");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    };
+    let out = std::env::var_os("TSS_SQUEEZE_STILLS").map(std::path::PathBuf::from);
+    wait_tick(&r, 0);
+    let mut original = None;
+    let mut light_delta = 0;
+    let mut contact = [0.5, 0.5];
+    for (tick, (label, amount)) in [("rest", 0.), ("light", 0.25), ("hard", 1.), ("released", 0.)]
+        .into_iter().enumerate() {
+        r.set_slide_pressure(0, amount, contact).unwrap();
+        wait_tick(&r, tick as u64);
+        let rgba = picture(&mut r);
+        if let Some(dir) = &out { write_ppm(&dir.join(format!("{label}.ppm")), size, &rgba); }
+        let field = read_rgba16(&r, &r.interpolated, r.field_size());
+        if tick == 0 {
+            let [w,h] = r.field_size().map(|x| x as usize);
+            let mut best = f32::INFINITY;
+            for y in h/8..7*h/8 {
+                for x in w/8..7*w/8 {
+                    let i = y*w+x;
+                    if (half(field[i][0]) >= 0.5) == (half(field[i+1][0]) >= 0.5) { continue; }
+                    let uv = [x as f32 / w as f32, y as f32 / h as f32];
+                    let score = (uv[0]-0.5).powi(2) + (uv[1]-0.5).powi(2);
+                    if score < best {
+                        best = score;
+                        contact = [uv[0] + 0.055, uv[1]];
+                    }
+                }
+            }
+            assert!(best.is_finite(), "no projected oil edge in the contact region");
+            eprintln!("pressure test contact {contact:?}");
+        }
+        let baseline = original.get_or_insert_with(|| field.clone());
+        let mut delta = 0u64;
+        for (a,b) in field.iter().zip(baseline.iter()) {
+            assert_eq!(a[1], b[1], "opposite oil moved during paused squeeze");
+            delta += u64::from(a[0].abs_diff(b[0]));
+        }
+        if tick == 1 { assert!(delta > 0); light_delta = delta; }
+        if tick == 2 { assert!(delta > light_delta); }
+        eprintln!("{label}: selected oil field absolute change {delta}, other oil identical");
+    }
+}
+
 #[test]
 #[ignore = "requires an isolated software Vulkan ICD"]
 fn colored_pressure_follows_one_slide_and_releases_exactly() {

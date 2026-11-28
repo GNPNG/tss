@@ -1,0 +1,4 @@
+32x32, contact (0.484375,0.390625), moved to (0.296875,0.609375), radius 0.131; changed pixels contained in the measured contact disks.
+Paused press: (changed samples, L1 u8) light (16, 102), hard (19, 451), release (18, 532); repeated hold byte-identical; time zero.
+Full load gap min 0.377349, max 1.151212; release min and max 1. Paused relative volume drift oil 2.220e-16, carrier 6.661e-16.
+Evolving press vs control: at tick 20 (93, 421); 10 ticks after release (121, 604). Max relative drift oil 4.669e-6, carrier 2.357e-6. Untouched cell matched all 31 legacy frames.

@@ -16,6 +16,7 @@ import { installProjectionLight, effectiveLighting } from './projection-light.js
 import { installPerformerDeck } from './performer-host.js';
 import { ProjectorDeck } from './projector-output.js';
 import { StereoPressureDeck } from './stereo-pressure.js';
+import { TrackpadMeter } from './trackpad-meter.js';
 import { initMacroDeck, songFingerprint, songGestureEvents } from './gesture-macros.js';
 import { PROJECT_FORMAT, layerSettings, validateProject, emptyGestures, EditHistory } from './project-file.js';
 import { audioCueGroups } from './phrase-cues.js';
@@ -42,7 +43,7 @@ let recordedBenchmark = false;
 const newFluidSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 const liveFluidTrack = layer => layer?.simulationSeed != null && !layer.media;
 let stereoDeck = null;
-const solvingProgram = () => !!stereoDeck?.selection || state.layers.some(layer => liveFluidTrack(layer) &&
+const solvingProgram = () => state.layers.some(layer => liveFluidTrack(layer) &&
   (layer.visible || state.layers.some(({visible, media}) => visible && media?.assetId != null &&
     (media.maskA === layer.id || media.maskB === layer.id))));
 const missingSolver = () => !solverAvailable && solvingProgram();
@@ -86,10 +87,19 @@ const legends=installLegends({
 byId('legends').hidden=!nativeDesktop;
 const usesLiveProjection=()=>!!legends.audition || lighting.usesLiveOptics || state.layers.some(l=>l.projector==='b');
 function wheelGestureSelection() { return selectedLayer()?.media ? null : liveSelection(); }
+function stereoPressureLayer() {
+  const cells = state.layers.filter(l => l.visible && liveFluidTrack(l) && l.filmDepth != null);
+  // The timeline is front-to-back, so equal physical depths favor the upper track.
+  return cells.find(l => l.id === stereoDeck?.targetId) ??
+    cells.reduce((front, l) => !front || l.filmDepth > front.filmDepth ? l : front, null);
+}
 function liveSelection() {
-  if (stereoDeck?.selection) return stereoDeck.selection;
-  const layer = selectedLayer();
-  if (!nativeDesktop || (startingNative && !slidePresets.size) || !layer || (!isWheel(layer) && !layer.media) || state.exporting || missingSolver()) return null;
+  const selected = selectedLayer();
+  if (!selected) return null;
+  const pressureTarget = stereoDeck?.active ? stereoPressureLayer() : null;
+  if (stereoDeck?.active && !pressureTarget) return null;
+  const layer = pressureTarget ?? selected;
+  if (!nativeDesktop || (startingNative && !slidePresets.size) || (!isWheel(layer) && !layer.media) || state.exporting || missingSolver()) return null;
   const rig=legends.audition;
   const stack = programLayers(state.layers,isWheel);
   if(rig)for(const item of stack)if(rig.routes.has(item.layerId))item.projector=rig.routes.get(item.layerId);
@@ -99,15 +109,19 @@ function liveSelection() {
   return { ...effectiveLighting(rig?.fields??lighting.fields()), ...(needsStack ? {stack} : {}), layerId: layer.id, wheel: layer.media?'violet-blue':layer.palette, slide: layer.slide, gesture: layer.gesture,
     ...paletteFields(layer), ...simulationFields(layer), ...detailScaleFields(layer), motion: layer.motion, motionTake: layer.motionTake, ...materialMotionFields(layer.media ? null : layer), visibleFilms: layer.visibleFilms ?? 'both',
     mousePressure: layer.mousePressure?.[layer.slide] ?? 0.5,
-    tugResponse: layer.tugResponse[layer.slide], renderWidth: layer.renderWidth, focus: rig?.focus??projectorFocus,
-    ...feedbackDeck.config(projectorDeck?.enabled || timed), keepPresenting:!!projectorDeck?.enabled };
+    tugResponse: layer.tugResponse[layer.slide], renderWidth: selected?.renderWidth ?? layer.renderWidth, focus: rig?.focus??projectorFocus,
+    ...feedbackDeck.config(projectorDeck?.enabled || stereoDeck?.active || timed),
+    keepPresenting:!!(projectorDeck?.enabled || stereoDeck?.active),
+    ...(pressureTarget ? {slide:'rear', gesture:'pressure', hardwarePressureOnly:true,
+      renderWidth:pressureMeter.stereoWidth, stereoDepth:pressureMeter.stereoDepth} : {}),
+    ...(pressureMeter && (pressureTarget || layer.gesture==='pressure') ? {pressureSensitivity:pressureMeter.sensitivity} : {}) };
 }
 const feedbackDeck = new VideoFeedbackControls(byId('video-feedback'), () => nativeSurface?.sync());
 function anchorFeedback(discontinuity = false, ended = false) {
   feedbackDeck.clock({loaded:!!(state.audioBuffer||state.audioRef), playing:state.playing,
     position:state.audioBuffer?currentPosition():state.position,ended},discontinuity);
   if(discontinuity) projectorDeck?.flush();
-  if (projectorDeck?.enabled || state.layers.some(l => l.envelope != null || l.media)) nativeSurface?.sync();
+  if (projectorDeck?.enabled || stereoDeck?.active || state.layers.some(l => l.envelope != null || l.media)) nativeSurface?.sync();
 }
 
 function reportNativeStats(stats) {
@@ -123,12 +137,15 @@ function reportNativeStats(stats) {
     readout.textContent = 'Waiting for native frame timing…';
     return;
   }
-  readout.textContent = `${stats.adapter} · ${stats.width} × ${stats.height} · ${stats.fps.toFixed(1)} FPS · p95 ${stats.p95Ms.toFixed(1)} ms · queue limit ${stats.frameLatency} frames`;
+  readout.textContent = `${stats.adapter} · ${stats.width} × ${stats.height} · ${stats.fps.toFixed(1)} FPS · p95 ${stats.p95Ms.toFixed(1)} ms · editor queue target ${stats.frameLatency} frames`;
   if (Number.isSafeInteger(stats.simulationTick)) readout.textContent += ' · fluid step ' + stats.simulationTick;
 }
 
 const nativeSurface = nativeDesktop ? new NativeWheelSurface(
   window.__TAURI__.core.invoke, preview, liveSelection, reportNativeStats
+) : null;
+const pressureMeter = nativeDesktop && !windowsDesktop ? new TrackpadMeter(
+  byId('trackpad-meter'), () => nativeSurface.sync(), window.__TAURI__.event.listen
 ) : null;
 async function prepareWheel(){
   if(!liveSelection()) throw new Error('Select a visible native slide or artwork track first.');
@@ -142,16 +159,14 @@ if (windowsDesktop) projectorDeck = new ProjectorDeck({
 if (nativeDesktop && !windowsDesktop) stereoDeck = new StereoPressureDeck({
   button:byId('projector'), output:byId('stereo-pressure-state'),
   invoke:window.__TAURI__.core.invoke, listen:window.__TAURI__.event.listen,
-  usedIds:() => new Set([...state.layers.map(layer => layer.id), ...retainedNativeLayers]),
-  blocked:() => state.exporting || !!wheelExporter?.busy || !!plateExporter?.busy,
+  unavailableReason:() => state.exporting || wheelExporter?.busy || plateExporter?.busy
+    ? 'Finish the current export before starting live 3D.'
+    : stereoPressureLayer() ? '' : 'Live 3D pressure needs a visible simulated oil layer with a slide depth.',
   prepare:async () => {
     preview.scrollIntoView({block:'nearest'});
     await nativeSurface.requirePresentation();
   },
-  restore:async ids => {
-    await nativeSurface.sync();
-    for (const layerId of ids) await desktopInvoke('forget_live_wheel_layer', {layerId});
-  },
+  sync:() => nativeSurface.sync(),
   change:() => { renderControls(); updateTransport(); }, status,
 });
 const macroDeck = windowsDesktop ? initMacroDeck({
@@ -553,6 +568,7 @@ function addDyeSlide(preset, envelope = null) {
 }
 function selectLayer(id) {
   state.selected = id;
+  if (stereoDeck?.active) stereoDeck.targetId = id;
   renderTimeline();
   renderControls();
 }
@@ -592,7 +608,7 @@ function renderTrack(layer,index,tracks,list,lanes) {
   const toggle = layerButton(layer.visible ? '●' : '○', `${layer.visible ? 'Hide' : 'Show'} ${layer.name}`, () => { layer.visible = !layer.visible; renderTimeline(); renderControls(); });
   function swap(other) {
     const a=state.layers.indexOf(layer),b=state.layers.indexOf(other);
-    [state.layers[a],state.layers[b]]=[other,layer];renderTimeline();
+    [state.layers[a],state.layers[b]]=[other,layer];renderTimeline();renderControls();
   }
   const up = layerButton('↑', `Move ${layer.name} up`, () => swap(tracks[index-1]), index===0);
   const down = layerButton('↓', `Move ${layer.name} down`, () => swap(tracks[index+1]), index===tracks.length-1);
@@ -651,6 +667,7 @@ function renderTimeline() {
   }
 }
 function renderControls() {
+  stereoDeck?.refresh();
   byId('projection-light').hidden=!nativeDesktop;
   lighting.refresh();
   updateExportNote();
@@ -675,7 +692,7 @@ function renderControls() {
   byId('native-wheel-controls').hidden = !nativeDesktop || !paletteAvailable;
   byId('native-performance').hidden = !live;
   byId('native-wheel-controls').hidden ||= !!layer?.media;
-  byId('live-wheel').checked = !!live;
+  byId('live-wheel').checked = !!live && !!layer?.visible && isWheel(layer);
   byId('live-wheel').disabled = !paletteAvailable || !layer?.visible || liveFluidTrack(layer);
   const simulated = liveFluidTrack(layer);
   const single = layer?.filmDepth != null;
@@ -708,14 +725,16 @@ function renderControls() {
     ? 'Replay front beads' : 'Replay release live';
   byId('replay-release').disabled = !live;
   byId('wheel-slide').value = layer?.slide ?? 'rear';
-  byId('wheel-width').value = String(layer?.renderWidth ?? 640);
-  byId('wheel-gesture').value = layer?.gesture ?? 'tug';
+  byId('wheel-width-label').textContent = stereoDeck?.active ? 'Resolution per eye' : 'Live resolution';
+  byId('wheel-width').value = String(stereoDeck?.active ? pressureMeter.stereoWidth : layer?.renderWidth ?? 640);
+  byId('wheel-gesture').value = stereoDeck?.active && live?.hardwarePressureOnly ? 'pressure' : layer?.gesture ?? 'tug';
   byId('wheel-gesture').disabled = byId('wheel-slide').disabled = byId('wheel-width').disabled = !live;
-  byId('wheel-slide').disabled ||= single;
+  byId('wheel-slide').disabled ||= single || !!live?.hardwarePressureOnly;
   byId('wheel-slide').parentElement.hidden = single;
   byId('tug-response').value = String(layer?.tugResponse[layer.slide] ?? 0.4);
-  byId('tug-response').disabled = !live || layer?.gesture !== 'tug';
-  byId('mouse-pressure-controls').hidden = !live || layer?.gesture !== 'pressure';
+  byId('tug-response').disabled = !live || !!live.hardwarePressureOnly || layer?.gesture !== 'tug';
+  byId('wheel-gesture').disabled ||= !!(stereoDeck?.active && live?.hardwarePressureOnly);
+  byId('mouse-pressure-controls').hidden = !live || layer?.gesture !== 'pressure' || !!live.hardwarePressureOnly;
   const strength = Math.round(100 * (layer?.mousePressure?.[layer?.slide] ?? .5));
   byId('mouse-pressure').value = strength;
   byId('mouse-pressure-value').textContent = strength+'%';
@@ -731,10 +750,16 @@ function renderControls() {
     ? `Drag around the center to rotate the ${target}.`
     : layer?.gesture === 'pressure' ? `Press the ${target} to compress it. Release to restore the gap.`
     : `Drag to tug the oil in the ${target}.`;
-  byId('stereo-pressure-state').hidden = !stereoDeck?.selection;
-  if (stereoDeck?.selection) {
-    byId('preview-status').textContent = 'LIVE 3D · THREE OIL LAYERS';
-    byId('native-instruction').textContent = 'Move the pointer onto the pink front oil in the Mac preview. Press the trackpad to compress it, then ease off to release.';
+  const targetLayer = state.layers.find(l => l.id === live?.layerId);
+  pressureMeter?.setStereoActive(!!stereoDeck?.active);
+  pressureMeter?.setTarget(live?.gesture === 'pressure' && targetLayer && !targetLayer.media
+    ? {layerId:live.layerId, slide:live.slide, name:targetLayer.name} : null);
+  byId('stereo-pressure-state').hidden = !stereoDeck?.active;
+  if (stereoDeck?.active && live) {
+    byId('preview-status').textContent = 'LIVE 3D · PROJECT OUTPUT';
+    byId('native-instruction').textContent = live.hardwarePressureOnly
+      ? `Press the MacBook trackpad over the preview to compress ${targetLayer.name}. Select another oil layer to control it.`
+      : 'Showing project output. Add a live oil layer to control its compression in 3D.';
   }
   byId('audio-note').hidden = !!live;
   byId('hue').disabled = !layer || !!layer.media;
@@ -767,7 +792,7 @@ function renderControls() {
   ['hue', 'speed', 'scale', 'opacity'].forEach((id) => { byId(id).value = layer[id]; });
   byId('hue-label').textContent = `${layer.hue}°`;
   byId('speed-output').textContent = `${layer.speed.toFixed(1)}×`;
-  byId('scale-output').textContent = `${layer.scale.toFixed(2)}×`;
+  updateScaleReadout(layer.scale);
   byId('opacity-output').textContent = `${Math.round(layer.opacity * 100)}%`;
 }
 function renderFrame(timestamp) {
@@ -1013,8 +1038,10 @@ byId('mouse-pressure').addEventListener('input', event => {
   nativeSurface?.sync();
 });
 byId('wheel-width').addEventListener('change', (event) => {
-  const layer = selectedLayer();
-  if (layer) { layer.renderWidth = Number(event.target.value); renderControls(); }
+  const width = Number(event.target.value);
+  if (stereoDeck?.active) pressureMeter.setStereoWidth(width);
+  else if (selectedLayer()) selectedLayer().renderWidth = width;
+  renderControls();
 });
 function updateFocusControl() {
   const value = Math.round(100 * (projectorFocus ?? 0.5));
@@ -1031,7 +1058,8 @@ byId('film-depth').addEventListener('input', event => {
   if (layer?.filmDepth == null) return;
   layer.filmDepth = Number(event.target.value) / 100;
   byId('film-depth-value').textContent = event.target.value+'%';
-  nativeSurface?.sync();
+  if (stereoDeck?.active) renderControls();
+  else nativeSurface?.sync();
 });
 byId('wheel-focus').addEventListener('input', (event) => {
   projectorFocus = Number(event.target.value) / 100;
@@ -1177,13 +1205,19 @@ seekArea.addEventListener('click',event=>{
   if(!dragged)seek(atWave(event)).catch(error=>status(error.message));
   dragged=false;
 });
+function updateScaleReadout(scale) {
+  const readout = scale.toFixed(2) + '× (' + (1 / scale).toFixed(2) + '× zoom)';
+  byId('scale-output').textContent = readout;
+  byId('scale').setAttribute('aria-valuetext', readout);
+}
 for (const id of ['hue', 'speed', 'scale', 'opacity']) {
   byId(id).addEventListener('input', (event) => {
     const layer = selectedLayer();
     if (!layer) return;
     layer[id] = Number(event.target.value);
     if (id === 'hue') { renderControls(); return; }
-    byId(id+'-output').textContent = id === 'opacity' ? Math.round(layer.opacity*100)+'%' : layer[id].toFixed(2)+'×';
+    if (id === 'scale') updateScaleReadout(layer.scale);
+    else byId(id+'-output').textContent = id === 'opacity' ? Math.round(layer.opacity*100)+'%' : layer[id].toFixed(2)+'×';
     nativeSurface?.sync();
   });
 }

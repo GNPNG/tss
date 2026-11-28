@@ -26,6 +26,25 @@ pub struct Drive {
     pub drive: f64,
 }
 
+/// A normal load on one glass cell. Distances are fractions of the full slide width.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Squeeze {
+    pub center: [f64; 2],
+    pub radius: f64,
+    pub load: f64,
+}
+
+impl Squeeze {
+    fn validate(self) -> io::Result<()> {
+        if self.center.into_iter().chain([self.radius, self.load]).all(|v| (0.0..=1.).contains(&v))
+            && (self.load == 0. || self.radius > 0.)
+        {
+            return Ok(());
+        }
+        Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid squeeze contact"))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Field {
     pub tick: u64,
@@ -109,6 +128,23 @@ impl Cell {
     }
 
     pub fn step(&mut self, drive: Drive) -> io::Result<Field> {
+        self.advance(drive, None)
+    }
+
+    pub fn step_with_pressure(&mut self, drive: Drive, pressure: Squeeze) -> io::Result<Field> {
+        self.advance(drive, Some(pressure))
+    }
+
+    pub fn press(&mut self, pressure: Squeeze) -> io::Result<Field> {
+        pressure.validate()?;
+        let commands = self.commands.as_mut().ok_or(io::ErrorKind::BrokenPipe)?;
+        let [x, y] = pressure.center;
+        writeln!(commands, "PRESS {x} {y} {} {}", pressure.radius, pressure.load)?;
+        commands.flush()?;
+        self.read_field()
+    }
+
+    fn advance(&mut self, drive: Drive, pressure: Option<Squeeze>) -> io::Result<Field> {
         if ![drive.x, drive.y, drive.drive]
             .iter()
             .all(|v| (0.0..=1.0).contains(v))
@@ -122,11 +158,14 @@ impl Cell {
             ));
         }
         let commands = self.commands.as_mut().ok_or(io::ErrorKind::BrokenPipe)?;
-        writeln!(
-            commands,
-            "STEP {} {} {} {} {}",
-            drive.x, drive.y, drive.dx, drive.dy, drive.drive
-        )?;
+        let Drive { x, y, dx, dy, drive } = drive;
+        if let Some(p) = pressure {
+            p.validate()?;
+            let [px, py] = p.center;
+            writeln!(commands, "STEP {x} {y} {dx} {dy} {drive} {px} {py} {} {}", p.radius, p.load)?;
+        } else {
+            writeln!(commands, "STEP {x} {y} {dx} {dy} {drive}")?;
+        }
         commands.flush()?;
         self.read_field()
     }

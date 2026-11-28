@@ -11,8 +11,10 @@ use tauri::{Emitter, Manager, WebviewWindow};
 use tss_live_wheel::{wgpu, DecodedMediaFrame, LiveWheel, MediaTrack, SlideGesture, WheelLayer};
 
 mod audience;
+mod pressure_meter;
 mod proof;
 mod view;
+use pressure_meter::{Contact, PressureMeter};
 
 enum Command {
     Stereo(bool, tauri::async_runtime::Sender<Result<String,String>>),
@@ -115,6 +117,8 @@ impl Host {
                 || !(1..=16384).contains(&c.rect.height)
                 || !matches!(c.render_width, 640 | 960)
                 || !(0.0..=1.0).contains(&c.mouse_pressure)
+                || !(0.25..=4.).contains(&c.pressure_sensitivity)
+                || !(0.0..=1.).contains(&c.stereo_depth)
                 || c.tug_response.is_some_and(|x| !(0.0..=1.0).contains(&x))
                 || c.focus.is_some_and(|x| !(0.0..=1.0).contains(&x))
                 || c.feedback_clock.as_ref().is_some_and(|a| {
@@ -269,6 +273,7 @@ fn run(
     let mut stereo: Option<(audience::Destination, tss_live_wheel::StereoOutput)> = None;
     let mut active: Option<Config> = None;
     let mut mouse = Mouse::default();
+    let mut meter = PressureMeter::default();
     let mut clock = ReleaseClock::default();
     let mut anchor = None;
     let mut stats = Stats {
@@ -384,9 +389,7 @@ fn run(
                         if c.gesture == Gesture::Pressure && mouse.last.is_some() {
                             let ms = start.elapsed().saturating_sub(export_pause).as_millis() as u64;
                             mouse.pressure.detach(ms);
-                            mouse.force = Some((point, amount));
-                            r.set_slide_pressure(c.slide as u32, amount, point)?;
-                            stats.trackpad_pressure = amount;
+                            mouse.apply_force(r, c, point, amount)?;
                             stats.trackpad_pressure_peak = stats.trackpad_pressure_peak.max(amount);
                             stats.trackpad_pressure_events += 1;
                         }
@@ -396,7 +399,7 @@ fn run(
                     if let (Some(c), Some(r)) = (&active, &mut engine) {
                         let ms = start.elapsed().saturating_sub(export_pause).as_millis() as u64;
                         mouse.release(r, c, ms)?;
-                        stats.trackpad_pressure = 0.;
+                        meter.publish(window, &mut stats, c, None);
                     }
                 }
                 Command::Pointer(phase, p) => {
@@ -408,7 +411,9 @@ fn run(
                             p,
                             start.elapsed().saturating_sub(export_pause).as_millis() as u64,
                         )? as u64;
-                        stats.trackpad_pressure = mouse.force.map_or(0., |(_, amount)| amount);
+                        if matches!(phase, Phase::Up) {
+                            meter.publish(window, &mut stats, c, None);
+                        }
                     }
                 }
                 Command::Set(config) => {
@@ -426,14 +431,15 @@ fn run(
                                 || n.slide != old.slide
                                 || n.gesture != old.gesture
                                 || n.hardware_pressure_only != old.hardware_pressure_only
+                                || (n.preview_hidden && !old.preview_hidden)
                                 || n.rect != old.rect
                         }) {
-                            stats.trackpad_pressure = 0.;
                             mouse.release(
                                 r,
                                 old,
                                 start.elapsed().saturating_sub(export_pause).as_millis() as u64,
                             )?;
+                            meter.publish(window, &mut stats, old, None);
                         }
                     }
                     if let Some(c) = &config {
@@ -465,6 +471,9 @@ fn run(
                         }
                         let r = engine.as_mut().unwrap();
                         objc2::rc::autoreleasepool(|_| configure(r, surface, active.as_ref(), c))?;
+                        if let Some(contact) = mouse.force {
+                            mouse.apply_force(r, c, contact.point, contact.raw)?;
+                        }
                         stats.adapter = r.adapter_name().to_owned();
                         [stats.width, stats.height] = r.preview_size();
                         stats.layer_id = c.layer_id;
@@ -533,6 +542,7 @@ fn run(
         let r = engine.as_mut().unwrap();
         let now = start.elapsed().saturating_sub(export_pause);
         mouse.advance(r, c, now.as_millis() as u64)?;
+        meter.publish(window, &mut stats, c, mouse.force);
         let program_time = anchor
             .as_ref()
             .map_or(now.as_secs_f64(), |c| c.position(now));
@@ -565,6 +575,7 @@ fn run(
                 None
             };
             let presented = if let Some((dest,out)) = &mut stereo {
+                out.set_depth(c.stereo_depth)?;
                 match out.present(r, &dest.surface, dest.size, rear, front, program_time) {
                     Ok(sent) => {
                         if sent {
@@ -668,10 +679,17 @@ impl ProgramClock {
 #[derive(Default)]
 struct Mouse {
     last: Option<[f32; 2]>,
-    force: Option<([f32; 2], f32)>,
+    force: Option<Contact>,
     pressure: super::mouse_pressure::MousePressure,
 }
 impl Mouse {
+    fn apply_force(&mut self, r: &mut LiveWheel, c: &Config, point: [f32; 2], raw: f32) -> Result<(), String> {
+        let contact = Contact::new(point, raw, c.pressure_sensitivity);
+        r.set_slide_pressure(c.slide as u32, contact.applied, point)?;
+        self.force = Some(contact);
+        Ok(())
+    }
+
     fn input(
         &mut self,
         r: &mut LiveWheel,
@@ -690,13 +708,12 @@ impl Mouse {
         }
         let slide = c.slide as u32;
         if c.gesture == Gesture::Pressure {
-            if let Some((_, amount)) = self.force {
+            if let Some(contact) = self.force {
                 if matches!(phase, Phase::Up) {
                     self.force = None;
                     r.set_slide_pressure(slide, 0., point)?;
                 } else {
-                    self.force = Some((point, amount));
-                    r.set_slide_pressure(slide, amount, point)?;
+                    self.apply_force(r, c, point, contact.raw)?;
                 }
             } else if !c.hardware_pressure_only {
                 self.pressure.input(phase, point, c.mouse_pressure, ms, &mut Vec::new());
@@ -729,8 +746,8 @@ impl Mouse {
         Ok(())
     }
     fn release(&mut self, r: &mut LiveWheel, c: &Config, ms: u64) -> Result<(), String> {
-        if let Some((point, _)) = self.force.take() {
-            r.set_slide_pressure(c.slide as u32, 0., point)?;
+        if let Some(contact) = self.force.take() {
+            r.set_slide_pressure(c.slide as u32, 0., contact.point)?;
         }
         if let Some((_, sample)) = self.pressure.detach(ms) {
             r.set_slide_pressure(c.slide as u32, 0., sample.point)?;

@@ -1045,7 +1045,7 @@ impl LiveWheel {
         if mode == SlideGesture::Tug {
             if let Some(source) = self.evolving.get_mut(&self.active) {
                 let pose = &t.slides[slide as usize];
-                let material = |p: [f32; 2]| pose.material_point(p.map(f64::from));
+                let material = |p: [f32; 2]| pose.rigid_point(p.map(f64::from));
                 source.tug(slide as usize, material(from), material(to), pose.response);
                 return;
             }
@@ -1084,6 +1084,10 @@ impl LiveWheel {
         let pose = &mut self.tracks.entry(self.active).or_default().slides[slide as usize];
         pose.pressure =
             pressure::Pressure::new(pose.rigid_point(center.map(f64::from)), amount, cache);
+        #[cfg(feature = "live-solver")]
+        if let Some(source) = self.evolving.get_mut(&self.active) {
+            source.squeeze(slide as usize, pose.pressure);
+        }
         Ok(())
     }
     pub fn end_gesture(&mut self, slide: u32) {
@@ -1332,9 +1336,9 @@ impl LiveWheel {
             )
         });
         #[cfg(not(feature = "live-solver"))]
-        let live: Option<(([u32; 2], f32), [f32; 4])> = None;
+        let live: Option<(([u32; 2], f32, [pressure::Pressure; 2]), [f32; 4])> = None;
         let ([first, second], fraction, front_frames, front_fraction, cache_rect) =
-            if let Some(((frames, fraction), view)) = live {
+            if let Some(((frames, fraction, _), view)) = live {
                 (frames, fraction, frames, fraction, view)
             } else {
                 let [rear, front] = FilmSource::for_slides(self.motion, self.material_motion);
@@ -1359,6 +1363,9 @@ impl LiveWheel {
             .get(&self.active)
             .map(|t| t.slides)
             .unwrap_or_default();
+        if let Some(((_, _, gap), _)) = live {
+            for (pose, pressure) in poses.iter_mut().zip(gap) { pose.pressure = pressure; }
+        }
         // The finite-pixel pass uses rotation and pressure to choose the pupil
         // footprint. Keep a hidden film's deformation out of that decision.
         for (pose, visible) in poses.iter_mut().zip(visibility) {
@@ -1379,7 +1386,7 @@ impl LiveWheel {
                 front_frames: [front_frames[0], front_frames[1], 0, 0],
                 detail: [
                     self.detail_scales.get(&self.active).copied().unwrap_or(1.),
-                    0.,
+                    if live.is_some() { 1. } else { 0. },
                     0.,
                     0.,
                 ],

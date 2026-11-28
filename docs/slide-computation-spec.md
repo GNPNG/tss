@@ -1,24 +1,28 @@
 # Confined-slide computation specification
 
-Two independent Basilisk slide solves supply the native Windows preview and the seven wheel themes. The pressure control deforms either solved field using a prescribed, volume-conserving plate gap. The owner approved the Violet / Blue rack focus. The earlier 640 × 360 Windows wheel benchmark measured 39.92–40.00 FPS. Calibrating physical sensor force to glass deflection and measuring same-slide coalescence remain open. [Pressure reference](../experiments/pressure-study/README.md) · [Windows wheel benchmark](../experiments/slide-look-study/approval/windows-live/README.md) · [Focus proof](../experiments/slide-look-study/approval/focus/README.md)
+Adding a slide preset creates a project layer for each dye. Each layer owns its seed, slide depth and evolving oil field. Changing the group palette changes its dyes while preserving the cells and their trajectories. The Mac half-side-by-side output renders the current project from two eye positions. [Project layer construction and palette edits](../WebAssets/app.js) · [Live solver](../live-wheel/src/evolving.rs) · [Stereo renderer](../live-wheel/src/stereo.rs)
+
+The archived seven-palette study colored the same pair of precomputed Basilisk trajectories. The owner approved its Violet / Blue rack focus. Its 640 × 360 Windows preview measured 39.92–40.00 FPS. Current Mac stereo cadence is measured separately in the live deck. [Archived Windows benchmark](../experiments/slide-look-study/approval/windows-live/README.md) · [Archived focus proof](../experiments/slide-look-study/approval/focus/README.md)
 
 ## Native pressure path
 
 ```mermaid
 flowchart LR
-    H["Pointer sample or recorded cue"] --> C["Rust host selects track, slide, XY and compression"]
-    C --> G["Local gap and radial map on the selected slide"]
-    R["Rear Basilisk phase atlas"] --> A["GPU material lookup per slide"]
-    F["Front Basilisk phase atlas"] --> A
-    G -->|"inverse map to unloaded material coordinates"| A
-    G -->|"gap, hence local thickness and optical mid-plane"| L["Optical shader"]
-    A -->|"independent boundaries and coverage"| L
+    H["Mac trackpad force and contact position"] --> C["Rust host applies sensitivity to the target oil cell"]
+    C --> G["Prescribed glass deflection on the selected cell"]
+    G --> F["Basilisk transports oil and carrier through shared cell faces"]
+    F --> A["CImg distance field for the transported interface"]
+    A --> M["GPU material lookup per slide"]
+    R["Other cells evolve independently"] --> M
+    G -->|"gap at the same solver tick"| L["Optical shader"]
+    M -->|"independent boundaries and coverage"| L
     P["Projector focal setting and pupil"] --> L
-    L -->|"per-ray transmissions multiplied, then averaged"| O["Editor, delayed projector or 4K export"]
-    B["Basilisk variable-gap Reynolds reference"] -.->|"checks lateral flux for a fixed contact center"| G
+    L -->|"per-ray transmissions multiplied, then averaged"| O["Mac editor preview / direct half-SBS TV output"]
 ```
 
-The live shader receives one pressure uniform per slide. It samples each original field in its own coordinates, including the slide's rotation and material tug. For optics, the selected gap scales absorption along the dyed path and changes the liquid mid-plane's distance from focus. The photographed wheel fit supplies the carrier tint. The independent CPU reference runs during model verification. The GPU evaluates the radial map directly during performance. [Native map](../live-wheel/src/pressure.rs) · [Field lookup](../live-wheel/src/fields.wgsl) · [Lens and transmission](../experiments/slide-look-study/optics.hook)
+The Mac meter reports normalized trackpad force and the applied load after sensitivity adjustment. At full load the prescribed gap reduction reaches 65% at the mathematical center of contact. The solver transfers phase volume across shared faces as the gap changes. At zero flow speed it can perform a squeeze at fixed simulation time. Release restores the neutral gap and subsequent steps evolve the displaced interface. The GPU samples the resulting oil field and uses the matching gap for absorption, focus and stereo. Archived fields retain their earlier coordinate-deformation model. An instrumented force-to-glass-deflection calibration remains open. [Pressure response](../live-wheel/src/pressure.rs) · [Solver and protocol](../experiments/live-slide-solver/README.md) · [64 × 64 conservation and displacement check](../experiments/live-slide-solver/evidence/squeeze-64.txt) · [GPU field lookup](../live-wheel/src/fields.wgsl)
+
+Mac stereo presents each completed eye pair directly to the external display. Delayed program output uses a separate path. Movie export rejects a project if a visible oil layer or a visible media mask needs a live solver trajectory. Recording and replaying that performance for a 4K movie remains open. [Mac presentation](../src-tauri/src/live/macos.rs) · [Editor export checks](../WebAssets/app.js)
 
 ## Choosing methods for each material
 
@@ -32,7 +36,7 @@ A preset can combine different libraries for interface evolution, performer resp
 | Glass and hard sugar candy | A rigid boundary refracts and transmits light. Candy can carry tint and inclusions. | Reuse the geometry while recalculating refraction, attenuation and focus. A flowing or heated sugar preset would require separate material data. |
 | Hydrophobic sand | Grain aggregates hold and break; trapped air changes how immersed grains reflect light. | Compare resolved boundaries with a cheaper aggregate surface and calibrated highlights. |
 
-These options are candidates. Today the seven wheel choices select optical fits on a common pair of oil trajectories. The native solver can independently generate alternate oil trajectories from measured properties. For each proposed treatment, hold the material, starting fields, gesture, palette and focus fixed; compare the motion and edge behavior side by side. Record frame-time percentiles, input latency where measured, and the operator's visual preference. Label art-directed controls separately from parameters with physical units. Cross-slide mixing stays forbidden. Record performance inputs for replay; the offline pass can spend more on the same performance. [Material data](../live-wheel/MATERIAL-MODELS.md) · [Specialty materials](../live-wheel/materials/specialty.json) · [Library evaluations](dependency-register.md)
+These options are candidates. A material trial can reuse the same project seeds and initial conditions across treatments. Hold the gesture, palette and focus fixed and compare motion and edge behavior side by side. Record frame-time percentiles, input latency where measured, and the operator's visual preference. Label art-directed controls separately from parameters with physical units. Cross-slide mixing stays forbidden. The proposed replay system would preserve performance inputs for an offline pass. [Material data](../live-wheel/MATERIAL-MODELS.md) · [Specialty materials](../live-wheel/materials/specialty.json) · [Library evaluations](dependency-register.md)
 
 The production application must start and operate without launching Node or Python. Use the Tauri Rust host for the editor, native GPU submission and frame scheduling. Go is a preferred candidate for independently built peer or batch components; use a C ABI for C/C++ library integration and verify the target compiler and linker on each supported platform. Keep CPU/GPU transfer boundaries explicit. A worker process or language transition inside a per-pixel or per-frame loop requires a measured reason. Browser JavaScript already running in a Tauri webview does not require a Node runtime. The approved Blender scene script is a research fixture with Blender's bundled API. It creates no production dependency.
 
@@ -40,7 +44,7 @@ Presets should describe the material pair, independently versioned motion, geome
 
 ## Computation graph
 
-The diagram is a proposed dataflow. `EXISTING` identifies a limited piece already exercised; `CANDIDATE` identifies real library capability whose required integration is unproved; `OPEN` identifies work for which no qualifying implementation has been established. Arrows do not mean that integration already works.
+This is the original proposed dataflow. Its status labels and the following node table describe the design study at the time it was written. For the implemented Mac solver, pressure and display path, see **Native pressure path** above.
 
 ```mermaid
 flowchart LR
@@ -111,7 +115,7 @@ The focal plane and each slide depth are explicit physical scene parameters. Use
 
 One 3840×2160 RGBA 16-bit-per-channel plate requires `3840 × 2160 × 8 = 66,355,200` bytes (~63.3 MiB) before depth, extra buffers, mipmaps, staging or allocator overhead. Queue depth, region bounds, output precision and available GPU memory must therefore be explicit; both target discrete GPUs have 4 GB. That calculation is a capacity estimate, not a measured transfer rate or throughput.
 
-`wgpu` has been exercised experimentally on macOS Metal and Windows Vulkan/DX12, but no coupled solver or LuxCore interop is established. The live renderer, fluid solver and compositor must enumerate actual devices and supported backends rather than require a model name. CPU + GPU may be used concurrently with scheduling appropriate to the measured machine. Do not interpret WSL GPU visibility as proof that Windows Job Objects contain WSL processes; shared reservation, process lifetime and telemetry across that boundary remain to be tested. Sampled utilization cannot guarantee GPU/driver recovery. Windows is the current test host; native Windows and Intel Mac Radeon support remain required independently of a WSL development build.
+`wgpu` has been exercised on macOS Metal and Windows Vulkan/DX12. The Mac live path feeds CPU-solved Basilisk fields to the GPU for rendering. LuxCore interop and a GPU-resident fluid solve remain unverified. The live renderer, fluid solver and compositor must enumerate actual devices and supported backends. Schedule concurrent CPU and GPU work against the measured machine budget. Verify shared reservation, Windows Job Object containment of WSL processes, and process lifetime and telemetry across that boundary separately. Sampled utilization cannot guarantee GPU/driver recovery. Both native Windows and Intel Mac Radeon support require verification independently of a WSL development build.
 
 ## Implementable verification sequence
 
@@ -121,11 +125,11 @@ One 3840×2160 RGBA 16-bit-per-channel plate requires `3840 × 2160 × 8 = 66,35
 4. **Compression and input:** apply a recorded calibrated pressure trajectory, verify gap and solver state respond, and test conservation and within-plane coalescence. Compare fixed-gap and changing-gap cases. Verify motion from simultaneous devices is mapped to the correct slide and replayed at the right song time.
 5. **Performance and appearance:** capture actual GPU/CPU timings, memory and input latency at selected preview settings and 4K export. Compare reduced focus/visibility budgets to a full-quality reference. Show actual stills and video for the owner's approval against the supplied blue/violet, red/blue, red/gold, green/cyan, green/yellow, pastel and red/magenta slides and the six approved color-theme panels. Record settings, device, library revisions, scene and input-event provenance.
 
-The fixed-state focus proof measures edge sharpness for each slide at both focal endpoints. The wheel gallery contains actual offline 4K outputs. Controlled merger, compression, live presentation and performance-replay trials remain open. [Focus measurements](../experiments/slide-look-study/approval/focus/README.md) · [4K gallery](../experiments/slide-look-study/approval/wheels/README.md)
+The archived focus proof measures edge sharpness at both focal endpoints. The archived 4K gallery used precomputed trajectories. The variable-gap solver now has numerical fixtures for held, moving and released contact, including constituent-volume checks. Controlled same-slide merger timing, physical force calibration and 4K replay of a live oil performance remain open. [Archived focus measurements](../experiments/slide-look-study/approval/focus/README.md) · [Archived 4K gallery](../experiments/slide-look-study/approval/wheels/README.md) · [Variable-gap measurements](../experiments/live-slide-solver/evidence/squeeze-64.txt)
 
 ## Implementation Gantt
 
-The columns are ordered implementation checkpoints, not estimates of calendar time. Work marked `█` is required in that checkpoint; `●` is the current bounded optics study. No delivery dates or durations have been measured.
+This is the original checkpoint plan. A `█` marks work required in a checkpoint and `●` marks the initial optics study. The columns establish dependency order. No delivery dates or durations have been measured.
 
 | Workstream | 1. Single slide | 2. Animated physics | 3. Layered live | 4. 4K and platforms |
 | --- | :---: | :---: | :---: | :---: |

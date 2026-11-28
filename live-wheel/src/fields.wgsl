@@ -9,7 +9,8 @@ fn sourceUV(uv:vec2<f32>,rotation:vec2<f32>,origin:vec2<f32>,front:bool)->vec2<f
     var gate=uv;
     if (pair.detail.x != 1.0) { gate=0.5+(uv-0.5)*pair.detail.x; }
     var release=gate;
-    if press.w > 0.0 {
+    // Solver-driven films already contain the transported interface at this tick.
+    if press.w > 0.0 && pair.detail.y == 0.0 {
         let delta=gate-press.xy;
         let q=delta*aspect;
         let s=dot(q,q)*press.z;

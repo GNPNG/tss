@@ -309,6 +309,10 @@ pub struct Config {
     mouse_pressure: f32,
     #[serde(default)]
     hardware_pressure_only: bool,
+    #[serde(default = "default_pressure_sensitivity")]
+    pressure_sensitivity: f32,
+    #[serde(default = "default_stereo_depth")]
+    stereo_depth: f32,
     render_width: u32,
     rect: Rect,
     focus: Option<f32>,
@@ -470,6 +474,12 @@ fn default_pressure() -> f32 {
     0.5
 }
 
+fn default_stereo_depth() -> f32 { 0.2 }
+
+fn default_pressure_sensitivity() -> f32 {
+    1.
+}
+
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Stats {
@@ -495,6 +505,7 @@ pub struct Stats {
     projector_song_time: Option<f64>,
     projector_presents: u64,
     trackpad_pressure: f32,
+    trackpad_pressure_applied: f32,
     trackpad_pressure_peak: f32,
     trackpad_pressure_events: u64,
 }

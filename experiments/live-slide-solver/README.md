@@ -2,7 +2,13 @@
 
 A single-color oil layer runs one persistent Basilisk worker. Older paired tracks run one worker for each of their two sealed cells. Each worker initializes a closed square cell from its seeded union of dyed drops and a divergence-free vortex. Eight large pools and sixteen smaller inclusions are sampled per cell. The signed seed function is evaluated during initialization only. Each subsequent step uses Basilisk's geometric VOF advection, incompressible Navier–Stokes pressure projection, viscosity and surface tension. Only each cell's coverage crosses the process boundary.
 
-The interactive tangential drag uses a depth-averaged Couette term. For local plate velocity **U**, gap h, viscosity μ, density ρ and mean fluid velocity **u**, the added acceleration is 12μ/(ρh²) × (w**U**/2 − **u**). The moving contact weight is w = (1 − r²/R²)² for r < R, zero elsewhere, with R = 0.16 slide widths. Positive drag moves the plate toward the pointer displacement. Releasing it sets **U** to zero and the fluid retains its velocity. The numerical model has a fixed gap and artistic nondimensional constants. Normal pressure currently uses the editor's volume-conserving material map. Physical squeeze flow, wetting and film drainage before coalescence remain open.
+The interactive tangential drag uses a depth-averaged Couette term. For local plate velocity **U**, gap h, viscosity μ, density ρ and mean fluid velocity **u**, the added acceleration is 12μ/(ρh²) × (w**U**/2 − **u**). The moving contact weight is w = (1 − r²/R²)² for r < R, zero elsewhere, with R = 0.16 slide widths. Positive drag moves the plate toward the pointer displacement. Releasing it sets **U** to zero and the fluid retains its velocity. The interactive materials use nondimensional constants.
+
+Normal pressure prescribes local glass deflection. For load P, squared relative radius s = r²/R² and s < 1, the continuum gap ratio is h/h₀ = 1 − 0.65 P (1 − s)² (1 − 4s). The center thins and an annulus accepts the displaced volume. The worker differences the integrated depth flux 0.325 P **r** (1 − s)³ at each shared face between two contact configurations. Basilisk's piecewise-linear interface reconstruction determines the dyed and carrier portions of each directional flux. Each substep advances the phase volumes and cell capacity together. Closed wall flux is zero. The worker uses the resulting gap in its cell-volume metric, face metric, pressure projection and viscous wall drag as the flow continues. The quadtree stays uniformly refined at the configured live level during contact and resumes adaptive refinement after release.
+
+The prescribed glass shape is an artistic constitutive assumption. Microscopic wetting, three-dimensional meniscus dynamics and drainage of the film between coalescing droplets remain outside this model.
+
+On the 64² grid, a quarter press on a dyed boundary changed 42 coverage samples at fixed simulation time. A full press changed 49 samples with 4.2 times the integrated absolute coverage change. The oil and carrier volume differences during the paused press, translation and release sequence were below 10⁻¹⁵ relative. During 30 evolving steps with a press and release, the maximum relative volume drifts were 6.6 and 3.5 parts per million, respectively. The independently run second cell matched its control at every tick. [32² measurements](evidence/squeeze-32.txt) · [64² measurements](evidence/squeeze-64.txt)
 
 ## Build and repeat the measurements
 
@@ -22,11 +28,14 @@ cargo +1.88.0 build --release --jobs 1 --locked \
   --examples --target-dir target/live-slide-solver/host
 target/live-slide-solver/host/release/examples/check target/live-slide-solver/tss-live-solver 5
 target/live-slide-solver/host/release/examples/check target/live-slide-solver/tss-live-solver 6
+target/live-slide-solver/host/release/examples/squeeze_flow target/live-slide-solver/tss-live-solver 6 target/live-slide-solver/pressure-masks
 target/live-slide-solver/host/release/examples/optical_pair \
   target/live-slide-solver/tss-live-solver 5 176 48
 ```
 
 ## Coordinate and integration contract
+
+`STEP x y dx dy drive press_x press_y radius load` sets the normal pressure for the interval and accepts the same tangential input as the five-argument form. Its last four fields use normalized whole-slide units, top-left origin and a load from zero to one. The five-argument form advances with released normal pressure. `PRESS press_x press_y radius load` applies just the squeeze transport at the current fluid time and returns the next numbered frame. This lets a performer press, move and release while flow speed is zero. The header's integrated phase fraction is weighted by local gap depth. Setting `TSS_LIVE_VOLUME_AUDIT=1` adds a diagnostic stderr record per frame with oil volume, carrier volume, total capacity, and minimum and maximum gap ratios.
 
 Start `tss-live-solver --live violet|cyan SEED [LEVEL]`. LEVEL 5–8 selects a maximum grid of 32, 64, 128 or 256 cells across. Its default is 5. At 32, the quadtree minimum and maximum coincide. Time zero is returned on startup. For each subsequent interval write `STEP x y dx dy drive\n`. XY and displacement are normalized to the entire square cell. X increases rightward, Y downward. X and Y range over [0,1], dx and dy over [−1,1], drive over [0,1]. The command applies a wall velocity of drive × displacement / (1/24) slide widths per simulation time unit for exactly one 1/24 interval. A contact-free step uses zero drive. Basilisk may take several internal steps in each interval. `QUIT\n` or EOF ends the worker. Output is a `TSSVOF1 tick time width height phase_fraction\n` ASCII header followed immediately by width × height row-major R8 coverage bytes. The phase fraction in the header is the integrated numerical field before rasterization. The process writes its normal Basilisk timing footer at shutdown.
 

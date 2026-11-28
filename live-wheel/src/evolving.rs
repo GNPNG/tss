@@ -1,6 +1,6 @@
 //! Interactive, per-track film sources. Presentation takes only completed CPU
 //! snapshots. Basilisk and the native CImg distance transform run on a worker.
-use super::{extent, gpu, upload_frame, CellLayout, LiveSolverStatus};
+use super::{extent, gpu, pressure::Pressure, upload_frame, CellLayout, LiveSolverStatus};
 use std::{
     collections::VecDeque,
     io,
@@ -10,8 +10,8 @@ use std::{
 };
 use tss_basilisk_live::{optics::Atlas, Cancellation, Cell, Drive, Slide};
 
-const LEVEL: u32 = 5;
-const SIDE: u32 = 176;
+const LEVEL: u32 = 6;
+const SIDE: u32 = 264;
 const HZ: f64 = 24.;
 pub(super) const VIEW: [f32; 4] = [32. / 44., 18. / 44., 6. / 44., 13. / 44.];
 
@@ -19,6 +19,7 @@ pub(super) const VIEW: [f32; 4] = [32. / 44., 18. / 44., 6. / 44., 13. / 44.];
 struct Frame {
     tick: u64,
     rg: Arc<[u8]>,
+    gap: [Pressure; 2],
 }
 
 #[derive(Default)]
@@ -26,6 +27,8 @@ struct Mailbox {
     stop: bool,
     target_tick: u64,
     pending: [Drive; 2],
+    loads: [VecDeque<Pressure>; 2],
+    held: [Pressure; 2],
     children: Vec<Cancellation>,
     frames: VecDeque<Frame>,
     shown: f64,
@@ -35,6 +38,17 @@ struct Mailbox {
 }
 
 impl Mailbox {
+    fn squeeze(&mut self, cell: usize, load: Pressure) {
+        let q = &mut self.loads[cell];
+        let previous = q.back().unwrap_or(&self.held[cell]);
+        if *previous == load { return; }
+        // Coalesce a continuous press but keep its release, even between solver ticks.
+        if let Some(last) = q.back_mut() {
+            if last.active() == load.active() { *last = load; return; }
+        }
+        q.push_back(load);
+    }
+
     fn tug(&mut self, cell: usize, from: [f64; 2], to: [f64; 2], strength: f32) {
         let world = |v: [f64; 2]| {
             [
@@ -110,6 +124,8 @@ fn solve(executable: &Path, seed: u32, layout: CellLayout, shared: &Shared) -> i
         CellLayout::Single => None,
         CellLayout::Paired => Some(start(Slide::Cyan)?),
     };
+    let mut gap = [Pressure::default(); 2];
+    let mut contact_only = false;
     loop {
         let mut rg = vec![0; atlas.byte_len()];
         match &front {
@@ -119,6 +135,7 @@ fn solve(executable: &Path, seed: u32, layout: CellLayout, shared: &Shared) -> i
         let current = Frame {
             tick: rear_field.tick,
             rg: rg.into(),
+            gap,
         };
         let drives = {
             let mut state = shared.0.lock().unwrap();
@@ -127,18 +144,29 @@ fn solve(executable: &Path, seed: u32, layout: CellLayout, shared: &Shared) -> i
             }
             let tick = current.tick;
             state.frames.push_back(current);
+            if contact_only && state.rate == 0. { state.shown = tick as f64; }
             state = shared
                 .1
-                .wait_while(state, |s| !s.stop && s.target_tick <= tick)
+                .wait_while(state, |s| !s.stop && s.target_tick <= tick &&
+                    (s.rate != 0. || s.loads.iter().all(VecDeque::is_empty)))
                 .unwrap();
             if state.stop {
                 break;
             }
+            contact_only = state.rate == 0. && state.loads.iter().any(|q| !q.is_empty());
+            for i in 0..2 {
+                if let Some(load) = state.loads[i].pop_front() { state.held[i] = load; }
+            }
+            gap = state.held;
             std::mem::take(&mut state.pending)
         };
-        rear_field = rear.step(drives[0])?;
+        let advance = |cell: &mut Cell, i: usize| {
+            let load = gap[i].squeeze(VIEW);
+            if contact_only { cell.press(load) } else { cell.step_with_pressure(drives[i], load) }
+        };
+        rear_field = advance(&mut rear, 0)?;
         if let Some((cell, field)) = &mut front {
-            *field = cell.step(drives[1])?;
+            *field = advance(cell, 1)?;
         }
     }
     Ok(())
@@ -152,8 +180,10 @@ pub(super) struct Source {
     pub executable: PathBuf,
     pub seed: u32,
     pub layout: CellLayout,
-    latched: Option<(u64, ([u32; 2], f32))>,
+    latched: Option<(u64, Sample)>,
 }
+
+type Sample = ([u32; 2], f32, [Pressure; 2]);
 
 impl Source {
     pub fn new(
@@ -245,7 +275,13 @@ impl Source {
 
     /// Every use of a film within one presentation (including matte passes)
     /// sees the same two states even if the solver publishes mid-composite.
-    pub fn present(&mut self, q: &gpu::Queue, presentation: u64, time: f64) -> ([u32; 2], f32) {
+    pub fn squeeze(&mut self, slide: usize, pressure: Pressure) {
+        let cell = if self.layout == CellLayout::Single { 0 } else { slide };
+        self.shared.0.lock().unwrap().squeeze(cell, pressure);
+        self.shared.1.notify_one();
+    }
+
+    pub fn present(&mut self, q: &gpu::Queue, presentation: u64, time: f64) -> Sample {
         if let Some((previous, frame)) = self.latched {
             if previous == presentation {
                 return frame;
@@ -256,11 +292,11 @@ impl Source {
         frame
     }
 
-    fn prepare(&mut self, q: &gpu::Queue, time: f64) -> ([u32; 2], f32) {
+    fn prepare(&mut self, q: &gpu::Queue, time: f64) -> Sample {
         let (pair, fraction) = {
             let mut s = self.shared.0.lock().unwrap();
             let Some(sample) = s.sample(time) else {
-                return ([0; 2], 0.);
+                return ([0; 2], 0., [Pressure::default(); 2]);
             };
             self.shared.1.notify_one();
             sample
@@ -273,7 +309,8 @@ impl Source {
             }
             slot as u32
         });
-        (slots, fraction)
+        let gap = std::array::from_fn(|i| pair[0].gap[i].between(pair[1].gap[i], fraction));
+        (slots, fraction, gap)
     }
 }
 
@@ -299,6 +336,7 @@ mod timing_tests {
         state.frames.push_back(Frame {
             tick,
             rg: Arc::from([]),
+            gap: [Pressure::default(); 2],
         });
     }
 

@@ -40,6 +40,12 @@ static double frame_dt = 1./rate;
  * per simulation tick, so pauses in wall time do not change the trajectory. */
 static int live = 0;
 static coord contact, wall_velocity;
+typedef struct { coord center; double radius, load; } PlatePress;
+static PlatePress held;
+static int volume_audit;
+static double flat_tolerance;
+scalar cell_gap[];
+face vector face_gap[];
 typedef struct { double x0,y0,rx,ry,cosine,sine; } LiveDrop;
 static LiveDrop drops[24];
 
@@ -81,6 +87,104 @@ static double brush (double xface, double yface) {
   return r2 < 1. ? sq(1.-r2) : 0.;
 }
 
+/* Time-integrated depth flux through a vertical face of the glass sandwich.
+ * Its negative divergence gives h/h0 - 1 = -0.65 P (1-s)^2 (1-4s).
+ * The positive annular gap change balances the center in the sealed cell. */
+static coord plate_displacement (PlatePress p, double px, double py) {
+  coord d = {px-p.center.x, py-p.center.y};
+  double s = p.radius > 0. ? (sq(d.x) + sq(d.y))/sq(p.radius) : 1.;
+  double k = s < 1. ? 0.325*p.load*cube(1.-s) : 0.;
+  return (coord){k*d.x, k*d.y};
+}
+
+/* A donor PLIC slab carries oil through each face, with the remaining flux
+ * carrying the other phase. Both cells use the same signed face integrals. */
+foreach_dimension()
+static void squeeze_sweep_x (face vector flux, double weight) {
+  vector normal[];
+  scalar intercept[];
+  face vector oil[];
+  reconstruction(f, normal, intercept);
+  foreach_face(x) {
+    double q = flux.x[]*weight;
+    int donor = q > 0. ? -1 : 0;
+    double c = f[donor];
+    if (q && c > 0. && c < 1.) {
+      double sign_q = q > 0. ? 1. : -1.;
+      double width = fabs(q)/(Delta*cell_gap[donor]);
+      c = rectangle_fraction((coord){-sign_q*normal.x[donor], normal.y[donor]},
+                             intercept[donor], (coord){-.5,-.5}, (coord){width-.5,.5});
+    }
+    oil.x[] = q*c;
+  }
+  foreach() {
+    double h = cell_gap[];
+    double next_h = h + weight*(flux.x[] - flux.x[1])/Delta;
+    f[] = (h*f[] + (oil.x[] - oil.x[1])/Delta)/next_h;
+    cell_gap[] = next_h;
+  }
+}
+
+static void squeeze (PlatePress next) {
+  next.radius = min(next.radius, min(min(next.center.x, 1.-next.center.x),
+                                     min(next.center.y, 1.-next.center.y)));
+  if (next.radius == 0.) next.load = 0.;
+  if (!held.load && !next.load) return;
+  if (held.center.x == next.center.x && held.center.y == next.center.y &&
+      held.radius == next.radius && held.load == next.load) return;
+
+  if (!held.load) {
+    /* Preserve the PLIC interface on refinement before changing cell
+     * capacities. Use shared equal-sized faces while the gap is nonuniform. */
+    refine(level < maxlevel);
+    foreach() cell_gap[] = 1.;
+    foreach_face() face_gap.x[] = 1.;
+    cm = cell_gap;
+    fm = face_gap;
+    flat_tolerance = TOLERANCE;
+    TOLERANCE = min(flat_tolerance, 1.e-6);
+  }
+  face vector flux[];
+  double max_width = 0.;
+  foreach_face(reduction(max:max_width)) {
+    coord old_d = plate_displacement(held,x,y);
+    coord new_d = plate_displacement(next,x,y);
+    flux.x[] = new_d.x - old_d.x;
+    max_width = max(max_width, fabs(flux.x[])/Delta);
+  }
+  /* At least 0.35 neutral depth remains under a full press. Keep each
+   * swept slab well below half that capacity, including opposing outflux. */
+  int steps = max(1, (int)ceil(max_width/.10));
+  for (int sub = 0; sub < steps; ++sub) {
+    squeeze_sweep_x(flux, 1./steps);
+    squeeze_sweep_y(flux, 1./steps);
+  }
+  foreach_face() {
+    double h = (cell_gap[] + cell_gap[-1])/2.;
+    uf.x[] *= h/face_gap.x[];
+    face_gap.x[] = h;
+  }
+  restriction((scalar *){cell_gap,face_gap});
+  /* Geometry changed between fluid ticks. Project the reweighted basal flux
+   * before the next advection so it obeys the new stationary-gap constraint. */
+  event("properties");
+  project(uf, pf, alpha, frame_dt);
+  held = next;
+  if (!held.load) {
+    /* The discrete flux difference telescopes back to unit capacity. */
+    cm = unity;
+    fm = unityf;
+    TOLERANCE = flat_tolerance;
+  }
+}
+
+static int valid_press (double x, double y, double radius, double load) {
+  return isfinite(x) && isfinite(y) && isfinite(radius) && isfinite(load) &&
+    x >= 0. && x <= 1. && y >= 0. && y <= 1. &&
+    radius >= 0. && radius <= 1. && load >= 0. && load <= 1.;
+}
+
+/* 0 = quit, 1 = normal fluid tick, 2 = squeeze only at the current time. */
 static int live_command (void) {
   char line[256], extra;
   if (!fgets(line,sizeof line,stdin)) {
@@ -88,13 +192,28 @@ static int live_command (void) {
     return 0;
   }
   if (!strcmp(line,"QUIT\n") || !strcmp(line,"QUIT\r\n") || !strcmp(line,"QUIT")) return 0;
-  double px,py,dx,dy,drive;
-  if (sscanf(line,"STEP %lf %lf %lf %lf %lf %c",&px,&py,&dx,&dy,&drive,&extra) != 5 ||
+  double px,py,dx,dy,drive,force_x=0.,force_y=0.,radius=0.,load=0.;
+  int end = 0;
+  if (!strncmp(line,"PRESS ",6)) {
+    if (sscanf(line+6,"%lf %lf %lf %lf %c",&force_x,&force_y,&radius,&load,&extra) != 4 ||
+        !valid_press(force_x,force_y,radius,load)) {
+      fprintf(stderr,"expected PRESS x y radius load\n"); exit(6);
+    }
+    squeeze((PlatePress){{force_x,1.-force_y},radius,load});
+    return 2;
+  }
+  if (sscanf(line,"STEP %lf %lf %lf %lf %lf%n",&px,&py,&dx,&dy,&drive,&end) != 5 ||
       !isfinite(px) || !isfinite(py) || !isfinite(dx) || !isfinite(dy) || !isfinite(drive) ||
       px < 0. || px > 1. || py < 0. || py > 1. || fabs(dx)>1. || fabs(dy)>1. ||
       drive < 0. || drive > 1.) {
-    fprintf(stderr,"expected STEP x y dx dy drive or QUIT\n"); exit(6);
+    fprintf(stderr,"expected STEP x y dx dy drive [press_x press_y radius load] or QUIT\n"); exit(6);
   }
+  while (isspace((unsigned char)line[end])) ++end;
+  if (line[end] && (sscanf(line+end,"%lf %lf %lf %lf %c",&force_x,&force_y,&radius,&load,&extra) != 4 ||
+                    !valid_press(force_x,force_y,radius,load))) {
+    fprintf(stderr,"invalid STEP pressure contact\n"); exit(6);
+  }
+  squeeze((PlatePress){{force_x,1.-force_y},radius,load});
   contact.x = px; contact.y = 1.-py;
   wall_velocity.x = drive*dx/frame_dt; wall_velocity.y = -drive*dy/frame_dt;
   return 1;
@@ -194,6 +313,7 @@ int main (int argc, char ** argv) {
       fprintf(stderr,"solver --live violet|cyan seed_u32 [level_5_to_8]\n"); return 2;
     }
     slide = !strcmp(argv[2],"cyan"); full_slide = 1; maxlevel = level;
+    volume_audit = getenv("TSS_LIVE_VOLUME_AUDIT") != NULL;
     raster_height = raster_width = 1 << maxlevel;
     seed_drops(seed);
     if (TSS_BINARY_STDOUT() < 0) { perror("stdout binary mode"); return 3; }
@@ -267,21 +387,22 @@ event init (i = 0) {
 }
 
 event adapt (i++) {
-  adapt_wavelet((scalar *){f,u}, (double[]){.012,.003,.003}, maxlevel, 5);
+  if (!held.load)
+    adapt_wavelet((scalar *){f,u}, (double[]){.012,.003,.003}, maxlevel, 5);
 }
 
 event acceleration (i++) {
-  /* Depth-averaged no-slip plate drag -12 mu/(rho h^2) u.
-   * The illustrative nondimensional gap h is fixed on each slide. */
+  /* Depth-averaged no-slip plate drag -12 mu/(rho h^2) u. */
   face vector av = a;
   foreach_face() {
     double phase = clamp((f[]+f[-1])/2.,0.,1.);
     double viscosity = phase*mu1+(1.-phase)*mu2;
-    av.x[] -= 12.*viscosity/(rho(phase)*sq(slide_gap)) * (u.x[]+u.x[-1])/2.;
+    double gap = slide_gap*fm.x[];
+    av.x[] -= 12.*viscosity/(rho(phase)*sq(gap)) * (u.x[]+u.x[-1])/2.;
     /* With one plate moving, the depth-mean Couette contribution is half
      * its local velocity. Pressure projection retains incompressibility. */
     if (live && (wall_velocity.x || wall_velocity.y))
-      av.x[] += 6.*viscosity/(rho(phase)*sq(slide_gap)) * brush(x,y)*wall_velocity.x;
+      av.x[] += 6.*viscosity/(rho(phase)*sq(gap)) * brush(x,y)*wall_velocity.x;
   }
 }
 
@@ -313,6 +434,14 @@ static void emit_frame (double time) {
       s.min < -1e-8 || s.max > 1.+1e-8) { fprintf(stderr,"invalid VOF bounds\n"); exit(4); }
   size_t count = (size_t)raster_width*raster_height;
   if (live) {
+    if (volume_audit) {
+      double lo = HUGE, hi = 0.;
+      foreach(reduction(min:lo) reduction(max:hi)) {
+        lo = min(lo,cm[]); hi = max(hi,cm[]);
+      }
+      fprintf(stderr,"volume %d %.17g %.17g %.17g %.17g %.17g\n",
+              frame, s.sum, s.volume-s.sum, s.volume, lo, hi);
+    }
     if (printf("TSSVOF1 %d %.12g %d %d %.15g\n",frame,time,raster_width,raster_height,s.sum) < 0 ||
         fwrite(pixels,1,count,stdout) != count || fflush(stdout)) exit(3);
     return;
@@ -326,7 +455,12 @@ static void emit_frame (double time) {
   fflush(stderr);
 }
 event frames (t = 0; live || t < (total - 0.5)*frame_dt; t += frame_dt) {
-  emit_frame(t);
-  ++frame;
-  if (live ? !live_command() : frame == total) return 1;
+  do {
+    emit_frame(t);
+    ++frame;
+    if (!live) return frame == total;
+    int cmd = live_command();
+    if (!cmd) return 1;
+    if (cmd == 1) break;
+  } while (1);
 }

@@ -6,6 +6,7 @@ use super::*;
 pub(super) const EYE_SCALE: f32 = 14.;
 
 pub struct StereoOutput {
+    depth: f32,
     cfg: gpu::SurfaceConfiguration,
     pack: Pass,
     left: Target,
@@ -48,6 +49,7 @@ impl StereoOutput {
             ],
         );
         Self {
+            depth: 0.2,
             cfg,
             pack,
             left: Target::new(&r.device, "Left eye", r.preview_size(), COLOR_FORMAT),
@@ -55,6 +57,12 @@ impl StereoOutput {
             feedback_generation: None,
             has_frame: false,
         }
+    }
+
+    pub fn set_depth(&mut self, depth: f32) -> Result<(), String> {
+        if !(0.0..=1.0).contains(&depth) { return Err("Expected stereo depth in [0, 1]".into()); }
+        self.depth = depth;
+        Ok(())
     }
 
     /// Render both eyes from one latched presentation and present one half-SBS frame.
@@ -110,12 +118,12 @@ impl StereoOutput {
             self.right_feedback = None;
             self.feedback_generation = None;
         }
-        r.stereo_eye_scale = EYE_SCALE;
+        r.stereo_eye_scale = EYE_SCALE * self.depth;
         r.upload_material();
         r.render_films_to(None, rear, front, program);
         std::mem::swap(&mut self.left, &mut r.optics);
         std::mem::swap(&mut self.right_feedback, &mut r.feedback);
-        r.stereo_eye_scale = -EYE_SCALE;
+        r.stereo_eye_scale = -EYE_SCALE * self.depth;
         r.upload_material();
         r.render_latched_films_to(None, rear, front, program);
         std::mem::swap(&mut self.right_feedback, &mut r.feedback);

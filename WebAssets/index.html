@@ -26,8 +26,31 @@
         <div class="native-performance" id="native-performance" hidden>
           <span id="native-instruction">Drag to tug the material on the selected slide.</span>
           <output id="native-frame-rate" aria-label="Native presentation statistics"></output>
-          <output id="stereo-pressure-state" aria-label="TV frames and measured trackpad pressure" hidden></output>
+          <output id="stereo-pressure-state" aria-label="Stereo TV presentation statistics" hidden></output>
         </div>
+        <section class="trackpad-meter" id="trackpad-meter" aria-label="Live performance controls" hidden>
+          <div class="force-inputs" hidden>
+          <div class="force-target">Pressure target <strong id="trackpad-target"></strong></div>
+          <div class="force-channel">
+            <label for="trackpad-force">Trackpad force</label><span id="trackpad-force-value" aria-hidden="true">0%</span>
+            <meter id="trackpad-force" min="0" max="100" value="0"></meter>
+          </div>
+          <div class="force-channel">
+            <label for="trackpad-load" title="Load applied to the slide after sensitivity. Full load reduces the gap at the center of contact by 65%.">Applied slide load</label><span id="trackpad-load-value" aria-hidden="true">0%</span>
+            <meter id="trackpad-load" min="0" max="100" value="0"></meter>
+          </div>
+          <div class="force-curve">
+            <label for="trackpad-sensitivity">Sensitivity</label><span id="trackpad-sensitivity-value" aria-hidden="true">1×</span>
+            <input type="range" id="trackpad-sensitivity" min="-2" max="2" step="0.1" value="0" aria-valuetext="1×">
+            <div class="range-ends" aria-hidden="true"><span>Firm press</span><span>Light touch</span></div>
+          </div>
+          </div>
+          <div class="force-curve" id="stereo-depth-controls" hidden>
+            <label for="stereo-depth">Stereo depth</label><span id="stereo-depth-value" aria-hidden="true">20%</span>
+            <input type="range" id="stereo-depth" min="0" max="100" step="1" value="20" aria-valuetext="20%">
+            <div class="range-ends" aria-hidden="true"><span>Flat</span><span>Full depth</span></div>
+          </div>
+        </section>
         <div class="native-choices" id="native-wheel-export" hidden>
           <label>Export starting pose<select id="native-export-baseline">
             <option value="auto">Automatic · neutral for releases or scheduled gestures</option>
@@ -146,8 +169,8 @@
               <button type="button" id="replay-release" class="button quiet" hidden>Replay release live</button>
             </div>
             <div class="native-choices">
-              <label>Rear film oil<select id="rear-film-oil" aria-describedby="film-oil-note"><option value="wheel">Recorded oil motion</option><option value="pdms-20">20 cSt PDMS</option><option value="pdms-1000">1,000 cSt PDMS</option></select></label>
-              <label>Front film oil<select id="front-film-oil" aria-describedby="film-oil-note"><option value="wheel">Recorded oil motion</option><option value="pdms-20">20 cSt PDMS</option><option value="pdms-1000">1,000 cSt PDMS</option></select></label>
+              <label>Rear film oil<select id="rear-film-oil" aria-describedby="film-oil-note"><option value="wheel">Recorded oil motion</option><option value="pdms-20">Recorded 20 cSt PDMS</option><option value="pdms-1000">Recorded 1,000 cSt PDMS</option></select></label>
+              <label>Front film oil<select id="front-film-oil" aria-describedby="film-oil-note"><option value="wheel">Recorded oil motion</option><option value="pdms-20">Recorded 20 cSt PDMS</option><option value="pdms-1000">Recorded 1,000 cSt PDMS</option></select></label>
             </div>
             <p id="film-oil-note" hidden></p>
             <div class="native-choices">
@@ -155,7 +178,7 @@
             </div>
             <div class="native-choices">
               <label>Mouse target<select id="wheel-slide"><option value="rear">Rear slide</option><option value="front">Front slide</option></select></label>
-              <label>Live resolution<select id="wheel-width"><option value="640">640 × 360</option><option value="960">960 × 540</option></select></label>
+              <label><span id="wheel-width-label">Live resolution</span><select id="wheel-width"><option value="640">640 × 360</option><option value="960">960 × 540</option></select></label>
             </div>
             <div class="native-choices motion-control">
               <label>Mouse action<select id="wheel-gesture"><option value="tug">Material tug</option><option value="rotate">Rotate slide</option><option value="pressure">Press slide</option></select></label>

@@ -7,6 +7,59 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 async function exerciseControls(platform) {
+  if (platform === 'Macintosh pressure meter') {
+    const {TrackpadMeter} = await import('/trackpad-meter.js');
+    const root = document.getElementById('trackpad-meter');
+    const slider = document.getElementById('trackpad-sensitivity');
+    const force = document.getElementById('trackpad-force');
+    const load = document.getElementById('trackpad-load');
+    const check = (condition, message) => { if (!condition) throw Error(message); };
+    let event, changes = 0;
+    const listen = async (name, listener) => {
+      check(name === 'tss-trackpad-pressure', 'subscribe to measured force');
+      event = listener;
+    };
+    const meter = new TrackpadMeter(root, () => changes++, listen);
+    await meter.registration;
+    const front = {layerId:3, slide:'rear', name:'Rose oil'};
+    meter.setTarget(front);
+    check(meter.sensitivity === 1 && !root.hidden && root.textContent.includes('Rose oil'), 'visible target and linear default');
+    event({payload:{...front, raw:.25, applied:.25}});
+    check(force.value === 25 && load.value === 25, 'immediate quarter force');
+    slider.value = 1;
+    slider.dispatchEvent(new Event('input'));
+    slider.dispatchEvent(new Event('change'));
+    check(changes === 1 && meter.sensitivity === 2 && slider.getAttribute('aria-valuetext') === '2×', 'sensitivity control');
+    event({payload:{...front, raw:.25, applied:.5}});
+    check(force.value === 25 && load.value === 50, 'native response with measured force unchanged');
+    meter.setTarget({...front, layerId:7});
+    event({payload:{...front, raw:1, applied:1}});
+    check(force.value === 0 && load.value === 0, 'ignore stale force after selection changes');
+    event({payload:{...front, layerId:7, raw:1, applied:1}});
+    event({payload:{...front, layerId:7, raw:0, applied:0}});
+    check(force.value === 0 && load.value === 0, 'release clears meters');
+    meter.setTarget(null);
+    check(root.hidden, 'hide outside pressure mode');
+    const reopened = new TrackpadMeter(root.cloneNode(true), () => {}, listen);
+    check(reopened.sensitivity === 2, 'operator sensitivity survives relaunch');
+    const depth = root.querySelector('#stereo-depth');
+    const depthControls = root.querySelector('#stereo-depth-controls');
+    check(meter.stereoDepth === .2 && depth.value === '20' && depthControls.hidden, 'default stereo separation');
+    meter.setStereoActive(true);
+    check(!root.hidden && !depthControls.hidden && root.querySelector('.force-inputs').hidden, 'depth independent of pressure target');
+    depth.value = '100';
+    depth.dispatchEvent(new Event('input'));
+    check(meter.stereoDepth === 1 && changes === 2, 'full separation updates config');
+    depth.value = '0';
+    depth.dispatchEvent(new Event('input'));
+    depth.dispatchEvent(new Event('change'));
+    check(meter.stereoDepth === 0 && depth.getAttribute('aria-valuetext') === '0%', 'flat stereo');
+    const restored = new TrackpadMeter(root.cloneNode(true), () => {}, listen);
+    check(restored.stereoDepth === 0 && restored.sensitivity === 2, 'flat output and pressure sensitivity persist independently');
+    meter.setStereoActive(false);
+    check(root.hidden, 'hide stereo settings after stop');
+    return;
+  }
   const coral = platform === 'Windows coral project';
   const oils = platform === 'Windows film oils';
   const windows = platform === 'Windows';
@@ -118,11 +171,55 @@ async function exerciseControls(platform) {
     await until(()=>stereoRequests.at(-1)===true && !button.disabled);
     const rig=previewRequests.at(-1);
     const original=previewRequests.find(c=>c?.simulation && !c.hardwarePressureOnly);
-    const trackCount=$('layer-count').textContent, edits=$('edit-history').options.length;
-    check(rig.layerId===rig.stack[2].layerId && rig.stack.length===3 && rig.hardwarePressureOnly &&
-      rig.gesture==='pressure' && rig.slide==='rear' && rig.focus===.72 && rig.renderWidth===640,'startup targets front physical cell');
-    check(rig.stack.every((t,i)=>t.simulation.depth===i/2 && t.simulation.rate===1 && t.visibleFilms==='rear') &&
-      new Set(rig.stack.map(t=>t.simulation.seed)).size===3 && rig.stack.every(t=>t.layerId!==original.layerId),'isolated live cells');
+    const trackCount=$('layer-count').textContent;
+    check(JSON.stringify(rig.stack)===JSON.stringify(original.stack),'stereo uses every authored dye and original solver seed in project order');
+    check(rig.layerId===rig.stack.at(-1).layerId && rig.hardwarePressureOnly &&
+      rig.gesture==='pressure' && rig.slide==='rear' && rig.focus===original.focus && rig.renderWidth===960,'startup binds pressure to the front project film');
+    check(rig.stereoDepth===.2 && rig.pressureSensitivity===1,'stereo depth and force begin at their defaults');
+    const latest=()=>previewRequests.at(-1);
+    const identity=stack=>stack.map(t=>[t.layerId,t.simulation.seed,t.simulation.depth]);
+    const originalIdentity=JSON.stringify(identity(original.stack));
+    check($('wheel-width-label').textContent === 'Resolution per eye' && $('wheel-width').value === '960',
+      'quality selector shows the actual stereo resolution');
+    set('wheel-width','640');
+    await until(()=>latest()?.renderWidth===640);
+    set('wheel-width','960');
+    await until(()=>latest()?.renderWidth===960);
+    const presets=await (await fetch('/assets/slide-presets.json')).json();
+    for (const preset of presets.wheels) {
+      set('slide-preset',preset.id);
+      await until(()=>latest()?.stack?.every(t=>t.wheel===preset.id));
+      check(latest().stack.every((t,i)=>t.swatches[1]===parseInt(preset.dyes[i].slice(1),16)),'project dye on each slide in stereo: '+preset.id);
+      check(JSON.stringify(identity(latest().stack))===originalIdentity,'palette edits preserve seeds, depth and track identity');
+    }
+    const rows=$('layer-list').querySelectorAll('.layer-row');
+    rows[rows.length-1].click();
+    await until(()=>latest()?.layerId===original.layerId);
+    const picker=$('pigment-colors').querySelector('input');
+    picker.value='#25bc71'; picker.dispatchEvent(new Event('input')); picker.dispatchEvent(new Event('change',{bubbles:true}));
+    await until(()=>latest()?.swatches?.[1]===0x25bc71);
+    check(latest().stack.find(t=>t.layerId===original.layerId).swatches[1]===0x25bc71,'active shader and composite use the same edited dye');
+    set('hue','90');
+    await until(()=>latest().swatches[1]!==0x25bc71);
+    set('hue','0');
+    set('speed','0'); set('scale','.4'); set('opacity','.65'); set('film-depth','43'); set('wheel-focus','72');
+    await until(()=>latest()?.stack?.some(t=>t.layerId===original.layerId && t.simulation.rate===0 && t.detailScale===.4 &&
+      t.opacity===.65 && t.simulation.depth===.43 && t.swatches[1]===0x25bc71) && latest().focus===.72);
+    check(latest().stack.find(t=>t.layerId!==original.layerId).simulation.rate===1,'flow pause targets only the chosen layer in stereo');
+    check($('scale-output').textContent.includes('2.50× zoom'),'field scale reports actual magnification');
+    set('speed','1'); set('scale','1'); set('opacity','1'); click('wheel-focus-reset');
+    await until(()=>latest()?.simulation?.rate===1 && latest().focus===original.focus);
+    const editedDepths = JSON.stringify(identity(latest().stack));
+    set('trackpad-sensitivity','-1');
+    await until(()=>latest()?.pressureSensitivity===.5);
+    set('stereo-depth','65');
+    await until(()=>latest()?.stereoDepth===.65);
+    check(JSON.stringify(identity(latest().stack))===editedDepths,'pressure sensitivity and stereo depth preserve edited depth and source identities');
+    click('save-project'); await idle();
+    const saved=JSON.parse(documentText);
+    check(saved.layers.length===original.stack.length && saved.selected===original.layerId &&
+      saved.layers.find(l=>l.id===original.layerId).colors[0]==='#25bc71','save during stereo preserves project layers, selection and edited color');
+    const edits=$('edit-history').options.length;
     const scale=devicePixelRatio, css=$('preview').getBoundingClientRect();
     const pixelRect = (ratio) => {
       const px = x => Math.round(x*ratio);
@@ -135,18 +232,33 @@ async function exerciseControls(platform) {
     check(oldQuery!==scaleQuery,'resolution change rearms for the new monitor scale');
     Object.defineProperty(window,'devicePixelRatio',{value:scale,configurable:true});
     await until(()=>JSON.stringify(previewRequests.at(-1).rect)===JSON.stringify(pixelRect(scale)));
-    await until(()=>$('stereo-pressure-state').textContent.includes('trackpad 42%'));
+    await until(()=>$('stereo-pressure-state').textContent.includes('SAMSUNG'));
     check($('stereo-pressure-state').textContent.includes('17 pressure events'),'measured force telemetry');
-    click('projector');await until(()=>!button.disabled && forgotten.length===3);
+    click('projector');await until(()=>!button.disabled && stereoRequests.at(-1)===false);
     check(stereoRequests.at(-1)===false && previewRequests.at(-1).layerId===original.layerId &&
       previewRequests.at(-1).simulation.seed===original.simulation.seed && $('stereo-pressure-state').hidden,'stop restores mono simulation');
-    check($('layer-count').textContent===trackCount && $('edit-history').options.length===edits,'audition leaves authored tracks and edits intact');
+    check($('layer-count').textContent===trackCount && $('edit-history').options.length===edits &&
+      latest().swatches[1]===0x25bc71 && latest().renderWidth===original.renderWidth && !latest().hardwarePressureOnly,
+      'stopping stereo preserves edits and restores mono preview width and gesture');
     stereoFails=true;click('projector');
     await until(()=>$('app-status').textContent.includes('No external display') && !button.disabled);
-    check(previewRequests.at(-1).layerId===original.layerId && forgotten.length===6,'failed start restores project and retires rig');
+    check(previewRequests.at(-1).layerId===original.layerId && forgotten.length===0,'failed start retains project solvers');
     stereoFails=false;click('projector');await until(()=>button.getAttribute('aria-pressed')==='true' && !button.disabled);
     await listeners.get('tss-stereo-closed')({payload:'Display disconnected'});
-    check(button.getAttribute('aria-pressed')==='false' && forgotten.length===9 && previewRequests.at(-1).layerId===original.layerId,'disconnect restores project');
+    check(button.getAttribute('aria-pressed')==='false' && forgotten.length===0 && previewRequests.at(-1).layerId===original.layerId,'disconnect restores project input');
+    const recorded=saved.layers.find(l=>l.id===saved.selected);
+    delete recorded.simulationSeed; delete recorded.filmDepth; delete recorded.presetGroup; delete recorded.dyeIndex;
+    recorded.colors=['#ffffff','#aa88aa','#335533','#aaff00'];
+    incoming=JSON.stringify(saved); click('open-project');
+    await until(()=>$('replace-project').open || !$('project-operation').open);
+    if ($('replace-project').open) $('replace-project').querySelector('[value=replace]').click();
+    await idle(); click('projector');
+    await until(()=>button.getAttribute('aria-pressed')==='true' && !button.disabled);
+    check(latest().layerId!==recorded.id && latest().stack.some(t=>t.layerId===recorded.id && !t.simulation) &&
+      $('wheel-slide').disabled && $('live-wheel').checked, 'mixed project keeps recorded geometry and routes pressure to the live film');
+    click('live-wheel');
+    await until(()=>!latest().stack?.some(t=>t.layerId===recorded.id));
+    check(!$('live-wheel').checked && latest().hardwarePressureOnly, 'legacy preview checkbox reflects the selected track');
     return;
   }
   if (benchmark) {
@@ -590,6 +702,7 @@ async function exerciseControls(platform) {
 const chrome=process.env.CHROME_BIN;
 const projectControls='editor project and region controls, reviewed advisor cues, lyric consent and undo';
 const editorCases=[
+  ['Macintosh pressure meter','MacBook measures raw force and applied slide load with adjustable sensitivity'],
   ['Linux','Linux '+projectControls],
   ['Windows','Windows '+projectControls],
   ['Macintosh','Mac desktop native wheel selection, optics and modal visibility'],

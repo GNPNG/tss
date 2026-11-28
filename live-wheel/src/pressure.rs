@@ -3,7 +3,7 @@ const ASPECT: f64 = 16. / 9.;
 const RADIUS: f64 = 0.32;
 const MAX_COMPRESSION: f64 = 0.65;
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub(crate) struct Pressure {
     pub center: [f64; 2],
     radius: f64,
@@ -36,6 +36,28 @@ impl Pressure {
 
     pub fn active(self) -> bool {
         self.amplitude > 0.
+    }
+
+    #[cfg(feature = "live-solver")]
+    pub(super) fn squeeze(self, view: [f32; 4]) -> tss_basilisk_live::Squeeze {
+        let [sx, sy, ox, oy] = view.map(f64::from);
+        tss_basilisk_live::Squeeze {
+            center: [self.center[0] * sx + ox, self.center[1] * sy + oy],
+            radius: self.radius * sy,
+            load: self.amplitude / MAX_COMPRESSION,
+        }
+    }
+
+    #[cfg(feature = "live-solver")]
+    pub(super) fn between(self, next: Self, fraction: f32) -> Self {
+        let t = f64::from(fraction);
+        let mut p = if self.active() { self } else { next };
+        if self.active() && next.active() {
+            for k in 0..2 { p.center[k] += (next.center[k] - p.center[k]) * t; }
+            p.radius += (next.radius - p.radius) * t;
+        }
+        p.amplitude = self.amplitude + (next.amplitude - self.amplitude) * t;
+        p
     }
 
     // Output-to-source coordinate and current gap / neutral physical gap.

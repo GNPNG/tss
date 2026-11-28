@@ -22,7 +22,7 @@ vec2 detailPoint(vec2 uv) {
 // The squared-radius inverse map s0=s[1-a(1-s)^3] conserves both phase
 // volumes when the physical gap is h0 ds0/ds. Same inverse as fields.wgsl.
 vec2 pressurePoint(vec2 uv,vec4 press) {
-    if (press.w == 0.0) return uv;
+    if (press.w == 0.0 || source.detail.y != 0.0) return uv;
     vec2 d=uv-press.xy;
     vec2 p=d*filmAspect;
     float s=dot(p,p)*press.z;
@@ -84,7 +84,7 @@ vec2 changedFootprint(vec2 sigma, vec2 uv) {
     turn=max(turn,vec2(abs(source.detail.x-1.0)));
     for (int k=0; k<2; ++k) {
         vec4 press=source.pressure[k];
-        if(press.w>0.0) {
+        if(press.w>0.0 && source.detail.y == 0.0) {
             vec2 p=(detailPoint(uv)-press.xy)*filmAspect;
             float t=max(1.0-dot(p,p)*press.z,0.0);
             turn[k]=max(turn[k],press.w*t*t*t);
