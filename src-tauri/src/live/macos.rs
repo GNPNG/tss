@@ -227,6 +227,7 @@ fn start_worker(
                 stats.running = false;
                 let was_stereo = stats.projector_running;
                 stats.projector_running = false;
+                stats.projector_visible = None;
                 stats.error = Some(error.clone());
                 drop(stats);
                 if was_stereo { let _ = window.emit("tss-stereo-closed", &error); }
@@ -283,6 +284,7 @@ fn run(
     };
     let start = Instant::now();
     let telemetry = std::env::var_os("TSS_LIVE_STEREO_TELEMETRY").is_some_and(|v| v == "1");
+    let mut eye_capture = proof::EyeCapture::from_environment();
     let mut next_telemetry = start;
     let mut display_check = start;
     let mut export_pause = Duration::ZERO;
@@ -297,6 +299,9 @@ fn run(
             .map_err(|e| format!("Cannot create verification directory: {e}"))?;
     }
     loop {
+        if let Some(capture) = &mut eye_capture {
+            capture.visibility(stats.projector_visible == Some(true), Instant::now());
+        }
         let cmd = if stereo.is_none() && active.as_ref().is_none_or(|c| c.preview_hidden) {
             match rx.recv() {
                 Ok(c) => Some(c),
@@ -317,6 +322,7 @@ fn run(
                         if !enabled {
                             if stereo.take().is_some() { audience::close(window); }
                             stats.projector_running = false;
+                            stats.projector_visible = None;
                             return Ok(String::new());
                         }
                         if let Some((dest, _)) = &stereo { return Ok(dest.name.clone()); }
@@ -328,6 +334,7 @@ fn run(
                         audience::show(window)?;
                         stereo = Some((dest,out));
                         stats.projector_running = true;
+                        stats.projector_visible = None;
                         stats.projector_presents = 0;
                         last_present = None;
                         periods.clear();
@@ -420,6 +427,7 @@ fn run(
                     if config.is_none() && stereo.take().is_some() {
                         audience::close(window);
                         stats.projector_running = false;
+                        stats.projector_visible = None;
                         let _ = window.emit("tss-stereo-closed", "Live preview closed");
                     }
                     if config == active {
@@ -522,13 +530,25 @@ fn run(
         }
         if Instant::now() >= display_check {
             if let Some((dest, _)) = &mut stereo {
-                if let Err(reason) = dest.refresh(window) {
-                    stereo.take();
-                    audience::close(window);
-                    stats.projector_running = false;
-                    *shared.lock().map_err(|e| e.to_string())? = stats.clone();
-                    let _ = window.emit("tss-stereo-closed", reason);
+                match dest.refresh(window) {
+                    Ok(visible) => {
+                        if stats.projector_visible != Some(visible) {
+                            last_present = None;
+                            periods.clear();
+                            stats.fps = 0.;
+                            stats.p95_ms = 0.;
+                        }
+                        stats.projector_visible = Some(visible);
+                    }
+                    Err(reason) => {
+                        stereo.take();
+                        audience::close(window);
+                        stats.projector_running = false;
+                        stats.projector_visible = None;
+                        let _ = window.emit("tss-stereo-closed", reason);
+                    }
                 }
+                *shared.lock().map_err(|e| e.to_string())? = stats.clone();
             }
             display_check = Instant::now() + Duration::from_secs(1);
         }
@@ -576,19 +596,26 @@ fn run(
             };
             let presented = if let Some((dest,out)) = &mut stereo {
                 out.set_depth(c.stereo_depth)?;
-                match out.present(r, &dest.surface, dest.size, rear, front, program_time) {
+                // Continue the same oil fields and stereo feedback across desktop Space switches.
+                let result = if stats.projector_visible == Some(false) {
+                    out.advance(r, rear, front, program_time).map(|_| false)
+                } else {
+                    out.present(r, &dest.surface, dest.size, rear, front, program_time)
+                };
+                match result {
                     Ok(sent) => {
                         if sent {
                             stats.projector_presents += 1;
                             stats.projector_song_time = Some(program_time);
-                            if window_visible && !c.preview_hidden { out.preview(r, surface)?; }
                         }
+                        if window_visible && !c.preview_hidden { out.preview(r, surface)?; }
                         sent
                     }
                     Err(reason) => {
                         stereo.take();
                         audience::close(window);
                         stats.projector_running = false;
+                        stats.projector_visible = None;
                         *shared.lock().map_err(|e| e.to_string())? = stats.clone();
                         let _ = window.emit("tss-stereo-closed", reason);
                         false
@@ -602,10 +629,22 @@ fn run(
             }
             Ok(presented)
         })?;
+        if !presented && stereo.is_some() {
+            c.read_solver_status(&mut stats, |id| r.live_solver_status(id));
+            *shared.lock().map_err(|e| e.to_string())? = stats.clone();
+        }
         if presented {
             let now = Instant::now();
             stats.presents += 1;
             c.read_solver_status(&mut stats, |id| r.live_solver_status(id));
+            if stats.projector_visible == Some(true) {
+                if let Some(capture) = &mut eye_capture {
+                    if let Err(error) = capture.on_present(r, c, &stats, now) {
+                        eprintln!("Stereo eye capture stopped: {error}");
+                        eye_capture = None;
+                    }
+                }
+            }
             if output.is_some() {
                 if let Some(error) = &stats.error { return Err(error.clone()); }
             }

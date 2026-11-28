@@ -501,6 +501,8 @@ pub struct Stats {
     focus: Option<f32>,
     error: Option<String>,
     projector_running: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    projector_visible: Option<bool>,
     projector_age_ms: Option<f64>,
     projector_song_time: Option<f64>,
     projector_presents: u64,

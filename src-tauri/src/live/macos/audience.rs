@@ -11,7 +11,6 @@ use std::{
     cell::RefCell,
     ffi::c_void,
     sync::{mpsc, Arc},
-    time::{Duration, Instant},
 };
 use tauri::WebviewWindow;
 use tss_live_wheel::wgpu;
@@ -20,6 +19,7 @@ use tss_live_wheel::wgpu;
 extern "C" {
     fn CGDisplayIsBuiltin(display: u32) -> u32;
     fn CGDisplayIsAsleep(display: u32) -> u32;
+    fn CGDisplayIsOnline(display: u32) -> u32;
     fn CGDisplayBounds(display: u32) -> NSRect;
     fn CGWindowListCopyWindowInfo(options: u32, relative_to: u32) -> *mut c_void;
     fn CGRectMakeWithDictionaryRepresentation(bounds: *const c_void, result: *mut NSRect) -> bool;
@@ -41,7 +41,6 @@ pub(super) struct Destination {
     pub(super) size: [u32; 2],
     pub(super) name: String,
     display_id: u32,
-    off_space_since: Option<Instant>,
 }
 
 fn id(screen: &NSScreen) -> Option<u32> {
@@ -212,7 +211,6 @@ pub(super) fn open(
                         size: pixel_size(&tv),
                         name: tv.localizedName().to_string(),
                         display_id,
-                        off_space_since: None,
                     })
                 })();
             let _ = tx.send(result);
@@ -248,7 +246,7 @@ pub(super) fn close(window: &WebviewWindow) {
 }
 
 impl Destination {
-    pub(super) fn refresh(&mut self, window: &WebviewWindow) -> Result<(), String> {
+    pub(super) fn refresh(&mut self, window: &WebviewWindow) -> Result<bool, String> {
         let id_to_find = self.display_id;
         let (tx, rx) = mpsc::sync_channel(1);
         window
@@ -258,51 +256,43 @@ impl Destination {
                         .iter()
                         .find(|s| id(s) == Some(id_to_find))
                         .map(|screen| {
-                            let issue = OUTPUT.with(|slot| {
+                            let visible = OUTPUT.with(|slot| {
                                 let mut state = slot.borrow_mut();
-                                let Some(w) = state.as_mut() else { return Some("has no audience window") };
-                                if !w.stage.styleMask().contains(NSWindowStyleMask::FullScreen)
-                                    || !w.stage.screen().is_some_and(|s| id(&s) == Some(id_to_find))
-                                    || !on_screen_bounds(w.stage.windowNumber()).is_some_and(|rect| fills_display(rect, id_to_find)) {
-                                    return Some("does not have a visible fullscreen audience window covering its display bounds");
-                                }
+                                let w =
+                                    state.as_mut().ok_or("The stereo audience window closed")?;
+                                let visible = unsafe { CGDisplayIsAsleep(id_to_find) } == 0
+                                    && w.stage.styleMask().contains(NSWindowStyleMask::FullScreen)
+                                    && w.stage.screen().is_some_and(|s| id(&s) == Some(id_to_find))
+                                    && on_screen_bounds(w.stage.windowNumber())
+                                        .is_some_and(|rect| fills_display(rect, id_to_find));
                                 // Restore input to the performance desk once, when TSS still owns focus.
                                 // AppKit owns window placement throughout the fullscreen transition.
-                                if w.entering {
+                                if w.entering && visible {
                                     w.entering = false;
-                                    if w.stage.isKeyWindow() { w.editor.makeKeyAndOrderFront(None) }
+                                    if w.stage.isKeyWindow() {
+                                        w.editor.makeKeyAndOrderFront(None)
+                                    }
                                 }
-                                if w.original_behavior.is_some() && !w.editor.isMiniaturized()
-                                    && (!w.editor.screen().is_some_and(|s|builtin(&s)) || on_screen_bounds(w.editor.windowNumber()).is_none()) {
-                                    return Some("is fullscreen, but the MacBook performance window is unavailable in the shared Space");
-                                }
-                                None
+                                Ok::<_, &'static str>(visible)
                             });
-                            (pixel_size(&screen), issue)
+                            (pixel_size(&screen), visible)
                         })
                 });
                 let _ = tx.send(placement);
             })
             .map_err(|e| e.to_string())?;
-        let (size, issue) = rx
-            .recv()
-            .map_err(|e| e.to_string())?
-            .ok_or("The external stereo display disconnected")?;
-        self.size = size;
-        // Space animations can briefly remove a window from the on-screen list.
-        // Keep the operator's keyboard focus and allow a sleeping TV to resume.
-        if let Some(issue) = issue.filter(|_| unsafe { CGDisplayIsAsleep(self.display_id) } == 0) {
-            if self
-                .off_space_since
-                .get_or_insert_with(Instant::now)
-                .elapsed()
-                >= Duration::from_secs(8)
-            {
-                return Err(format!("{} {}.", self.name, issue));
-            }
-        } else {
-            self.off_space_since = None;
+        let placement = rx.recv().map_err(|e| e.to_string())?;
+        if let Some((size, visible)) = placement {
+            self.size = size;
+            return visible.map_err(str::to_owned);
         }
-        Ok(())
+        // AppKit can temporarily omit an online display during a reconfiguration.
+        if unsafe { CGDisplayIsOnline(self.display_id) } != 0 {
+            return Ok(false);
+        }
+        Err(format!(
+            "The external stereo display {} disconnected.",
+            self.name
+        ))
     }
 }

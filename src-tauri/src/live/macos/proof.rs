@@ -1,9 +1,84 @@
-use super::{view, Stats};
+use super::{view, Config, Stats};
 use objc2_app_kit::{NSEvent, NSEventModifierFlags, NSEventType, NSView};
 use objc2_foundation::NSPoint;
-use std::{fs::File, path::Path, sync::mpsc, time::Duration};
+use std::{
+    fs::File,
+    path::{Path, PathBuf},
+    sync::mpsc,
+    time::{Duration, Instant},
+};
 use tauri::WebviewWindow;
 use tss_live_wheel::LiveWheel;
+
+/// Three spaced samples of the right-eye texture just submitted to the TV.
+/// Capturing this texture does not read the desktop or run another render.
+pub(super) struct EyeCapture {
+    directory: PathBuf,
+    visible_since: Option<Instant>,
+    previous_visible: Duration,
+    count: usize,
+}
+
+impl EyeCapture {
+    pub(super) fn from_environment() -> Option<Self> {
+        let path = std::env::var_os("TSS_LIVE_STEREO_CAPTURE_DIR").filter(|p| !p.is_empty())?;
+        Some(Self {
+            directory: path.into(),
+            visible_since: None,
+            previous_visible: Duration::ZERO,
+            count: 0,
+        })
+    }
+
+    pub(super) fn visibility(&mut self, visible: bool, now: Instant) {
+        if visible {
+            self.visible_since.get_or_insert(now);
+        } else if let Some(since) = self.visible_since.take() {
+            self.previous_visible += now.duration_since(since);
+        }
+    }
+
+    pub(super) fn on_present(
+        &mut self,
+        wheel: &LiveWheel,
+        config: &Config,
+        stats: &Stats,
+        now: Instant,
+    ) -> Result<(), String> {
+        const TIMES: [u64; 3] = [4, 60, 62];
+        let Some(&target) = TIMES.get(self.count) else {
+            return Ok(());
+        };
+        let visible_time =
+            self.previous_visible + now.duration_since(*self.visible_since.get_or_insert(now));
+        if visible_time < Duration::from_secs(target) {
+            return Ok(());
+        }
+        std::fs::create_dir_all(&self.directory).map_err(|e| e.to_string())?;
+        let base = format!("right-eye-{:02}", self.count + 1);
+        let frame = File::create_new(self.directory.join(format!("{base}.png")))
+            .map_err(|e| e.to_string())?;
+        let (width, height, rgba) = wheel.capture_rgba8()?;
+        let mut encoder = png::Encoder::new(frame, width, height);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_compression(png::Compression::Fast);
+        let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
+        writer.write_image_data(&rgba).map_err(|e| e.to_string())?;
+        writer.finish().map_err(|e| e.to_string())?;
+        let metadata = File::create_new(self.directory.join(format!("{base}.json")))
+            .map_err(|e| e.to_string())?;
+        let mut details = serde_json::to_value(stats).map_err(|e| e.to_string())?;
+        details["captureVisibleSeconds"] = serde_json::json!(visible_time.as_secs_f64());
+        details["eye"] = serde_json::json!("right");
+        details["wheel"] = serde_json::json!(config.wheel);
+        details["simulation"] = serde_json::json!(config.simulation);
+        details["swatches"] = serde_json::json!(config.swatches);
+        serde_json::to_writer_pretty(metadata, &details).map_err(|e| e.to_string())?;
+        self.count += 1;
+        Ok(())
+    }
+}
 
 // Exercise only the editor's own window. No global mouse events or cursor movement.
 pub(super) fn inspect(window: &WebviewWindow, dir: &Path) -> Result<isize, String> {

@@ -75,12 +75,9 @@ impl StereoOutput {
         front: f64,
         program: f64,
     ) -> Result<bool, String> {
+        self.advance(r, rear, front, program)?;
         if size.contains(&0) {
             return Ok(false);
-        }
-        r.verify_live_sources()?;
-        if ![rear, front, program].iter().all(|t| t.is_finite()) {
-            return Err("Invalid stereo frame time".into());
         }
         if [self.cfg.width, self.cfg.height] != size {
             check_extent(size, r.device.limits().max_texture_dimension_2d)?;
@@ -90,10 +87,19 @@ impl StereoOutput {
         let Some(frame) = acquire(r, surface, &self.cfg)? else {
             return Ok(false);
         };
-        self.render_pair(r, rear, front, program);
         self.pack_eyes(r, &frame.texture.create_view(&Default::default()), size);
         frame.present();
         Ok(true)
+    }
+
+    /// Advance both eyes on their shared clock when the TV has no visible drawable.
+    pub fn advance(&mut self, r: &mut LiveWheel, rear: f64, front: f64, program: f64) -> Result<(), String> {
+        r.verify_live_sources()?;
+        if ![rear, front, program].iter().all(|t| t.is_finite()) {
+            return Err("Invalid stereo frame time".into());
+        }
+        self.render_pair(r, rear, front, program);
+        Ok(())
     }
 
     fn render_pair(&mut self, r: &mut LiveWheel, rear: f64, front: f64, program: f64) {
