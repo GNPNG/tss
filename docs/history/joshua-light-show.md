@@ -16,7 +16,17 @@ The inventory published by the group includes three film projectors, eight carou
 
 For a model-specific comparison, the Science Museum Group catalogues a 1961 Kodak Carousel 550R with a five-inch f/3.5 Ektanar lens, rack-and-pinion focus and a high/low lamp switch. White identifies the Carousel family. The exact model, lens, lamp temperature, beam intensity, dye concentrations, vessel curvature and operator pressure for a particular shot of *Liquid Loops* are unverified here. [550R museum specimen and photographs, object 1990-5036/7646](https://collection.sciencemuseumgroup.org.uk/objects/co205500/kodak-carousel-projector-model-550r) · [White’s equipment history](https://www.pooterland.com/lightshows_joshua.html)
 
+## Room and screen
+
+The [OpenUSD scale study](../../experiments/historical-venue-study/README.md) gives an operator’s view of the two platforms and the screen. Its scene notes identify which dimensions came from the archive and which placements were chosen for the study.
+
+Greg Zinman's account in the group's archive describes one 20 × 30 ft vinyl screen in a seated theater. The rear-projection apparatus occupied two elevated platforms roughly 20 ft behind the stage. Tom Shoesmith worked the upper platform with reflective and refractive equipment. The reported 20 ft locates the setup relative to the stage. The throw of any particular lens would require its position and the path its beam took to the screen. Platform heights, individual projector aims, screen gain and the viewing position for a given photograph remain open. [Group archive, Fillmore apparatus and lumia](https://www.joshualightshow.com/about-classic/joshua-light-show-1967-68)
+
+Screen material matters to a viewer standing off-axis. As a modern measurement example, the Stewart FilmScreen 150 rear-projection datasheet reports a peak gain of 1.5 on axis and half that gain at 31°. A historical venue reconstruction would need the directional response of the vinyl used there. Its manufacturer and optical response are unverified. [Stewart FilmScreen 150 data, p. 2](https://www.stewartfilmscreen.com/Files/files/Support%20Material/Material%20Data%20Sheets/FilmScreen%20150.pdf)
+
 ## Play Fillmore Ghost
+
+The optional Joshua Light Show research pack can audition an overhead and a faint film beam on the tracks already open in the editor. The *Fillmore Ghost* example below is a separate editable project with its own oil tracks and original moth film. [Joshua Light Show research pack](../../legend-packs/research/joshua-light-show.tsslegends.json) · [Legends contributions](../legends-packs.md)
 
 *Fillmore Ghost* is an editable homage to that separation of duties. One operator shapes colored liquid. A second light adds a moving figure. Both reach the same screen. TSS uses three flat, sealed liquid cells for this example. Each conserves its own volume and has an independent seed and focal depth. Pressure deforms the selected liquid within its slide. The nested, curved clock-crystal boundary described above would require a different physical model.
 

@@ -14,7 +14,7 @@ The artist’s galleries provide stills for comparing overlapping contours and m
 
 ## TSS interpretation
 
-In **Legends → Bill Ham**, audition two liquid overheads at the same screen position. Projector A starts at 100% relative light and focus 35%. B starts at 42% and focus 70%. Both begin at 3200 K. These are adjustable performance choices. With two visible oil tracks, rotate one slide, tug the other and fade the two beam intensities independently. The editor’s sealed, planar cells model a different vessel geometry from Ham’s curved, open clock crystals. [Rig definition](../../WebAssets/legends.js)
+GNPNG’s optional research pack models two liquid overheads at the same screen position. Projector A starts at 100% relative light and focus 35%. B starts at 42% and focus 70%. Both begin at 3200 K. These are adjustable performance choices. With two visible oil tracks, rotate one slide, tug the other and fade the two beam intensities independently. The editor’s sealed, planar cells model a different vessel geometry from Ham’s curved, open clock crystals. Operators can contribute corrections to the interpretation and identify individual roles. [Bill Ham research pack](../../legend-packs/research/bill-ham.tsslegends.json) · [Legends contributions](../legends-packs.md)
 
 ## Open historical parameters
 

@@ -1,0 +1,657 @@
+#usda 1.0
+(
+    defaultPrim = "Fillmore"
+    metersPerUnit = 1
+    upAxis = "Y"
+    doc = "GNPNG Fillmore East rear-projection scale study (1968-71). Screen size and counts derive from Greg Zinman in the Joshua Light Show archive. Equipment envelopes, stage datum, platform dimensions, screen height and all exact placements are illustrative. +Z points toward the audience."
+)
+
+class Mesh "UnitBox" {
+    uniform token subdivisionScheme = "none"
+    point3f[] points = [(-0.5,-0.5,-0.5),(0.5,-0.5,-0.5),(0.5,0.5,-0.5),(-0.5,0.5,-0.5),(-0.5,-0.5,0.5),(0.5,-0.5,0.5),(0.5,0.5,0.5),(-0.5,0.5,0.5)]
+    int[] faceVertexCounts = [4,4,4,4,4,4]
+    int[] faceVertexIndices = [0,3,2,1,4,5,6,7,0,4,7,3,1,2,6,5,0,1,5,4,3,7,6,2]
+    normal3f[] normals = [(0,0,-1),(0,0,1),(-1,0,0),(1,0,0),(0,-1,0),(0,1,0)] (interpolation = "uniform")
+}
+
+class Xform "FilmUnit"
+{
+    def Mesh "Body" (
+        prepend inherits = </UnitBox>
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double3 xformOp:translate = (0, 0.2, 0)
+        float3 xformOp:scale = (0.4, 0.4, 0.55)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        rel material:binding = </Fillmore/Looks/Equipment>
+    }
+    def Cylinder "Reel01" (prepend apiSchemas = ["MaterialBindingAPI"])
+    {
+        uniform token axis = "X"
+        double height = 0.08
+        double radius = 0.22
+        double3 xformOp:translate = (0, 0.53, -0.22)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        rel material:binding = </Fillmore/Looks/Film>
+    }
+    def Cylinder "Reel02" (prepend apiSchemas = ["MaterialBindingAPI"])
+    {
+        uniform token axis = "X"
+        double height = 0.08
+        double radius = 0.19
+        double3 xformOp:translate = (0, 0.53, 0.16)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        rel material:binding = </Fillmore/Looks/Film>
+    }
+    def Cylinder "Lens" (prepend apiSchemas = ["MaterialBindingAPI"])
+    {
+        uniform token axis = "Z"
+        double height = 0.17
+        double radius = 0.08
+        double3 xformOp:translate = (0, 0.24, 0.34)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        rel material:binding = </Fillmore/Looks/Glass>
+    }
+}
+class Xform "OverheadUnit"
+{
+    def Mesh "Body" (
+        prepend inherits = </UnitBox>
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double3 xformOp:translate = (0, 0.18, 0)
+        float3 xformOp:scale = (0.55, 0.36, 0.52)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        rel material:binding = </Fillmore/Looks/Equipment>
+    }
+    def Mesh "Stage" (
+        prepend inherits = </UnitBox>
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double3 xformOp:translate = (0, 0.367, 0)
+        float3 xformOp:scale = (0.48, 0.02, 0.48)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        rel material:binding = </Fillmore/Looks/Glass>
+    }
+    def Mesh "Support" (
+        prepend inherits = </UnitBox>
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double3 xformOp:translate = (-0.21, 0.65, -0.2)
+        float3 xformOp:scale = (0.042, 0.57, 0.045)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        rel material:binding = </Fillmore/Looks/Overhead>
+    }
+    def Mesh "Arm" (
+        prepend inherits = </UnitBox>
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double3 xformOp:translate = (-0.105, 0.924, -0.2)
+        float3 xformOp:scale = (0.25, 0.06, 0.06)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        rel material:binding = </Fillmore/Looks/Overhead>
+    }
+    def Mesh "Head" (
+        prepend inherits = </UnitBox>
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double3 xformOp:translate = (0, 0.92, -0.1)
+        float3 xformOp:scale = (0.18, 0.15, 0.22)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        rel material:binding = </Fillmore/Looks/Overhead>
+    }
+    def Cylinder "Lens" (prepend apiSchemas = ["MaterialBindingAPI"])
+    {
+        uniform token axis = "Z"
+        double height = 0.09
+        double radius = 0.058
+        double3 xformOp:translate = (0, 0.92, 0.03)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        rel material:binding = </Fillmore/Looks/Glass>
+    }
+}
+class Xform "SlideUnit"
+{
+    def Mesh "Body" (
+        prepend inherits = </UnitBox>
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double3 xformOp:translate = (0, 0.13, 0)
+        float3 xformOp:scale = (0.38, 0.26, 0.44)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        rel material:binding = </Fillmore/Looks/Equipment>
+    }
+    def Cylinder "Magazine" (prepend apiSchemas = ["MaterialBindingAPI"])
+    {
+        uniform token axis = "Y"
+        double height = 0.1
+        double radius = 0.19
+        double3 xformOp:translate = (0, 0.31, -0.01)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        rel material:binding = </Fillmore/Looks/Slides>
+    }
+    def Cylinder "Lens" (prepend apiSchemas = ["MaterialBindingAPI"])
+    {
+        uniform token axis = "Z"
+        double height = 0.13
+        double radius = 0.055
+        double3 xformOp:translate = (0, 0.15, 0.26)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        rel material:binding = </Fillmore/Looks/Glass>
+    }
+}
+
+def Xform "Fillmore"
+{
+    def Scope "Looks" {
+        def Material "Deck"
+        {
+            token outputs:surface.connect = </Fillmore/Looks/Deck/PBR.outputs:surface>
+            def Shader "PBR"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.12, 0.18, 0.23)
+                float inputs:roughness = 0.72
+                token outputs:surface
+            }
+        }
+        def Material "Frame"
+        {
+            token outputs:surface.connect = </Fillmore/Looks/Frame/PBR.outputs:surface>
+            def Shader "PBR"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.24, 0.33, 0.37)
+                float inputs:roughness = 0.72
+                token outputs:surface
+            }
+        }
+        def Material "Equipment"
+        {
+            token outputs:surface.connect = </Fillmore/Looks/Equipment/PBR.outputs:surface>
+            def Shader "PBR"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.25, 0.31, 0.34)
+                float inputs:roughness = 0.72
+                token outputs:surface
+            }
+        }
+        def Material "Film"
+        {
+            token outputs:surface.connect = </Fillmore/Looks/Film/PBR.outputs:surface>
+            def Shader "PBR"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.01, 0.43, 0.54)
+                float inputs:roughness = 0.72
+                token outputs:surface
+            }
+        }
+        def Material "Slides"
+        {
+            token outputs:surface.connect = </Fillmore/Looks/Slides/PBR.outputs:surface>
+            def Shader "PBR"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.32, 0.28, 0.67)
+                float inputs:roughness = 0.72
+                token outputs:surface
+            }
+        }
+        def Material "Overhead"
+        {
+            token outputs:surface.connect = </Fillmore/Looks/Overhead/PBR.outputs:surface>
+            def Shader "PBR"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.73, 0.38, 0.08)
+                float inputs:roughness = 0.72
+                token outputs:surface
+            }
+        }
+        def Material "Glass"
+        {
+            token outputs:surface.connect = </Fillmore/Looks/Glass/PBR.outputs:surface>
+            def Shader "PBR"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.58, 0.78, 0.75)
+                float inputs:roughness = 0.72
+                token outputs:surface
+            }
+        }
+        def Material "Lumia"
+        {
+            token outputs:surface.connect = </Fillmore/Looks/Lumia/PBR.outputs:surface>
+            def Shader "PBR"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.47, 0.27, 0.42)
+                float inputs:roughness = 0.72
+                token outputs:surface
+            }
+        }
+        def Material "Datum"
+        {
+            token outputs:surface.connect = </Fillmore/Looks/Datum/PBR.outputs:surface>
+            def Shader "PBR"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.65, 0.58, 0.44)
+                float inputs:roughness = 0.72
+                token outputs:surface
+            }
+        }
+        def Material "Floor"
+        {
+            token outputs:surface.connect = </Fillmore/Looks/Floor/PBR.outputs:surface>
+            def Shader "PBR"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.079, 0.113, 0.145)
+                float inputs:roughness = 0.72
+                token outputs:surface
+            }
+        }
+        def Material "StudyImage"
+        {
+            token outputs:surface.connect = </Fillmore/Looks/StudyImage/Surface.outputs:surface>
+            def Shader "Surface"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor.connect = </Fillmore/Looks/StudyImage/Image.outputs:rgb>
+                float inputs:roughness = 1
+                token outputs:surface
+            }
+            def Shader "UV"
+            {
+                uniform token info:id = "UsdPrimvarReader_float2"
+                token inputs:varname = "st"
+                float2 outputs:result
+            }
+            def Shader "Image"
+            {
+                uniform token info:id = "UsdUVTexture"
+                asset inputs:file = @screen-study.jpg@
+                token inputs:sourceColorSpace = "sRGB"
+                float2 inputs:st.connect = </Fillmore/Looks/StudyImage/UV.outputs:result>
+                float3 outputs:rgb
+            }
+        }
+    }
+    def Xform "Screen_One_Vinyl" (
+        doc = "Documented 20 by 30 foot vinyl screen. Landscape orientation, elevation, trim and exact position are illustrative. Screen texture is a TSS oil study."
+    )
+    {
+        double3 xformOp:translate = (0, 0.9, -1.2)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        def Mesh "Vinyl_30ft_by_20ft" (prepend apiSchemas = ["MaterialBindingAPI"])
+        {
+            bool doubleSided = true
+            uniform token subdivisionScheme = "none"
+            point3f[] points = [(-4.572,0,0),(4.572,0,0),(4.572,6.096,0),(-4.572,6.096,0)]
+            int[] faceVertexCounts = [4]
+            int[] faceVertexIndices = [0,1,2,3]
+            texCoord2f[] primvars:st = [(0,0),(1,0),(1,1),(0,1)] (interpolation = "vertex")
+            rel material:binding = </Fillmore/Looks/StudyImage>
+        }
+        def Mesh "Trim_Top" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (0, 6.131, 0)
+            float3 xformOp:scale = (9.27, 0.07, 0.09)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Trim_Bottom" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (0, -0.035, 0)
+            float3 xformOp:scale = (9.27, 0.07, 0.09)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Trim_0" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (-4.607, 3.048, 0)
+            float3 xformOp:scale = (0.07, 6.2, 0.09)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Trim_1" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (4.607, 3.048, 0)
+            float3 xformOp:scale = (0.07, 6.2, 0.09)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+    }
+    def Xform "LowerPlatform_ApproxRearSystem" (
+        doc = "The rear-projection system was about 20 feet behind the stage. A representative lower-deck center uses Z=-6.096 m from an illustrative stage datum. Inventory counts are documented; placements and sizes on this deck are illustrative."
+    )
+    {
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        def Mesh "Platform" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (0, 1.05, -6.096)
+            float3 xformOp:scale = (8.9, 0.18, 1.65)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Deck>
+        }
+        def Mesh "Table" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (0, 1.9, -6.096)
+            float3 xformOp:scale = (8.5, 0.12, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Leg00" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (-3.9, 0.48, -6.82)
+            float3 xformOp:scale = (0.13, 0.96, 0.13)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Leg01" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (-3.9, 0.48, -5.38)
+            float3 xformOp:scale = (0.13, 0.96, 0.13)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Leg10" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (-1.3, 0.48, -6.82)
+            float3 xformOp:scale = (0.13, 0.96, 0.13)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Leg11" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (-1.3, 0.48, -5.38)
+            float3 xformOp:scale = (0.13, 0.96, 0.13)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Leg20" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (1.3, 0.48, -6.82)
+            float3 xformOp:scale = (0.13, 0.96, 0.13)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Leg21" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (1.3, 0.48, -5.38)
+            float3 xformOp:scale = (0.13, 0.96, 0.13)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Leg30" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (3.9, 0.48, -6.82)
+            float3 xformOp:scale = (0.13, 0.96, 0.13)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Leg31" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (3.9, 0.48, -5.38)
+            float3 xformOp:scale = (0.13, 0.96, 0.13)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Xform "Film_1" (prepend inherits = </FilmUnit>)
+        {
+            double3 xformOp:translate = (-3.8, 1.97, -6.096)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Film_2" (prepend inherits = </FilmUnit>)
+        {
+            double3 xformOp:translate = (-3.07, 1.97, -6.096)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Film_3" (prepend inherits = </FilmUnit>)
+        {
+            double3 xformOp:translate = (-2.34, 1.97, -6.096)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Overhead_1" (prepend inherits = </OverheadUnit>)
+        {
+            double3 xformOp:translate = (2.24, 1.97, -6.096)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Overhead_2" (prepend inherits = </OverheadUnit>)
+        {
+            double3 xformOp:translate = (3.05, 1.97, -6.096)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Overhead_3" (prepend inherits = </OverheadUnit>)
+        {
+            double3 xformOp:translate = (3.86, 1.97, -6.096)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Carousel_Bank1_Unit1" (prepend inherits = </SlideUnit>)
+        {
+            double3 xformOp:translate = (-1.5, 1.97, -5.8)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Carousel_Bank2_Unit1" (prepend inherits = </SlideUnit>)
+        {
+            double3 xformOp:translate = (-1.5, 1.97, -6.38)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Carousel_Bank1_Unit2" (prepend inherits = </SlideUnit>)
+        {
+            double3 xformOp:translate = (-1.06, 1.97, -5.8)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Carousel_Bank2_Unit2" (prepend inherits = </SlideUnit>)
+        {
+            double3 xformOp:translate = (-1.06, 1.97, -6.38)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Carousel_Bank1_Unit3" (prepend inherits = </SlideUnit>)
+        {
+            double3 xformOp:translate = (-0.62, 1.97, -5.8)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Carousel_Bank2_Unit3" (prepend inherits = </SlideUnit>)
+        {
+            double3 xformOp:translate = (-0.62, 1.97, -6.38)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Carousel_Bank1_Unit4" (prepend inherits = </SlideUnit>)
+        {
+            double3 xformOp:translate = (-0.18, 1.97, -5.8)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Carousel_Bank2_Unit4" (prepend inherits = </SlideUnit>)
+        {
+            double3 xformOp:translate = (-0.18, 1.97, -6.38)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+    }
+    def Xform "UpperPlatform_Lumia" (
+        doc = "Tom Shoesmith worked the upper platform with lumia. This mirror-wheel silhouette and both platform dimensions are illustrative."
+    )
+    {
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        def Mesh "Platform" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (0, 3.1, -8)
+            float3 xformOp:scale = (5.2, 0.18, 1.35)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Deck>
+        }
+        def Mesh "LumiaWorkSurface" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (0, 3.81, -8)
+            float3 xformOp:scale = (3.6, 0.1, 0.74)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Lumia>
+        }
+        def Mesh "Leg00" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (-2.4, 1.5, -8.55)
+            float3 xformOp:scale = (0.13, 3, 0.13)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Leg01" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (-2.4, 1.5, -7.45)
+            float3 xformOp:scale = (0.13, 3, 0.13)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Leg10" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (2.4, 1.5, -8.55)
+            float3 xformOp:scale = (0.13, 3, 0.13)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "Leg11" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (2.4, 1.5, -7.45)
+            float3 xformOp:scale = (0.13, 3, 0.13)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "BenchLeg0" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (-1.35, 3.49, -8)
+            float3 xformOp:scale = (0.09, 0.63, 0.12)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Mesh "BenchLeg1" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (1.35, 3.49, -8)
+            float3 xformOp:scale = (0.09, 0.63, 0.12)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Frame>
+        }
+        def Cylinder "MirrorWheelExample" (prepend apiSchemas = ["MaterialBindingAPI"])
+        {
+            uniform token axis = "Z"
+            double height = 0.055
+            double radius = 0.34
+            double3 xformOp:translate = (0, 4.15, -8)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+            rel material:binding = </Fillmore/Looks/Lumia>
+        }
+    }
+    def Xform "StageReference_Illustrative" (
+        doc = "The line at Z=0 supplies a datum for this exhibit. The archive does not locate a measured stage edge. Hall walls and seating are unspecified."
+    )
+    {
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        def Mesh "StageDeck" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (0, -0.1, 1.6)
+            float3 xformOp:scale = (11.6, 0.18, 3.2)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Deck>
+        }
+        def Mesh "StageDatum" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (0, 0.012, 0)
+            float3 xformOp:scale = (11.6, 0.035, 0.045)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Datum>
+        }
+        def Mesh "BackstageFloor" (
+            prepend inherits = </UnitBox>
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double3 xformOp:translate = (0, -0.18, -5)
+            float3 xformOp:scale = (11.6, 0.12, 10)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            rel material:binding = </Fillmore/Looks/Floor>
+        }
+    }
+}

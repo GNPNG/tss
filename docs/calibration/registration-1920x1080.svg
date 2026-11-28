@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <title>TSS full HD projection registration plate</title>
+  <desc>One-pixel outer frame, labelled corners, square grid, centre circle, horizontal and vertical one-pixel bar patches and ten full-range neutral levels.</desc>
+  <defs>
+    <pattern id="grid" width="120" height="120" x="0" y="60" patternUnits="userSpaceOnUse">
+      <path d="M0.5 120V0.5H120" stroke="#575757" fill="none"/>
+    </pattern>
+    <pattern id="vertical" width="2" height="2" patternUnits="userSpaceOnUse"><path fill="white" d="M0 0h1v2H0z"/></pattern>
+    <pattern id="horizontal" width="2" height="2" patternUnits="userSpaceOnUse"><path fill="white" d="M0 0h2v1H0z"/></pattern>
+  </defs>
+  <rect width="1920" height="1080" fill="#282828"/>
+  <rect width="1920" height="1080" fill="url(#grid)"/>
+  <g stroke="white" fill="none">
+    <rect x=".5" y=".5" width="1919" height="1079"/>
+    <rect x="20.5" y="20.5" width="1879" height="1039"/>
+    <circle cx="960" cy="540" r="192" stroke-width="3"/>
+    <path d="M48 540h1824M960 48v984"/>
+    <circle cx="960" cy="540" r="12" stroke-width="2"/>
+  </g>
+  <g fill="#f5f5f5" font-family="sans-serif" font-size="28" font-weight="bold">
+    <text x="48" y="76">1 · TOP LEFT</text><text x="1872" y="76" text-anchor="end">2 · TOP RIGHT</text>
+    <text x="48" y="1027">3 · BOTTOM LEFT</text><text x="1872" y="1027" text-anchor="end">4 · BOTTOM RIGHT</text>
+  </g>
+  <g fill="#f5f5f5" font-family="sans-serif" text-anchor="middle">
+    <rect x="670" y="94" width="580" height="95" fill="#282828"/>
+    <text x="960" y="138" font-size="38" font-weight="bold">Projection registration</text>
+    <text x="960" y="175" font-size="23">1920 × 1080 · Audience view</text>
+    <rect x="256" y="446" width="192" height="188" fill="black"/>
+    <rect x="256" y="446" width="192" height="188" fill="url(#vertical)"/>
+    <rect x="1472" y="446" width="192" height="188" fill="black"/>
+    <rect x="1472" y="446" width="192" height="188" fill="url(#horizontal)"/>
+    <text x="352" y="673" font-size="22">Vertical · 1 px</text>
+    <text x="1568" y="673" font-size="22">Horizontal · 1 px</text>
+    <rect x="487" y="765" width="946" height="180" fill="#282828"/>
+    <text x="960" y="801" font-size="23">Full-range neutral RGB code values</text>
+    <rect x="509.5" y="821.5" width="901" height="73" fill="none" stroke="white"/>
+    <g font-size="20">
+    <rect x="510" y="822" width="90" height="72" fill="rgb(0,0,0)"/>
+    <text x="555" y="925">0</text>
+    <rect x="600" y="822" width="90" height="72" fill="rgb(8,8,8)"/>
+    <text x="645" y="925">8</text>
+    <rect x="690" y="822" width="90" height="72" fill="rgb(16,16,16)"/>
+    <text x="735" y="925">16</text>
+    <rect x="780" y="822" width="90" height="72" fill="rgb(32,32,32)"/>
+    <text x="825" y="925">32</text>
+    <rect x="870" y="822" width="90" height="72" fill="rgb(64,64,64)"/>
+    <text x="915" y="925">64</text>
+    <rect x="960" y="822" width="90" height="72" fill="rgb(128,128,128)"/>
+    <text x="1005" y="925">128</text>
+    <rect x="1050" y="822" width="90" height="72" fill="rgb(192,192,192)"/>
+    <text x="1095" y="925">192</text>
+    <rect x="1140" y="822" width="90" height="72" fill="rgb(235,235,235)"/>
+    <text x="1185" y="925">235</text>
+    <rect x="1230" y="822" width="90" height="72" fill="rgb(247,247,247)"/>
+    <text x="1275" y="925">247</text>
+    <rect x="1320" y="822" width="90" height="72" fill="rgb(255,255,255)"/>
+    <text x="1365" y="925">255</text>
+    </g>
+  </g>
+</svg>

@@ -68,6 +68,7 @@ const lighting=installProjectionLight({selected:selectedLayer, changed:layout=>{
 }});
 const legends=installLegends({
   layers:()=>state.layers,
+  availablePacks:()=>nativeDesktop ? window.__TAURI__.core.invoke('available_legend_packs') : [],
   preview:()=>{nativeSurface?.sync();updateTransport();},
   apply:(rig,artist)=>{
     for(const [id,beam] of rig.routes) {

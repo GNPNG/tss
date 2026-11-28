@@ -1,0 +1,40 @@
+{
+  "format": "tss.legends",
+  "schemaVersion": 1,
+  "id": "joshua-light-show",
+  "title": "Joshua Light Show",
+  "version": "0.1.0",
+  "credits": [
+    "GNPNG · historical research and simulation",
+    "Joshua Light Show · historical subject"
+  ],
+  "review": {
+    "status": "research",
+    "note": "GNPNG research interpretation. Artist or representative feedback has not been recorded for this version."
+  },
+  "rigs": [
+    {
+      "id": "joshua",
+      "artist": "Joshua Light Show",
+      "venue": "Fillmore East · New York",
+      "record": "The group combined film, carousel slides and liquid overheads behind one screen.",
+      "sources": [
+        [
+          "Group archive",
+          "https://www.joshualightshow.com/about-classic/joshua-light-show-1967-68"
+        ]
+      ],
+      "setup": "Liquid overhead with a film beam at 8% exposure. Offset the second image for a ghost.",
+      "rig": {
+        "a": "liquid-overhead",
+        "b": "film",
+        "temperatureA": 3200,
+        "temperatureB": 6500,
+        "levelB": 0.08,
+        "offsetX": 0.025,
+        "focusA": 0.5,
+        "focusB": 0.68
+      }
+    }
+  ]
+}

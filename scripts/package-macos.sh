@@ -15,7 +15,7 @@ repo=$(cd "$(dirname "$0")/.." && pwd -P)
 cd "$repo"
 app="The Sacred Swirls.app"
 zip="The-Sacred-Swirls-$tag-macOS-x86_64.zip"
-[[ ! -e "$out/$app" && ! -e "$out/$zip" && ! -e "$out/examples" ]] || fail "The output already contains this app, archive or examples."
+[[ ! -e "$out/$app" && ! -e "$out/$zip" && ! -e "$out/examples" && ! -e "$out/legend-packs" ]] || fail "The output already contains the app, archive, examples or Legends packs."
 
 if [[ -n ${TSS_TAURI_CLI:-} ]]; then
   cli=("$TSS_TAURI_CLI")
@@ -60,7 +60,7 @@ verify_bundle "$built"
 stage=$(mktemp -d "$out/.tss-mac-package.XXXXXX")
 trap 'rm -r "$stage"' EXIT
 source "$repo/scripts/macos-review-archive.sh"
-macos_review_archive "$built" "$repo/examples" "$stage" "$stage/$zip"
+macos_review_archive "$built" "$repo/examples" "$stage" "$stage/$zip" "${TSS_LEGEND_PACK_DIR-$repo/legend-packs/research}"
 verify_bundle "$stage/extracted/$app"
 helper="$stage/extracted/$app/Contents/MacOS/tss-performer"
 printf '%s\n' '{"bind":"127.0.0.1","host":"127.0.0.1","port":0}' join hold release |
@@ -72,6 +72,9 @@ done
 codesign -d --verbose=2 "$stage/extracted/$app"
 if [[ -d "$stage/extracted/examples" ]]; then
   mv "$stage/extracted/examples" "$out/examples"
+fi
+if [[ -d "$stage/extracted/legend-packs" ]]; then
+  mv "$stage/extracted/legend-packs" "$out/legend-packs"
 fi
 mv "$stage/extracted/$app" "$out/$app"
 mv "$stage/$zip" "$out/$zip"

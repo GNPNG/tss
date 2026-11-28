@@ -1,0 +1,32 @@
+{
+  "format": "tss.legends",
+  "schemaVersion": 1,
+  "id": "two-beam-studio",
+  "title": "Two-beam studio",
+  "version": "1.0.0",
+  "credits": ["GNPNG · The Sacred Swirls"],
+  "review": {
+    "status": "original",
+    "note": "Original studio exercise for exploring overlapping projector beams."
+  },
+  "rigs": [
+    {
+      "id": "split-focus",
+      "artist": "Two-beam studio",
+      "venue": "Studio exercise",
+      "record": "Two liquid overheads illuminate the same screen. Each beam has its own lamp and focal plane.",
+      "sources": [],
+      "setup": "Use two visible oil layers. Bring the warm beam forward in focus while the cooler beam fills the shadows.",
+      "rig": {
+        "a": "liquid-overhead",
+        "b": "liquid-overhead",
+        "temperatureA": 3200,
+        "temperatureB": 6500,
+        "levelB": 0.25,
+        "offsetX": 0,
+        "focusA": 0.3,
+        "focusB": 0.75
+      }
+    }
+  ]
+}

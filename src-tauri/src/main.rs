@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod advisor;
+mod legend_catalog;
 mod export;
 mod export_smoke;
 mod lyrics;
@@ -287,6 +288,7 @@ fn main() {
         .manage(performer::Performer::default())
         .manage(live::movie::ExportControl::default())
         .invoke_handler(tauri::generate_handler![
+            legend_catalog::available_legend_packs,
             export_smoke::select_wheel_export_fixture,
             export_smoke::finish_wheel_export_verification,
             live::set_live_wheel,

@@ -17,12 +17,20 @@ for fixture in absent empty projects; do
       printf '%s\n' '{}' > "$stage/examples/first/Sample.tss"
       printf '%s\n' 'companion media' > "$stage/examples/first/Motif clip.mp4" ;;
   esac
-  macos_review_archive "$app" "$stage/examples" "$stage" "$stage/App.zip"
+  if [[ "$fixture" == projects ]]; then
+    mkdir "$stage/catalog"
+    printf '%s\n' '{}' > "$stage/catalog/original.tsslegends.json"
+    printf '%s\n' 'private correspondence' > "$stage/catalog/notes.txt"
+  fi
+  macos_review_archive "$app" "$stage/examples" "$stage" "$stage/App.zip" "$stage/catalog"
   cmp "$app/Contents/payload" "$stage/extracted/Test.app/Contents/payload"
   if [[ "$fixture" == projects ]]; then
+    cmp "$stage/catalog/original.tsslegends.json" "$stage/extracted/legend-packs/original.tsslegends.json"
+    test ! -e "$stage/extracted/legend-packs/notes.txt"
     cmp "$stage/examples/first/Motif clip.mp4" "$stage/extracted/examples/first/Motif clip.mp4"
     cmp "$stage/examples/first/Sample.tss" "$stage/extracted/examples/first/Sample.tss"
   else
+    test ! -e "$stage/extracted/legend-packs"
     test ! -e "$stage/extracted/examples"
   fi
 done

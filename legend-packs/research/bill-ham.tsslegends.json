@@ -1,0 +1,48 @@
+{
+  "format": "tss.legends",
+  "schemaVersion": 1,
+  "id": "bill-ham",
+  "title": "Bill Ham",
+  "version": "0.1.0",
+  "credits": [
+    "GNPNG · historical research and simulation",
+    "Bill Ham · historical subject"
+  ],
+  "review": {
+    "status": "research",
+    "note": "GNPNG research interpretation. Artist or representative feedback has not been recorded for this version."
+  },
+  "rigs": [
+    {
+      "id": "ham",
+      "artist": "Bill Ham",
+      "venue": "Light Sound Dimension · San Francisco",
+      "record": "Ham stacked concave clock crystals on overhead projectors and combined their images on the screen.",
+      "sources": [
+        [
+          "Artist interview",
+          "https://www.collectorsweekly.com/articles/lightman-fantastic/"
+        ],
+        [
+          "Stills",
+          "https://billhamlights.com/light-paintings-screenshots/"
+        ],
+        [
+          "Videos",
+          "https://billhamlights.com/lightpaintings-videos/"
+        ]
+      ],
+      "setup": "Two overlapping liquid overheads with independent focus and exposure. Raise one beam as the other fades.",
+      "rig": {
+        "a": "liquid-overhead",
+        "b": "liquid-overhead",
+        "temperatureA": 3200,
+        "temperatureB": 3200,
+        "levelB": 0.42,
+        "offsetX": 0,
+        "focusA": 0.35,
+        "focusB": 0.7
+      }
+    }
+  ]
+}

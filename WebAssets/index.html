@@ -18,6 +18,11 @@
       <section class="stage card" aria-label="Visual preview">
         <div class="section-heading"><div><span class="eyebrow">LIVE CANVAS</span><h1>Liquid light</h1></div><span class="live-indicator"><i></i><span id="preview-status">PROCEDURAL PREVIEW</span></span></div>
         <div class="preview-shell"><canvas id="preview" width="1280" height="720" aria-label="Liquid light preview"></canvas><div id="render-error" class="render-error" hidden></div><div id="solver-unavailable" class="render-error" role="status" hidden>Live fluid simulation requires the Basilisk solver. Your saved slide settings are retained.</div><div class="preview-bottom"><span id="preview-resolution">1280 × 720</span><span>PROJECTED LIGHT</span></div></div>
+        <div id="legend-preview" class="rig-actions" hidden>
+          <span id="legend-preview-artist"></span>
+          <button class="button quiet" type="button" id="legend-back">Back to rig</button>
+          <button class="button quiet" type="button" id="legend-preview-stop">Stop audition</button>
+        </div>
         <div class="native-performance" id="native-performance" hidden>
           <span id="native-instruction">Drag to tug the material on the selected slide.</span>
           <output id="native-frame-rate" aria-label="Native presentation statistics"></output>
@@ -215,10 +220,35 @@
 
     <details class="legends card" id="legends" hidden>
       <summary>Legends</summary>
-      <p>Audition a two-projector interpretation with your current tracks. With two or more visible tracks on one projector, the rig moves one to the other projector.</p>
-      <div id="legend-cards"></div>
+      <div class="rig-actions legend-library">
+        <button class="button quiet" id="legend-install" type="button">Install pack…</button>
+        <input type="file" id="legend-file" accept=".json,application/json" hidden>
+        <output id="legend-pack-status" role="status"></output>
+        <span class="rig-actions" id="legend-replacement" hidden>
+          <button class="button quiet" id="legend-keep" type="button">Keep installed pack</button>
+          <button class="button quiet" id="legend-replace" type="button">Replace pack</button>
+        </span>
+      </div>
+      <fieldset id="legend-available" hidden>
+        <legend>Available packs</legend>
+        <div id="legend-available-list"></div>
+      </fieldset>
+      <output id="legend-catalog-status" role="status"></output>
+      <fieldset id="legend-installed" hidden>
+        <legend>Installed packs</legend>
+        <div id="legend-packs"></div>
+      </fieldset>
+      <p id="legend-empty">Import a Legends pack (.tsslegends.json) to audition a rig with your current tracks.</p>
+      <section id="legend-carousel" role="region" aria-roledescription="carousel" aria-label="Legend rigs" tabindex="0" hidden>
+        <p>Audition on your current tracks. If two or more visible tracks share one projector, the rig assigns one to the second beam.</p>
+        <div class="rig-actions legend-navigation">
+          <button class="button quiet" id="legend-prev" type="button" aria-controls="legend-cards">Previous rig</button>
+          <output id="legend-position" role="status" aria-atomic="true"></output>
+          <button class="button quiet" id="legend-next" type="button" aria-controls="legend-cards">Next rig</button>
+        </div>
+        <div id="legend-cards"></div>
+      </section>
       <div class="rig-actions"><output id="legend-status" role="status"></output><button class="button quiet" id="legend-stop" type="button" hidden>Stop audition</button></div>
-      <p>For the film-overlay study, open <code>examples/fillmore-ghost.tss</code> with its companion film in the same folder.</p>
     </details>
     <section class="timeline card" aria-label="Timeline">
       <div class="timeline-header"><div><span class="eyebrow">ARRANGEMENT</span><h2>Timeline</h2></div><div class="timeline-actions"><label>History <select id="edit-history" aria-label="Edit history"></select></label><button class="button quiet" type="button" id="undo-edit" disabled>Undo</button><button class="button quiet" type="button" id="redo-edit" disabled>Redo</button><span id="layer-count">1 visual layer</span><label>New track <select id="track-source" aria-label="New track source"><option value="blank">Blank liquid layer</option></select></label><button id="artwork-add" class="button quiet" type="button" hidden>Add artwork</button><button id="add-layer" class="button add-layer">＋ &nbsp;Add visual layer</button></div></div>

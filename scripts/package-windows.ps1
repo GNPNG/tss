@@ -8,7 +8,9 @@ param(
     # Root of the curated example tree. Paths inside it are preserved under examples/.
     [string] $ExampleDirectory,
     # Output of build-windows-solver.ps1 paired with a live-solver feature build.
-    [string] $LiveSolverDirectory
+    [string] $LiveSolverDirectory,
+    # Set to an empty string for a release without a suggested Legends collection.
+    [AllowEmptyString()][string] $LegendPackDirectory = (Join-Path $PSScriptRoot '../legend-packs/research')
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -45,6 +47,14 @@ try {
         $example = Get-Item -LiteralPath $ExampleDirectory
         if (!$example.PSIsContainer) { throw "ExampleDirectory must be a directory: $ExampleDirectory" }
         Copy-Item -LiteralPath $example.FullName -Destination (Join-Path $scratch 'examples') -Recurse
+    }
+    if ($LegendPackDirectory -and (Test-Path -LiteralPath $LegendPackDirectory -PathType Container)) {
+        $packs = Get-ChildItem -LiteralPath $LegendPackDirectory -File -Filter '*.tsslegends.json' |
+            Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) }
+        if ($packs) {
+            $catalog = [IO.Directory]::CreateDirectory((Join-Path $scratch 'legend-packs')).FullName
+            foreach ($pack in $packs) { Copy-Item -LiteralPath $pack.FullName -Destination $catalog }
+        }
     }
     $files = @(Get-ChildItem -LiteralPath $scratch | Sort-Object Name | ForEach-Object FullName)
     $archive = Join-Path $scratch $name

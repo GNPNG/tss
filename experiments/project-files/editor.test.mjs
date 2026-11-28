@@ -31,7 +31,7 @@ async function exerciseControls(platform) {
     const input=$(id);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
   };
   const audio = coral || oils || missing || benchmark ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
-  let documentText, incoming, linked=null, lastSelection=1;
+  let documentText, incoming, linked=null, lastSelection=1, catalogFiles=[];
   const advisorRequests=[],reviewedLyrics=[],previewRequests=[],movieRequests=[];
   let finishInference;
   let mediaChecks=0,mediaInstalls=0,mediaReady=false;
@@ -43,6 +43,7 @@ async function exerciseControls(platform) {
   }
   window.__TAURI__ = {event:{listen:async()=>()=>{}},core:{invoke:async (command,args)=>{
     switch(command) {
+    case 'available_legend_packs': return catalogFiles;
     case 'choose_visual_media': throw Error('Could not find ffmpeg. Open FFmpeg media tools in the editor to install or recheck.');
     case 'check_media_tools':
       mediaChecks++;
@@ -110,6 +111,7 @@ async function exerciseControls(platform) {
     };
     const option=$('wheel-motion').querySelector('[value=simulated]');
     if (!helperAvailable) {
+      check($('legend-title')?.textContent==='Studio signed-off rig','installed pack survives reopening the editor');
       check(!$('solver-unavailable').hidden,'fresh startup reports the unavailable solver');
       click('add-layer');
       const newProject=await save();
@@ -225,15 +227,79 @@ async function exerciseControls(platform) {
       'model selection exposes the fitted optical geometry and an effective low lamp mode');
     const beforeAudition=await save();
     check(beforeAudition.projectorAIntensity===.63 && beforeAudition.equipmentA.lowIntensity===.4,'authored exposure and low-lamp estimate are independently preserved');
-    $('legend-cards').querySelector('[data-audition=joshua]').click();
+    const studio=await (await fetch('/test-legend-pack.json')).json();
+    const base=studio.rigs[0];
+    studio.rigs=[
+      {...base,id:'study',artist:'Studio ghost rig',rig:{...base.rig,a:'liquid-overhead',b:'film'}},
+      {...base,id:'pair',artist:'Studio twin rig',rig:{...base.rig,a:'liquid-overhead',b:'liquid-overhead'}}
+    ];
+    async function importPack(data) {
+      const transfer=new DataTransfer();
+      transfer.items.add(new File([typeof data==='string'?data:JSON.stringify(data)],'study.tsslegends.json',{type:'application/json'}));
+      $('legend-file').files=transfer.files;
+      $('legend-file').dispatchEvent(new Event('change'));
+      await until(()=>!$('legend-install').disabled);
+    }
+    const keyToGallery=key=>$('legend-carousel').dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true}));
+    const activeControl=attr=>$('legend-cards').querySelector('[data-'+attr+']');
+    const packControl=(action,id)=>[...$('legend-packs').querySelectorAll('[data-'+action+']')].find(control=>control.dataset[action]===id);
+    check(!$('legend-empty').hidden && $('legend-carousel').hidden,'fresh install has an empty optional gallery');
+    catalogFiles=[{fileName:'corrupt.tsslegends.json',text:'{'},{fileName:'studio.tsslegends.json',text:JSON.stringify(studio)}];
+    $('legends').open=true;
+    await until(()=>!!$('legend-available-list').querySelector('button'));
+    check($('legend-carousel').hidden && $('legend-catalog-status').textContent.includes('corrupt.tsslegends.json'),
+      'discovery lists valid peer packs without activating them and identifies invalid files');
+    $('legend-available-list').querySelector('button').click();
+    check($('legend-title').textContent==='Studio ghost rig' && $('legend-position').textContent.startsWith('1 of 2') &&
+      $('legend-cards').textContent.includes(studio.credits[0]) && $('legend-cards').textContent.includes(studio.review.note),
+      'installed entries expose credit and version-specific review');
+    const otherPack={...studio,id:'gnpng-other-study',title:'Studio rehearsal',rigs:[{...studio.rigs[0],artist:'Other setup'}]};
+    await importPack(otherPack);
+    check($('legend-title').textContent==='Other setup' && $('legend-position').textContent.startsWith('3 of 3'),
+      'rig identifiers can repeat in independent packs');
+    click('legend-next');
+    check($('legend-title').textContent==='Studio ghost rig','carousel advances through packs and wraps');
+    activeControl('audition').click();
     await until(()=>latest()?.equipmentA?.profile==='liquid-overhead' && latest().projectorB?.equipment?.profile==='film');
     check(JSON.stringify(await save())===JSON.stringify(beforeAudition),'rig audition leaves the project untouched');
-    click('legend-stop');await until(()=>latest()?.equipmentA?.profile==='carousel-550r');
-    $('legend-cards').querySelector('[data-apply=ham]').click();
+    keyToGallery('End');
+    check(activeControl('audition').getAttribute('aria-pressed')==='false' && !$('legend-stop').hidden,
+      'browsing to a pack with the same rig id leaves the intended audition active');
+    packControl('remove',otherPack.id).click();
+    check($('legend-title').textContent==='Studio twin rig' && !$('legend-stop').hidden,'removing another pack preserves the audition');
+    $('preview').scrollIntoView({block:'center'});click('legend-preview-stop');
+    check($('legend-stop').hidden,'stopping from the preview returns to the rig');
+    $('preview').scrollIntoView({block:'center'});document.dispatchEvent(new Event('visibilitychange'));
+    await until(()=>latest()?.equipmentA?.profile==='carousel-550r');
+    keyToGallery('Home');keyToGallery('ArrowRight');
+    activeControl('apply').click();
     await until(()=>latest()?.projectorB?.equipment?.profile==='liquid-overhead');
     check((await save()).layers.every((l,i)=>l.simulationSeed===beforeAudition.layers[i].simulationSeed),'applying a historical rig preserves existing oil');
+    const appliedRig=await save();
+    packControl('remove',studio.id).click();
+    check(!$('legend-empty').hidden && JSON.stringify(await save())===JSON.stringify(appliedRig),'removing the pack preserves applied project settings');
     click('undo-edit');await idle();
     check(JSON.stringify(await save())===JSON.stringify(beforeAudition),'applied historical rig is one undoable operation');
+    await importPack(studio);activeControl('audition').click();packControl('remove',studio.id).click();
+    await until(()=>latest()?.equipmentA?.profile==='carousel-550r');
+    check($('legend-stop').hidden,'removing the performing pack ends its audition');
+    await importPack(studio);activeControl('audition').click();
+    packControl('enable',studio.id).click();
+    await until(()=>latest()?.equipmentA?.profile==='carousel-550r');
+    check(!$('legend-empty').hidden && !$('legend-installed').hidden && $('legend-stop').hidden &&
+      JSON.stringify(await save())===JSON.stringify(beforeAudition),'disabling an auditioned pack restores original project, retaining pack management');
+    const revision={...studio,version:'1.2.0',rigs:[{...base,artist:'Studio signed-off rig'}]};
+    await importPack(revision);
+    check(!$('legend-replacement').hidden && $('legend-carousel').hidden,'duplicate identifiers require explicit replacement');
+    click('legend-keep');
+    await importPack(revision);click('legend-replace');
+    check($('legend-carousel').hidden && !packControl('enable',studio.id).checked,'replacing a disabled pack preserves its disabled state');
+    packControl('enable',studio.id).click();
+    await importPack('{');
+    check($('legend-title').textContent==='Studio signed-off rig' && !!$('legend-pack-status').textContent,
+      'failed import leaves the replaced pack intact');
+    $('legends').open=false;
+    $('preview').scrollIntoView({block:'center'});
     const normalRequests=previewRequests.filter(Boolean);
     check(normalRequests.every(c=>c.simulation && (!c.stack || c.stack.every(l=>l.simulation))),
       'every normal palette and new blank track draws solved fields');
@@ -496,6 +562,10 @@ for (const [platform,title] of editorCases) test(title,
         if(req.url==='/coral-wheel.tss') {
           res.writeHead(200,{'Content-Type':'application/json'});
           res.end(await readFile(new URL('../slide-look-study/approval/coral-wheel/coral-wheel.tss',import.meta.url)));return;
+        }
+        if(req.url==='/test-legend-pack.json'){
+          res.writeHead(200,{'Content-Type':'application/json'});
+          res.end(await readFile(new URL('../../examples/legend-packs/two-beam-studio.tsslegends.json',import.meta.url)));return;
         }
         if(req.url==='/sample.m4a'){res.writeHead(200,{'Content-Type':'audio/mp4'});res.end(await readFile(media));return;}
         const allowed=/^\/(?:[a-z-]+\.js|styles\.css|assets\/(?:slide-presets\.json|visual-advice\.json|tss-project-logo\.jpeg))$/;
