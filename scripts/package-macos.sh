@@ -15,7 +15,7 @@ repo=$(cd "$(dirname "$0")/.." && pwd -P)
 cd "$repo"
 app="The Sacred Swirls.app"
 zip="The-Sacred-Swirls-$tag-macOS-x86_64.zip"
-[[ ! -e "$out/$app" && ! -e "$out/$zip" ]] || fail "The output already contains this app or archive."
+[[ ! -e "$out/$app" && ! -e "$out/$zip" && ! -e "$out/examples" ]] || fail "The output already contains this app, archive or examples."
 
 if [[ -n ${TSS_TAURI_CLI:-} ]]; then
   cli=("$TSS_TAURI_CLI")
@@ -59,8 +59,8 @@ verify_bundle "$built"
 
 stage=$(mktemp -d "$out/.tss-mac-package.XXXXXX")
 trap 'rm -r "$stage"' EXIT
-ditto -c -k --sequesterRsrc --keepParent "$built" "$stage/$zip"
-ditto -x -k "$stage/$zip" "$stage/extracted"
+source "$repo/scripts/macos-review-archive.sh"
+macos_review_archive "$built" "$repo/examples" "$stage" "$stage/$zip"
 verify_bundle "$stage/extracted/$app"
 helper="$stage/extracted/$app/Contents/MacOS/tss-performer"
 printf '%s\n' '{"bind":"127.0.0.1","host":"127.0.0.1","port":0}' join hold release |
@@ -70,6 +70,9 @@ for step in joined held released; do
     fail "The packaged controller did not complete $step."
 done
 codesign -d --verbose=2 "$stage/extracted/$app"
+if [[ -d "$stage/extracted/examples" ]]; then
+  mv "$stage/extracted/examples" "$out/examples"
+fi
 mv "$stage/extracted/$app" "$out/$app"
 mv "$stage/$zip" "$out/$zip"
 shasum -a 256 "$out/$zip"

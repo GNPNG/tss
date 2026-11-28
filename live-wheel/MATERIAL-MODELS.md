@@ -1,5 +1,17 @@
 # Slide material models
 
+## What runs in the live editor
+
+| Medium | Current implementation |
+|---|---|
+| Dyed oil and carrier | A native Basilisk worker evolves the immiscible interface of each sealed cell. Live workers start with fixed nondimensional viscosities and interfacial tension. Dye, depth, tug, flow speed, rotation, pressure deformation and optical strength are editable. [Worker startup](../experiments/live-slide-solver/src/lib.rs) · [Solver coefficients](../experiments/slide-look-study/solver.c) |
+| 20 cSt and 1,000 cSt silicone oils | The recorded SI-parameterized studies have distinct trajectories. Earlier dual-film study tracks can load them independently. The live editor currently launches its workers with the fixed coefficients described above. [Materials experiment](../experiments/oil-projection/README.md) |
+| Glass and sugar candy | SCHOTT glass and separate cast and melt-quenched sugar records supply optical reference data. Glass has a standalone optical study. Solid glass and sugar objects await an editor geometry and material path. [Material registry](materials/specialty.json) · [Optical slab study](../experiments/filament-optics/README.md) |
+| Wax | The registry identifies phase-dependent measurements. The catalog records thermal solver candidates. Melting, solidification and the associated transmission change await implementation. [Library catalog](../docs/library-catalog.md) |
+| Slime | A standalone Oldroyd-B drop experiment measured stress relaxation after shear release. Live oil cells currently evolve Newtonian stresses. [Shear-release results](../experiments/viscoelastic-release/README.md) |
+| Magic sand | Reference records distinguish hydrophobic grains from paraffin-coated silica. Submerged wetting, trapped air and granular clumping await testing. [Material registry](materials/specialty.json) |
+
+
 Each sealed glass gap has its own two-phase volume fraction. Two drops of the dispersed phase can meet within one gap. A crossing between gaps changes transmitted light while preserving both interfaces. Wheel colors describe dyes. The material parameters describe the carrier and dispersed phases that move those dyes.
 
 ## Oil and water
@@ -11,7 +23,7 @@ The two reference pairs in [the material registry](materials/fluids-and-glass.js
 | 20 cSt | 950 | 0.019 | 40.9 ± 0.5 | 19.4 ± 0.7 |
 | 1,000 cSt | 970 | 0.970 | 40.8 ± 1.0 | 21.7 ± 0.2 |
 
-[The field solver](../experiments/slide-look-study/solver.c) uses a VOF interface, force density σ κ ∇f, and depth-averaged no-slip plate drag −12 μ u/(ρ h²). Its SI input accepts each phase’s density and dynamic viscosity, the tension of their shared interface, and the chosen plate gap. As an illustrative comparison at U = 10 mm/s, the oil-based capillary number μU/σ is 0.00465 for 20 cSt and 0.238 for 1,000 cSt. These predict different relative viscous and capillary stresses at the same speed. Halving the gap quadruples the drag coefficient. The GPU editor samples cached solutions and warps the selected slide under a drag. To change viscosity in the solved motion, generate fields for that pair. [Basilisk surface tension](https://basilisk.fr/src/tension.h)
+[The field solver](../experiments/slide-look-study/solver.c) uses a VOF interface, force density σ κ ∇f, and depth-averaged no-slip plate drag −12 μ u/(ρ h²). Its SI input accepts each phase’s density and dynamic viscosity, the tension of their shared interface, and the chosen plate gap. As an illustrative comparison at U = 10 mm/s, the oil-based capillary number μU/σ is 0.00465 for 20 cSt and 0.238 for 1,000 cSt. These predict different relative viscous and capillary stresses at the same speed. Halving the gap quadruples the drag coefficient. These comparison projects sample the two archived SI solutions. Changing their physical viscosity requires a solve with the selected pair. [Basilisk surface tension](https://basilisk.fr/src/tension.h)
 
 A same-gap VOF merger occurs once the intervening film is under-resolved. A physical merger time additionally depends on film drainage, interfacial mobility and surfactant formulation. Wall adhesion would require wetting data for the substrate, both fluids and the surface preparation, including advancing and receding contact angles. Those inputs are uncalibrated. [Measured drainage and coalescence of oil drops in water](https://pubmed.ncbi.nlm.nih.gov/22215134/)
 

@@ -1,0 +1,128 @@
+{
+  "format": "the-sacred-swirls",
+  "version": 1,
+  "audio": null,
+  "position": 0,
+  "lampKelvin": 6500,
+  "focus": 0.5,
+  "exportBaseline": "current",
+  "feedback": {
+    "enabled": false,
+    "delay": 185,
+    "strength": 65,
+    "zoom": 100,
+    "rotation": 0
+  },
+  "layers": [
+    {
+      "visible": true,
+      "palette": "orchid",
+      "customColors": true,
+      "hue": 0,
+      "speed": 0.58,
+      "scale": 1,
+      "opacity": 1,
+      "nativeLive": true,
+      "motion": "wheel-flow",
+      "motionTake": 0,
+      "visibleFilms": "rear",
+      "slide": "rear",
+      "gesture": "tug",
+      "tugResponse": {
+        "rear": 0.55,
+        "front": 0.55
+      },
+      "mousePressure": {
+        "rear": 0.42,
+        "front": 0.42
+      },
+      "renderWidth": 640,
+      "projector": "a",
+      "presetGroup": "fillmore-three",
+      "id": 3,
+      "name": "Orange red",
+      "dyeIndex": 2,
+      "filmDepth": 0.8,
+      "simulationSeed": 17312,
+      "colors": [
+        "#FD3D0C"
+      ]
+    },
+    {
+      "visible": true,
+      "palette": "orchid",
+      "customColors": true,
+      "hue": 0,
+      "speed": 0.9,
+      "scale": 1,
+      "opacity": 1,
+      "nativeLive": true,
+      "motion": "wheel-flow",
+      "motionTake": 0,
+      "visibleFilms": "rear",
+      "slide": "rear",
+      "gesture": "tug",
+      "tugResponse": {
+        "rear": 0.55,
+        "front": 0.55
+      },
+      "mousePressure": {
+        "rear": 0.42,
+        "front": 0.42
+      },
+      "renderWidth": 640,
+      "projector": "a",
+      "presetGroup": "fillmore-three",
+      "id": 2,
+      "name": "Blue",
+      "dyeIndex": 1,
+      "filmDepth": 0.5,
+      "simulationSeed": 92843,
+      "colors": [
+        "#308BC0"
+      ]
+    },
+    {
+      "visible": true,
+      "palette": "orchid",
+      "customColors": true,
+      "hue": 0,
+      "speed": 0.7,
+      "scale": 1,
+      "opacity": 1,
+      "nativeLive": true,
+      "motion": "wheel-flow",
+      "motionTake": 0,
+      "visibleFilms": "rear",
+      "slide": "rear",
+      "gesture": "tug",
+      "tugResponse": {
+        "rear": 0.55,
+        "front": 0.55
+      },
+      "mousePressure": {
+        "rear": 0.42,
+        "front": 0.42
+      },
+      "renderWidth": 640,
+      "projector": "a",
+      "presetGroup": "fillmore-three",
+      "id": 1,
+      "name": "Yellow",
+      "dyeIndex": 0,
+      "filmDepth": 0.2,
+      "simulationSeed": 83724,
+      "colors": [
+        "#FEF052"
+      ]
+    }
+  ],
+  "selected": 3,
+  "nextId": 4,
+  "gestures": {
+    "macros": [],
+    "audioGroups": [],
+    "lyricGroups": [],
+    "selected": null
+  }
+}
