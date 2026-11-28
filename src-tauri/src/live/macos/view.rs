@@ -1,7 +1,7 @@
 use super::{Command, SharedSender};
 use crate::live::{Phase, Rect};
-use objc2::{define_class, msg_send, rc::Retained, DefinedClass, MainThreadOnly};
-use objc2_app_kit::{NSEvent, NSResponder, NSView};
+use objc2::{define_class, msg_send, rc::Retained, AnyThread, DefinedClass, MainThreadOnly};
+use objc2_app_kit::{NSEvent, NSPressureBehavior, NSPressureConfiguration, NSResponder, NSView};
 use objc2_foundation::{MainThreadMarker, NSObject, NSPoint, NSRect, NSSize};
 use objc2_quartz_core::CAMetalLayer;
 use std::cell::Cell;
@@ -28,16 +28,24 @@ define_class!(
         fn view_tag(&self) -> isize { TAG }
 
         #[unsafe(method(mouseDown:))]
-        fn down(&self, event: &NSEvent) { self.sample(Phase::Down, event); }
+        fn down(&self, event: &NSEvent) { self.sample(event, |p| Command::Pointer(Phase::Down, p)); }
         #[unsafe(method(mouseDragged:))]
-        fn drag(&self, event: &NSEvent) { self.sample(Phase::Move, event); }
+        fn drag(&self, event: &NSEvent) { self.sample(event, |p| Command::Pointer(Phase::Move, p)); }
         #[unsafe(method(mouseUp:))]
-        fn up(&self, event: &NSEvent) { self.sample(Phase::Up, event); }
+        fn up(&self, event: &NSEvent) { self.sample(event, |p| Command::Pointer(Phase::Up, p)); }
+        #[unsafe(method(pressureChangeWithEvent:))]
+        fn force(&self, event: &NSEvent) {
+            if let Some(amount) = force_sample(event.stage(), event.pressure()) {
+                self.sample(event, |p| Command::Force(p, amount));
+            }
+        }
+        #[unsafe(method(acceptsFirstMouse:))]
+        fn accepts_first_mouse(&self, _event: Option<&NSEvent>) -> bool { true }
     }
 );
 
 impl WheelView {
-    fn sample(&self, phase: Phase, event: &NSEvent) {
+    fn sample(&self, event: &NSEvent, command: impl FnOnce([f32; 2]) -> Command) {
         let p = self.convertPoint_fromView(event.locationInWindow(), None);
         let bounds = self.bounds().size;
         if bounds.width <= 0. || bounds.height <= 0. {
@@ -49,9 +57,18 @@ impl WheelView {
         ];
         if let Ok(sender) = self.ivars().sender.lock() {
             if let Some(tx) = &*sender {
-                let _ = tx.send(Command::Pointer(phase, point));
+                let _ = tx.send(command(point));
             }
         }
+    }
+}
+
+// PrimaryGeneric delivers one continuous pressure stage following mouseDown.
+fn force_sample(stage: isize, pressure: f32) -> Option<f32> {
+    match stage {
+        0 => Some(0.),
+        1 if pressure.is_finite() => Some(pressure.clamp(0., 1.)),
+        _ => None,
     }
 }
 
@@ -110,6 +127,11 @@ pub(super) fn place(
         // WheelView inherits NSView's designated initializer.
         let child: Retained<WheelView> =
             unsafe { msg_send![super(allocated), initWithFrame:frame] };
+        let pressure = NSPressureConfiguration::initWithPressureBehavior(
+            NSPressureConfiguration::alloc(),
+            NSPressureBehavior::PrimaryGeneric,
+        );
+        child.setPressureConfiguration(Some(&pressure));
         let layer = CAMetalLayer::new();
         child.setLayer(Some(&layer));
         child.setWantsLayer(true);
@@ -145,6 +167,13 @@ pub(super) fn place(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn force_range_preserves_intermediate_samples_and_releases_at_stage_zero() {
+        assert_eq!(force_sample(1, 0.37), Some(0.37));
+        assert_eq!(force_sample(1, 1.1), Some(1.));
+        assert_eq!(force_sample(1, f32::NAN), None);
+        assert_eq!(force_sample(0, 0.37), Some(0.));
+    }
     #[test]
     fn retinal_pixels_map_to_flipped_and_unflipped_webview_coordinates() {
         let r = Rect {

@@ -2,6 +2,8 @@
 mod beams;
 mod feedback;
 mod projector;
+mod stereo;
+pub use stereo::StereoOutput;
 pub use beams::BeamSettings;
 pub use projector::{ProjectorOutput, ProjectorTiming};
 #[cfg(feature = "live-solver")]
@@ -288,7 +290,6 @@ pub struct LiveWheel {
     evolving: HashMap<u64, evolving::Source>,
     #[cfg(feature = "live-solver")]
     presentation: u64,
-    #[cfg(test)]
     stereo_eye_scale: f32,
     active: u64,
     stack: Vec<WheelLayer>,
@@ -324,6 +325,7 @@ pub struct LiveWheel {
     film_material: Option<Target>,
     footprint_sampling: bool,
     feedback: Option<feedback::Feedback>,
+    feedback_generation: u64,
     blit_pass: Pass,
     optics: Target,
     cap: u32,
@@ -606,7 +608,6 @@ impl LiveWheel {
             evolving: HashMap::new(),
             #[cfg(feature = "live-solver")]
             presentation: 0,
-            #[cfg(test)]
             stereo_eye_scale: 0.,
             active: 0,
             stack: Vec::new(),
@@ -642,6 +643,7 @@ impl LiveWheel {
             film_material: None,
             footprint_sampling: false,
             feedback: None,
+            feedback_generation: 0,
             blit_pass,
             optics,
             cap: 640,
@@ -927,10 +929,7 @@ impl LiveWheel {
         let mut material = self.active_material;
         material.lamp = self.lamp_gain;
         material.geometry = lens::GateLens::for_projector(self.carousel_lenses[0]).uniform();
-        #[cfg(test)]
-        {
-            material.geometry[3] = self.stereo_eye_scale;
-        }
+        material.geometry[3] = self.stereo_eye_scale;
         let depth = self.film_depths.get(&self.active);
         let [rear, front] = depth.map_or(pair, |d| [*d; 2]);
         material.lens = [
@@ -964,6 +963,7 @@ impl LiveWheel {
             if let Some(f) = &mut self.feedback {
                 f.settings = settings;
             } else {
+                self.feedback_generation = self.feedback_generation.wrapping_add(1);
                 self.feedback = Some(feedback::Feedback::new(
                     &self.device,
                     self.preview_size(),
@@ -979,6 +979,7 @@ impl LiveWheel {
     pub fn reset_feedback_history(&mut self) {
         if let Some(f) = &mut self.feedback {
             f.reset();
+            self.feedback_generation = self.feedback_generation.wrapping_add(1);
         }
     }
     /// Set the constant-luminance incident projector white point.
@@ -1278,6 +1279,15 @@ impl LiveWheel {
         {
             self.presentation = self.presentation.wrapping_add(1);
         }
+        self.render_latched_films_to(out, rear_time, front_time, program_time);
+    }
+    fn render_latched_films_to(
+        &mut self,
+        out: Option<&gpu::TextureView>,
+        rear_time: f64,
+        front_time: f64,
+        program_time: f64,
+    ) {
         if !self.mixed.tracks.is_empty()
             || !self.beams.secondary_ids.is_empty()
             || self.primary_intensity != 1.
@@ -1441,7 +1451,9 @@ impl LiveWheel {
             return;
         }
         // Keep the selected optical model continuous through first movement.
-        let integrate = self.footprint_sampling || poses.iter().any(|p| p.pressure.active());
+        let integrate = self.footprint_sampling
+            || poses.iter().any(|p| p.pressure.active())
+            || (self.stereo_eye_scale != 0. && self.film_depths.contains_key(&self.active));
         let optic_pipe = match (integrate, self.baseline_optics()) {
             (true, true) => &self.footprint_baseline_pass,
             (true, false) => &self.footprint_palette_pass,

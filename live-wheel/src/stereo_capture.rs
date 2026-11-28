@@ -10,7 +10,7 @@ use std::process::{Command, Stdio};
 const SIZE: [u32; 2] = [960, 540];
 // Signed half eye separation times focal length, in gate-width-normalized
 // pinhole units × mm. A stereo staging choice, independent of iris and focus.
-const EYE: f32 = 14.0;
+const EYE: f32 = stereo::EYE_SCALE;
 const LAYERS: [(u64, f32, u32, u32); 3] = [
     (1, 0.0, 83724, 0x7234cf),
     (2, 0.5, 92843, 0x18d7df),

@@ -15,6 +15,7 @@ import { installLegends } from './legends.js';
 import { installProjectionLight, effectiveLighting } from './projection-light.js';
 import { installPerformerDeck } from './performer-host.js';
 import { ProjectorDeck } from './projector-output.js';
+import { StereoPressureDeck } from './stereo-pressure.js';
 import { initMacroDeck, songFingerprint, songGestureEvents } from './gesture-macros.js';
 import { PROJECT_FORMAT, layerSettings, validateProject, emptyGestures, EditHistory } from './project-file.js';
 import { audioCueGroups } from './phrase-cues.js';
@@ -40,7 +41,8 @@ let solverAvailable = false;
 let recordedBenchmark = false;
 const newFluidSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 const liveFluidTrack = layer => layer?.simulationSeed != null && !layer.media;
-const solvingProgram = () => state.layers.some(layer => liveFluidTrack(layer) &&
+let stereoDeck = null;
+const solvingProgram = () => !!stereoDeck?.selection || state.layers.some(layer => liveFluidTrack(layer) &&
   (layer.visible || state.layers.some(({visible, media}) => visible && media?.assetId != null &&
     (media.maskA === layer.id || media.maskB === layer.id))));
 const missingSolver = () => !solverAvailable && solvingProgram();
@@ -85,6 +87,7 @@ byId('legends').hidden=!nativeDesktop;
 const usesLiveProjection=()=>!!legends.audition || lighting.usesLiveOptics || state.layers.some(l=>l.projector==='b');
 function wheelGestureSelection() { return selectedLayer()?.media ? null : liveSelection(); }
 function liveSelection() {
+  if (stereoDeck?.selection) return stereoDeck.selection;
   const layer = selectedLayer();
   if (!nativeDesktop || (startingNative && !slidePresets.size) || !layer || (!isWheel(layer) && !layer.media) || state.exporting || missingSolver()) return null;
   const rig=legends.audition;
@@ -108,6 +111,7 @@ function anchorFeedback(discontinuity = false, ended = false) {
 }
 
 function reportNativeStats(stats) {
+  stereoDeck?.report(stats);
   const selected = liveSelection();
   if (!selected) return;
   const readout = byId('native-frame-rate');
@@ -134,6 +138,21 @@ async function prepareWheel(){
 if (windowsDesktop) projectorDeck = new ProjectorDeck({
   invoke:window.__TAURI__.core.invoke,listen:window.__TAURI__.event.listen,
   prepare:prepareWheel,ensureAudio,onChange:()=>nativeSurface.sync(),
+});
+if (nativeDesktop && !windowsDesktop) stereoDeck = new StereoPressureDeck({
+  button:byId('projector'), output:byId('stereo-pressure-state'),
+  invoke:window.__TAURI__.core.invoke, listen:window.__TAURI__.event.listen,
+  usedIds:() => new Set([...state.layers.map(layer => layer.id), ...retainedNativeLayers]),
+  blocked:() => state.exporting || !!wheelExporter?.busy || !!plateExporter?.busy,
+  prepare:async () => {
+    preview.scrollIntoView({block:'nearest'});
+    await nativeSurface.requirePresentation();
+  },
+  restore:async ids => {
+    await nativeSurface.sync();
+    for (const layerId of ids) await desktopInvoke('forget_live_wheel_layer', {layerId});
+  },
+  change:() => { renderControls(); updateTransport(); }, status,
 });
 const macroDeck = windowsDesktop ? initMacroDeck({
   invoke: window.__TAURI__.core.invoke,
@@ -202,6 +221,7 @@ function updateExportNote() {
     : 'Use native movie export to include projector lighting. Individual plate export is unavailable with this lighting.';
 }
 function updateTransport() {
+  stereoDeck?.refresh();
   localLyrics?.source(state.audioPath, state.audioBuffer);
   const ready = !!state.audioBuffer;
   byId('play').disabled = !ready;
@@ -648,7 +668,7 @@ function renderControls() {
   const wheel = layer && !layer.media && slidePresets.get(layer.palette);
   const paletteAvailable = !!wheel || (!!layer && !layer.media && Object.hasOwn(LIQUID_PALETTES, layer.palette));
   const live = liveSelection();
-  byId('plate-formats').hidden = !plateExporter || !live || !!layer.media || solvingProgram() || usesLiveProjection();
+  byId('plate-formats').hidden = !plateExporter || !live || !!layer?.media || solvingProgram() || usesLiveProjection();
   wheelExporter?.refresh();
   plateExporter?.refresh();
   byId('video-feedback').hidden = !live;
@@ -694,8 +714,8 @@ function renderControls() {
   byId('wheel-slide').disabled ||= single;
   byId('wheel-slide').parentElement.hidden = single;
   byId('tug-response').value = String(layer?.tugResponse[layer.slide] ?? 0.4);
-  byId('tug-response').disabled = !live || layer.gesture !== 'tug';
-  byId('mouse-pressure-controls').hidden = !live || layer.gesture !== 'pressure';
+  byId('tug-response').disabled = !live || layer?.gesture !== 'tug';
+  byId('mouse-pressure-controls').hidden = !live || layer?.gesture !== 'pressure';
   const strength = Math.round(100 * (layer?.mousePressure?.[layer?.slide] ?? .5));
   byId('mouse-pressure').value = strength;
   byId('mouse-pressure-value').textContent = strength+'%';
@@ -711,6 +731,11 @@ function renderControls() {
     ? `Drag around the center to rotate the ${target}.`
     : layer?.gesture === 'pressure' ? `Press the ${target} to compress it. Release to restore the gap.`
     : `Drag to tug the oil in the ${target}.`;
+  byId('stereo-pressure-state').hidden = !stereoDeck?.selection;
+  if (stereoDeck?.selection) {
+    byId('preview-status').textContent = 'LIVE 3D · THREE OIL LAYERS';
+    byId('native-instruction').textContent = 'Move the pointer onto the pink front oil in the Mac preview. Press the trackpad to compress it, then ease off to release.';
+  }
   byId('audio-note').hidden = !!live;
   byId('hue').disabled = !layer || !!layer.media;
   byId('speed').disabled = !layer || !!layer.media || (!!live && !liveFluidTrack(layer));
@@ -1522,3 +1547,5 @@ if (!nativeDesktop) addLayer();
 renderTimeline(); renderControls(); updateTransport(); requestAnimationFrame(renderFrame);
 const presetsReady = loadSlidePresets();
 presetsReady.then(() => { if (!editHistory.entries.length) { resetHistory('New session'); savedEdits = editSignature(); } });
+if (stereoDeck) presetsReady.then(() => stereoDeck.initialize(solverAvailable))
+  .catch(error => status('Live 3D: ' + (error.message || error)));

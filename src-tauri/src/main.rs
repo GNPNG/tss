@@ -301,6 +301,8 @@ fn main() {
             performer::performer_verification_step,
             performer::stop_performer,
             live::set_projector_output,
+            live::set_stereo_output,
+            live::stereo_startup_requested,
             live::verify_projector_visibility,
             live::set_live_wheel_capture_enabled,
             live::replay_live_wheel_gesture,

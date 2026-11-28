@@ -12,6 +12,7 @@ export class NativeWheelSurface {
     this.report = report;
     this.pending = Promise.resolve();
     this.desiredKey = 'null';
+    this.presentedKey = 'null';
     this.surfaceRequested = false;
     this.pollInFlight = false;
     const layoutChanged = () => {
@@ -24,7 +25,21 @@ export class NativeWheelSurface {
     window.addEventListener('resize', layoutChanged);
     window.addEventListener('scroll', layoutChanged, true);
     document.addEventListener('visibilitychange', () => this.sync());
-    setInterval(() => this.poll(), 750);
+    // Moving the editor between HDMI and Retina can leave its CSS bounds
+    // unchanged while the NSView and its input coordinates need new pixels.
+    let scaleQuery;
+    const watchScale = () => {
+      scaleQuery?.removeEventListener('change', scaleChanged);
+      this.scale = devicePixelRatio;
+      scaleQuery = matchMedia('(resolution: ' + this.scale + 'dppx)');
+      scaleQuery.addEventListener('change', scaleChanged);
+    };
+    const scaleChanged = () => { watchScale(); this.sync(); };
+    watchScale();
+    setInterval(() => {
+      if (this.scale !== devicePixelRatio) scaleChanged();
+      this.poll();
+    }, 750);
   }
 
   config() {
@@ -47,7 +62,8 @@ export class NativeWheelSurface {
   sync() {
     const config = this.config();
     const key = JSON.stringify(config);
-    if (key === this.desiredKey) return this.pending;
+    if (key === this.desiredKey && !this.lastError) return this.pending;
+    this.lastError = '';
     this.desiredKey = key;
     if (config) this.surfaceRequested = true;
     // Keep the newest desired state while serializing native view changes. A slow
@@ -56,13 +72,28 @@ export class NativeWheelSurface {
       if (key !== this.desiredKey) return;
       try {
         await this.invoke('set_live_wheel', { config });
+        this.presentedKey = key;
         this.surfaceRequested = !!config;
         if (config) this.poll();
       } catch (error) {
-        if (key === this.desiredKey) this.report({ error: String(error) });
+        if (key === this.desiredKey) {
+          this.lastError = String(error);
+          this.report({ error:this.lastError });
+        }
       }
     });
     return this.pending;
+  }
+
+  async requirePresentation() {
+    let pending = this.sync();
+    await pending;
+    while (pending !== this.pending) {
+      pending = this.pending;
+      await pending;
+    }
+    if (this.lastError || this.desiredKey === 'null' || this.presentedKey !== this.desiredKey)
+      throw new Error(this.lastError || 'The native preview is unavailable.');
   }
 
   async poll() {

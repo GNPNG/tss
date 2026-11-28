@@ -7,16 +7,20 @@ use std::{
     sync::{mpsc, Arc, Mutex},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-use tauri::{Manager, WebviewWindow};
+use tauri::{Emitter, Manager, WebviewWindow};
 use tss_live_wheel::{wgpu, DecodedMediaFrame, LiveWheel, MediaTrack, SlideGesture, WheelLayer};
 
+mod audience;
 mod proof;
 mod view;
 
 enum Command {
+    Stereo(bool, tauri::async_runtime::Sender<Result<String,String>>),
     Set(Option<Config>),
     Forget(u64),
     Pointer(Phase, [f32; 2]),
+    Force([f32; 2], f32),
+    CancelPointer,
     Movie(
         movie_render::Job,
         tauri::async_runtime::Sender<Result<(), String>>,
@@ -58,6 +62,16 @@ pub(crate) fn watch_verification() {
 }
 
 impl Host {
+    pub async fn stereo(&self, enabled: bool) -> Result<String, String> {
+        let (reply, mut rx) = tauri::async_runtime::channel(1);
+        let worker = self.sender.lock().map_err(|e| e.to_string())?.clone();
+        let Some(tx) = worker else {
+            return if enabled { Err("Show a live oil preview before starting stereo output".into()) }
+                else { Ok(String::new()) };
+        };
+        tx.send(Command::Stereo(enabled, reply)).map_err(|_| "The Metal worker stopped")?;
+        rx.recv().await.ok_or("The Metal worker stopped")?
+    }
     pub async fn export_movie(
         &self,
         paths: (PathBuf, PathBuf),
@@ -176,6 +190,8 @@ fn start_worker(
         if matches!(e, tauri::WindowEvent::Destroyed) {
             closed.store(true, Ordering::Release);
             let _ = close.send(Command::Quit);
+        } else if matches!(e, tauri::WindowEvent::Focused(false)) {
+            let _ = close.send(Command::CancelPointer);
         }
     });
     std::thread::Builder::new()
@@ -184,7 +200,7 @@ fn start_worker(
             let output = verify_output();
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 run(
-                    &instance,
+                    &Arc::new(instance),
                     &surface,
                     &window,
                     &rx,
@@ -201,11 +217,15 @@ fn start_worker(
                     .unwrap_or("unknown error");
                 Err(format!("Metal wheel preview failed: {msg}"))
             });
+            audience::close(&window);
             if let Err(error) = result {
                 let mut stats = shared.lock().unwrap_or_else(|p| p.into_inner());
                 stats.running = false;
+                let was_stereo = stats.projector_running;
+                stats.projector_running = false;
                 stats.error = Some(error.clone());
                 drop(stats);
+                if was_stereo { let _ = window.emit("tss-stereo-closed", &error); }
                 if output.is_some() {
                     eprintln!("{error}");
                     window.app_handle().exit(1);
@@ -236,7 +256,7 @@ fn export_visibility(window: &WebviewWindow, hidden: bool) -> Result<(), String>
 // The AppKit view stays on the UI thread. Only the independently retained
 // Metal surface and the renderer enter this worker.
 fn run(
-    instance: &wgpu::Instance,
+    instance: &Arc<wgpu::Instance>,
     surface: &wgpu::Surface<'_>,
     window: &WebviewWindow,
     rx: &mpsc::Receiver<Command>,
@@ -246,6 +266,7 @@ fn run(
 ) -> Result<(), String> {
     let mut proof_window = None;
     let mut engine = None;
+    let mut stereo: Option<(audience::Destination, tss_live_wheel::StereoOutput)> = None;
     let mut active: Option<Config> = None;
     let mut mouse = Mouse::default();
     let mut clock = ReleaseClock::default();
@@ -256,6 +277,9 @@ fn run(
         ..Default::default()
     };
     let start = Instant::now();
+    let telemetry = std::env::var_os("TSS_LIVE_STEREO_TELEMETRY").is_some_and(|v| v == "1");
+    let mut next_telemetry = start;
+    let mut display_check = start;
     let mut export_pause = Duration::ZERO;
     let mut last_film_times = None;
     let mut next_frame = start;
@@ -268,7 +292,7 @@ fn run(
             .map_err(|e| format!("Cannot create verification directory: {e}"))?;
     }
     loop {
-        let cmd = if active.as_ref().is_none_or(|c| c.preview_hidden) {
+        let cmd = if stereo.is_none() && active.as_ref().is_none_or(|c| c.preview_hidden) {
             match rx.recv() {
                 Ok(c) => Some(c),
                 Err(_) => break,
@@ -283,6 +307,33 @@ fn run(
         if let Some(command) = cmd {
             match command {
                 Command::Quit => break,
+                Command::Stereo(enabled, reply) => {
+                    let result = (|| {
+                        if !enabled {
+                            if stereo.take().is_some() { audience::close(window); }
+                            stats.projector_running = false;
+                            return Ok(String::new());
+                        }
+                        if let Some((dest, _)) = &stereo { return Ok(dest.name.clone()); }
+                        let r = engine.as_ref().filter(|_| active.is_some())
+                            .ok_or("The live oil preview has not initialized")?;
+                        let dest = audience::open(window, instance.clone())?;
+                        let out = tss_live_wheel::StereoOutput::new(r, &dest.surface, dest.size)?;
+                        let name = dest.name.clone();
+                        audience::show(window)?;
+                        stereo = Some((dest,out));
+                        stats.projector_running = true;
+                        stats.projector_presents = 0;
+                        last_present = None;
+                        periods.clear();
+                        next_frame = Instant::now();
+                        display_check = next_frame + Duration::from_secs(1);
+                        Ok(name)
+                    })();
+                    if result.is_err() { audience::close(window); }
+                    *shared.lock().map_err(|e| e.to_string())? = stats.clone();
+                    let _ = reply.try_send(result);
+                }
                 Command::Movie(job, reply) => {
                     let result = match (engine.as_mut(), active.as_ref()) {
                         (Some(r), Some(c))
@@ -328,6 +379,26 @@ fn run(
                     }
                     clock.forget(id);
                 }
+                Command::Force(point, amount) => {
+                    if let (Some(c), Some(r)) = (&active, &mut engine) {
+                        if c.gesture == Gesture::Pressure && mouse.last.is_some() {
+                            let ms = start.elapsed().saturating_sub(export_pause).as_millis() as u64;
+                            mouse.pressure.detach(ms);
+                            mouse.force = Some((point, amount));
+                            r.set_slide_pressure(c.slide as u32, amount, point)?;
+                            stats.trackpad_pressure = amount;
+                            stats.trackpad_pressure_peak = stats.trackpad_pressure_peak.max(amount);
+                            stats.trackpad_pressure_events += 1;
+                        }
+                    }
+                }
+                Command::CancelPointer => {
+                    if let (Some(c), Some(r)) = (&active, &mut engine) {
+                        let ms = start.elapsed().saturating_sub(export_pause).as_millis() as u64;
+                        mouse.release(r, c, ms)?;
+                        stats.trackpad_pressure = 0.;
+                    }
+                }
                 Command::Pointer(phase, p) => {
                     if let (Some(c), Some(r)) = (&active, &mut engine) {
                         stats.drags += mouse.input(
@@ -337,9 +408,15 @@ fn run(
                             p,
                             start.elapsed().saturating_sub(export_pause).as_millis() as u64,
                         )? as u64;
+                        stats.trackpad_pressure = mouse.force.map_or(0., |(_, amount)| amount);
                     }
                 }
                 Command::Set(config) => {
+                    if config.is_none() && stereo.take().is_some() {
+                        audience::close(window);
+                        stats.projector_running = false;
+                        let _ = window.emit("tss-stereo-closed", "Live preview closed");
+                    }
                     if config == active {
                         continue;
                     }
@@ -348,8 +425,10 @@ fn run(
                             n.layer_id != old.layer_id
                                 || n.slide != old.slide
                                 || n.gesture != old.gesture
+                                || n.hardware_pressure_only != old.hardware_pressure_only
                                 || n.rect != old.rect
                         }) {
+                            stats.trackpad_pressure = 0.;
                             mouse.release(
                                 r,
                                 old,
@@ -432,7 +511,19 @@ fn run(
                 && !window.is_minimized().map_err(|e| e.to_string())?;
             window_check = Instant::now() + Duration::from_millis(250);
         }
-        if !window_visible {
+        if Instant::now() >= display_check {
+            if let Some((dest, _)) = &mut stereo {
+                if let Err(reason) = dest.refresh(window) {
+                    stereo.take();
+                    audience::close(window);
+                    stats.projector_running = false;
+                    *shared.lock().map_err(|e| e.to_string())? = stats.clone();
+                    let _ = window.emit("tss-stereo-closed", reason);
+                }
+            }
+            display_check = Instant::now() + Duration::from_secs(1);
+        }
+        if !window_visible && stereo.is_none() {
             last_present = None;
             periods.clear();
             next_frame = window_check;
@@ -473,7 +564,28 @@ fn run(
             } else {
                 None
             };
-            let presented = r.render_film_times(surface, rear, front, program_time)?;
+            let presented = if let Some((dest,out)) = &mut stereo {
+                match out.present(r, &dest.surface, dest.size, rear, front, program_time) {
+                    Ok(sent) => {
+                        if sent {
+                            stats.projector_presents += 1;
+                            stats.projector_song_time = Some(program_time);
+                            if window_visible && !c.preview_hidden { out.preview(r, surface)?; }
+                        }
+                        sent
+                    }
+                    Err(reason) => {
+                        stereo.take();
+                        audience::close(window);
+                        stats.projector_running = false;
+                        *shared.lock().map_err(|e| e.to_string())? = stats.clone();
+                        let _ = window.emit("tss-stereo-closed", reason);
+                        false
+                    }
+                }
+            } else {
+                r.render_film_times(surface, rear, front, program_time)?
+            };
             if presented {
                 last_film_times = Some([rear, front]);
             }
@@ -497,6 +609,10 @@ fn run(
                 stats.p95_ms = sorted[(sorted.len() * 95).div_ceil(100) - 1];
             }
             *shared.lock().map_err(|e| e.to_string())? = stats.clone();
+            if telemetry && stats.projector_running && now >= next_telemetry {
+                eprintln!("TSS stereo {}", serde_json::to_string(&stats).map_err(|e| e.to_string())?);
+                next_telemetry = now + Duration::from_secs(2);
+            }
             if stats.presents == 2 {
                 if let Some(dir) = output {
                     proof_window = Some(proof::inspect(window, dir)?);
@@ -552,6 +668,7 @@ impl ProgramClock {
 #[derive(Default)]
 struct Mouse {
     last: Option<[f32; 2]>,
+    force: Option<([f32; 2], f32)>,
     pressure: super::mouse_pressure::MousePressure,
 }
 impl Mouse {
@@ -573,8 +690,17 @@ impl Mouse {
         }
         let slide = c.slide as u32;
         if c.gesture == Gesture::Pressure {
-            self.pressure
-                .input(phase, point, c.mouse_pressure, ms, &mut Vec::new());
+            if let Some((_, amount)) = self.force {
+                if matches!(phase, Phase::Up) {
+                    self.force = None;
+                    r.set_slide_pressure(slide, 0., point)?;
+                } else {
+                    self.force = Some((point, amount));
+                    r.set_slide_pressure(slide, amount, point)?;
+                }
+            } else if !c.hardware_pressure_only {
+                self.pressure.input(phase, point, c.mouse_pressure, ms, &mut Vec::new());
+            }
         } else {
             if matches!(phase, Phase::Move | Phase::Up) {
                 if let Some(from) = previous {
@@ -603,6 +729,9 @@ impl Mouse {
         Ok(())
     }
     fn release(&mut self, r: &mut LiveWheel, c: &Config, ms: u64) -> Result<(), String> {
+        if let Some((point, _)) = self.force.take() {
+            r.set_slide_pressure(c.slide as u32, 0., point)?;
+        }
         if let Some((_, sample)) = self.pressure.detach(ms) {
             r.set_slide_pressure(c.slide as u32, 0., sample.point)?;
         }

@@ -12,6 +12,7 @@ async function exerciseControls(platform) {
   const windows = platform === 'Windows';
   const solver = platform === 'Windows live solver';
   const benchmark = platform === 'Windows recorded benchmark';
+  const stereo = platform === 'Macintosh stereo session';
   const missing = solver && location.hash === '#missing-helper';
   const helperAvailable = platform !== 'Linux' && !missing;
   let resolveHelper;
@@ -30,9 +31,20 @@ async function exerciseControls(platform) {
   const set = (id,value) => {
     const input=$(id);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
   };
-  const audio = coral || oils || missing || benchmark ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
+  const audio = coral || oils || missing || benchmark || stereo ? null : new Uint8Array(await (await fetch('/sample.m4a')).arrayBuffer());
   let documentText, incoming, linked=null, lastSelection=1, catalogFiles=[];
   const advisorRequests=[],reviewedLyrics=[],previewRequests=[],movieRequests=[];
+  const listeners=new Map(), stereoRequests=[], forgotten=[];
+  let stereoFails=false, stereoFrames=0;
+  let scaleQuery;
+  if (stereo) {
+    const browserMatchMedia = window.matchMedia.bind(window);
+    window.matchMedia = media => {
+      const query = browserMatchMedia(media);
+      if (media.startsWith('(resolution:')) scaleQuery = query;
+      return query;
+    };
+  }
   let finishInference;
   let mediaChecks=0,mediaInstalls=0,mediaReady=false;
   if (windows) {
@@ -41,7 +53,7 @@ async function exerciseControls(platform) {
     const macro={id:'take',name:'Pulse',duration:1,events,songStart:0,enabled:true,fit:true,cue:'recording-position',muted:[],amount:1,step:0,cap:2};
     localStorage.setItem('tss.gestures.v1.'+hash,JSON.stringify({macros:[macro],lyricGroups:[]}));
   }
-  window.__TAURI__ = {event:{listen:async()=>()=>{}},core:{invoke:async (command,args)=>{
+  window.__TAURI__ = {event:{listen:async(name,cb)=>{listeners.set(name,cb);return ()=>listeners.delete(name);}},core:{invoke:async (command,args)=>{
     switch(command) {
     case 'available_legend_packs': return catalogFiles;
     case 'choose_visual_media': throw Error('Could not find ffmpeg. Open FFmpeg media tools in the editor to install or recheck.');
@@ -64,8 +76,17 @@ async function exerciseControls(platform) {
     case 'read_pending_audio': return lastSelection===9 ? new Uint8Array([1,2,3]) : audio.slice();
     case 'set_live_wheel': previewRequests.push(args.config);return null;
     case 'live_wheel_benchmark_config': return benchmark ? {wheel:'violet-blue',motion:'wheel-flow',slide:'rear',gesture:'tug',renderWidth:640,wheelStack:true} : null;
-    case 'forget_live_wheel_layer': return null;
-    case 'live_wheel_stats': return {running:false};
+    case 'stereo_startup_requested': return stereo;
+    case 'set_stereo_output':
+      stereoRequests.push(args.enabled);
+      if (args.enabled && stereoFails) throw Error('No external display available');
+      return args.enabled ? 'SAMSUNG' : '';
+    case 'forget_live_wheel_layer': forgotten.push(args.layerId);return null;
+    case 'live_wheel_stats': return !stereo || !stereoRequests.at(-1) ? {running:false} : {
+      running:true,layerId:previewRequests.at(-1)?.layerId,adapter:'Metal',fps:30,p95Ms:34,
+      width:640,height:360,frameLatency:2,projectorRunning:true,projectorPresents:++stereoFrames,
+      trackpadPressure:.42,trackpadPressurePeak:.78,trackpadPressureEvents:17,
+    };
     case 'read_timed_lyrics': return ['song.vtt','WEBVTT\n\n00:00.000 --> 00:00.500\nGo\n\n00:01.000 --> 00:01.500\nGo'];
     case 'save_project': documentText=args.document;return 'Headliner.tss';
     case 'transcribe_song':return [
@@ -92,6 +113,42 @@ async function exerciseControls(platform) {
     resolveHelper(false);
   }
   await until(()=>$('edit-history').options.length>0);
+  if (stereo) {
+    const button=$('projector');
+    await until(()=>stereoRequests.at(-1)===true && !button.disabled);
+    const rig=previewRequests.at(-1);
+    const original=previewRequests.find(c=>c?.simulation && !c.hardwarePressureOnly);
+    const trackCount=$('layer-count').textContent, edits=$('edit-history').options.length;
+    check(rig.layerId===rig.stack[2].layerId && rig.stack.length===3 && rig.hardwarePressureOnly &&
+      rig.gesture==='pressure' && rig.slide==='rear' && rig.focus===.72 && rig.renderWidth===640,'startup targets front physical cell');
+    check(rig.stack.every((t,i)=>t.simulation.depth===i/2 && t.simulation.rate===1 && t.visibleFilms==='rear') &&
+      new Set(rig.stack.map(t=>t.simulation.seed)).size===3 && rig.stack.every(t=>t.layerId!==original.layerId),'isolated live cells');
+    const scale=devicePixelRatio, css=$('preview').getBoundingClientRect();
+    const pixelRect = (ratio) => {
+      const px = x => Math.round(x*ratio);
+      return {x:px(css.left),y:px(css.top),width:px(css.right)-px(css.left),height:px(css.bottom)-px(css.top)};
+    };
+    Object.defineProperty(window,'devicePixelRatio',{value:scale*2,configurable:true});
+    const oldQuery=scaleQuery;
+    oldQuery.dispatchEvent(new Event('change'));
+    await until(()=>JSON.stringify(previewRequests.at(-1).rect)===JSON.stringify(pixelRect(scale*2)));
+    check(oldQuery!==scaleQuery,'resolution change rearms for the new monitor scale');
+    Object.defineProperty(window,'devicePixelRatio',{value:scale,configurable:true});
+    await until(()=>JSON.stringify(previewRequests.at(-1).rect)===JSON.stringify(pixelRect(scale)));
+    await until(()=>$('stereo-pressure-state').textContent.includes('trackpad 42%'));
+    check($('stereo-pressure-state').textContent.includes('17 pressure events'),'measured force telemetry');
+    click('projector');await until(()=>!button.disabled && forgotten.length===3);
+    check(stereoRequests.at(-1)===false && previewRequests.at(-1).layerId===original.layerId &&
+      previewRequests.at(-1).simulation.seed===original.simulation.seed && $('stereo-pressure-state').hidden,'stop restores mono simulation');
+    check($('layer-count').textContent===trackCount && $('edit-history').options.length===edits,'audition leaves authored tracks and edits intact');
+    stereoFails=true;click('projector');
+    await until(()=>$('app-status').textContent.includes('No external display') && !button.disabled);
+    check(previewRequests.at(-1).layerId===original.layerId && forgotten.length===6,'failed start restores project and retires rig');
+    stereoFails=false;click('projector');await until(()=>button.getAttribute('aria-pressed')==='true' && !button.disabled);
+    await listeners.get('tss-stereo-closed')({payload:'Display disconnected'});
+    check(button.getAttribute('aria-pressed')==='false' && forgotten.length===9 && previewRequests.at(-1).layerId===original.layerId,'disconnect restores project');
+    return;
+  }
   if (benchmark) {
     await until(()=>previewRequests.at(-1)?.stack?.length===2);
     const stack=previewRequests.at(-1).stack;
@@ -536,6 +593,7 @@ const editorCases=[
   ['Linux','Linux '+projectControls],
   ['Windows','Windows '+projectControls],
   ['Macintosh','Mac desktop native wheel selection, optics and modal visibility'],
+  ['Macintosh stereo session','Mac stereo pressure autostart, physical force, loss and project restoration'],
   ['Windows coral project','Open and replay the standalone coral capture project without audio'],
   ['Windows live solver','Desktop live solver lifecycle, independent pigments and seed-preserving offline reopen'],
   ['Windows recorded benchmark','Explicit two-track recorded benchmark remains reproducible'],

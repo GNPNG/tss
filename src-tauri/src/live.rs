@@ -307,6 +307,8 @@ pub struct Config {
     tug_response: Option<f32>,
     #[serde(default = "default_pressure")]
     mouse_pressure: f32,
+    #[serde(default)]
+    hardware_pressure_only: bool,
     render_width: u32,
     rect: Rect,
     focus: Option<f32>,
@@ -492,6 +494,9 @@ pub struct Stats {
     projector_age_ms: Option<f64>,
     projector_song_time: Option<f64>,
     projector_presents: u64,
+    trackpad_pressure: f32,
+    trackpad_pressure_peak: f32,
+    trackpad_pressure_events: u64,
 }
 
 #[derive(Serialize, Default)]
@@ -510,6 +515,22 @@ pub async fn verify_projector_visibility(host: State<'_, Host>) -> Result<Visibi
     {
         let _ = host;
         Err("Projector visibility verification requires Windows.".into())
+    }
+}
+
+#[tauri::command]
+pub fn stereo_startup_requested() -> bool {
+    cfg!(target_os = "macos") && std::env::args_os().any(|a| a == "--live-stereo")
+}
+
+#[tauri::command]
+pub async fn set_stereo_output(host: State<'_, Host>, enabled: bool) -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    return host.stereo(enabled).await;
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = host;
+        if enabled { Err("The live stereo display requires macOS.".into()) } else { Ok(String::new()) }
     }
 }
 
