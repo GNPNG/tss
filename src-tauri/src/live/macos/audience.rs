@@ -1,14 +1,17 @@
 use objc2::{rc::Retained, MainThreadOnly};
 use objc2_app_kit::{
-    NSBackingStoreType, NSMainMenuWindowLevel, NSScreen, NSView, NSWindow,
-    NSWindowCollectionBehavior, NSWindowStyleMask,
+    NSBackingStoreType, NSScreen, NSView, NSWindow, NSWindowCollectionBehavior as Behavior,
+    NSWindowStyleMask, NSWindowTitleVisibility,
 };
-use objc2_foundation::{MainThreadMarker, NSNumber, NSPoint, NSRect, NSSize, NSString};
+use objc2_foundation::{
+    MainThreadMarker, NSArray, NSDictionary, NSNumber, NSObject, NSPoint, NSRect, NSSize, NSString,
+};
 use objc2_quartz_core::CAMetalLayer;
 use std::{
     cell::RefCell,
     ffi::c_void,
     sync::{mpsc, Arc},
+    time::{Duration, Instant},
 };
 use tauri::WebviewWindow;
 use tss_live_wheel::wgpu;
@@ -16,10 +19,21 @@ use tss_live_wheel::wgpu;
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
     fn CGDisplayIsBuiltin(display: u32) -> u32;
+    fn CGDisplayIsAsleep(display: u32) -> u32;
+    fn CGDisplayBounds(display: u32) -> NSRect;
+    fn CGWindowListCopyWindowInfo(options: u32, relative_to: u32) -> *mut c_void;
+    fn CGRectMakeWithDictionaryRepresentation(bounds: *const c_void, result: *mut NSRect) -> bool;
+}
+
+struct AudienceWindow {
+    stage: Retained<NSWindow>,
+    editor: Retained<NSWindow>,
+    original_behavior: Option<Behavior>,
+    entering: bool,
 }
 
 thread_local! {
-    static OUTPUT: RefCell<Option<Retained<NSWindow>>> = const { RefCell::new(None) };
+    static OUTPUT: RefCell<Option<AudienceWindow>> = const { RefCell::new(None) };
 }
 
 pub(super) struct Destination {
@@ -27,6 +41,7 @@ pub(super) struct Destination {
     pub(super) size: [u32; 2],
     pub(super) name: String,
     display_id: u32,
+    off_space_since: Option<Instant>,
 }
 
 fn id(screen: &NSScreen) -> Option<u32> {
@@ -46,6 +61,49 @@ fn pixel_size(screen: &NSScreen) -> [u32; 2] {
     let s = screen.frame().size;
     let k = screen.backingScaleFactor();
     [(s.width * k).round() as u32, (s.height * k).round() as u32]
+}
+
+// WindowServer's global coordinates use the main display's top-left origin.
+// The Create Rule transfers a retained, toll-free-bridged NSArray to this scope.
+fn on_screen_bounds(number: isize) -> Option<NSRect> {
+    const ON_SCREEN_ONLY: u32 = 1;
+    let windows = unsafe {
+        Retained::<NSArray<NSDictionary<NSString, NSObject>>>::from_raw(
+            CGWindowListCopyWindowInfo(ON_SCREEN_ONLY, 0).cast(),
+        )
+    }?;
+    let number_key = NSString::from_str("kCGWindowNumber");
+    let bounds_key = NSString::from_str("kCGWindowBounds");
+    for window in windows.iter() {
+        let Some(id) = window
+            .objectForKey(&number_key)
+            .and_then(|n| n.downcast::<NSNumber>().ok())
+        else {
+            continue;
+        };
+        if id.integerValue() != number {
+            continue;
+        }
+        let bounds = window.objectForKey(&bounds_key)?;
+        let mut rect = NSRect::new(NSPoint::new(0., 0.), NSSize::new(0., 0.));
+        return unsafe {
+            CGRectMakeWithDictionaryRepresentation(Retained::as_ptr(&bounds).cast(), &mut rect)
+        }
+        .then_some(rect);
+    }
+    None
+}
+
+fn fills_display(window: NSRect, display_id: u32) -> bool {
+    let expected = unsafe { CGDisplayBounds(display_id) };
+    [
+        (window.origin.x, expected.origin.x),
+        (window.origin.y, expected.origin.y),
+        (window.size.width, expected.size.width),
+        (window.size.height, expected.size.height),
+    ]
+    .iter()
+    .all(|(a, b)| (a - b).abs() <= 2.)
 }
 
 pub(super) fn open(
@@ -86,23 +144,25 @@ pub(super) fn open(
                     }
                     let frame = tv.frame();
                     let stage = unsafe {
-                        NSWindow::initWithContentRect_styleMask_backing_defer(
+                        NSWindow::initWithContentRect_styleMask_backing_defer_screen(
                             NSWindow::alloc(mtm),
-                            frame,
-                            NSWindowStyleMask::Borderless,
+                            NSRect::new(NSPoint::new(0., 0.), frame.size),
+                            NSWindowStyleMask::Titled
+                                | NSWindowStyleMask::Resizable
+                                | NSWindowStyleMask::FullSizeContentView,
                             NSBackingStoreType::Buffered,
                             false,
+                            Some(&tv),
                         )
                     };
                     // The main-thread slot owns the NSWindow across render-thread presents.
                     unsafe { stage.setReleasedWhenClosed(false) };
                     stage.setFrame_display(frame, false);
                     stage.setTitle(&NSString::from_str("The Sacred Swirls • Live Stereo"));
-                    stage.setLevel(NSMainMenuWindowLevel + 1);
+                    stage.setTitleVisibility(NSWindowTitleVisibility::Hidden);
+                    stage.setTitlebarAppearsTransparent(true);
                     stage.setCollectionBehavior(
-                        NSWindowCollectionBehavior::CanJoinAllSpaces
-                            | NSWindowCollectionBehavior::FullScreenAuxiliary
-                            | NSWindowCollectionBehavior::IgnoresCycle,
+                        Behavior::FullScreenPrimary | Behavior::FullScreenDisallowsTiling,
                     );
                     stage.setIgnoresMouseEvents(true);
                     stage.setHidesOnDeactivate(false);
@@ -125,13 +185,34 @@ pub(super) fn open(
                         )
                     }
                     .map_err(|e| e.to_string())?;
-                    OUTPUT.with(|slot| *slot.borrow_mut() = Some(stage));
-                    editor.makeKeyAndOrderFront(None);
+                    let original_behavior =
+                        (!NSScreen::screensHaveSeparateSpaces(mtm)).then(|| {
+                            let previous = editor.collectionBehavior();
+                            let conflicting = Behavior::FullScreenPrimary
+                                | Behavior::FullScreenNone
+                                | Behavior::Primary
+                                | Behavior::CanJoinAllApplications;
+                            editor.setCollectionBehavior(
+                                (previous - conflicting)
+                                    | Behavior::Auxiliary
+                                    | Behavior::FullScreenAuxiliary,
+                            );
+                            previous
+                        });
+                    OUTPUT.with(|slot| {
+                        *slot.borrow_mut() = Some(AudienceWindow {
+                            stage,
+                            editor,
+                            original_behavior,
+                            entering: true,
+                        })
+                    });
                     Ok(Destination {
                         surface,
                         size: pixel_size(&tv),
                         name: tv.localizedName().to_string(),
                         display_id,
+                        off_space_since: None,
                     })
                 })();
             let _ = tx.send(result);
@@ -145,7 +226,8 @@ pub(super) fn show(window: &WebviewWindow) -> Result<(), String> {
         .run_on_main_thread(|| {
             OUTPUT.with(|slot| {
                 if let Some(w) = slot.borrow().as_ref() {
-                    w.orderFrontRegardless();
+                    w.stage.makeKeyAndOrderFront(None);
+                    w.stage.toggleFullScreen(None);
                 }
             })
         })
@@ -156,8 +238,10 @@ pub(super) fn close(window: &WebviewWindow) {
     let _ = window.run_on_main_thread(|| {
         OUTPUT.with(|slot| {
             if let Some(w) = slot.take() {
-                w.orderOut(None);
-                w.close();
+                w.stage.close();
+                if let Some(previous) = w.original_behavior {
+                    w.editor.setCollectionBehavior(previous);
+                }
             }
         })
     });
@@ -169,29 +253,56 @@ impl Destination {
         let (tx, rx) = mpsc::sync_channel(1);
         window
             .run_on_main_thread(move || {
-                let size = MainThreadMarker::new().and_then(|mtm| {
+                let placement = MainThreadMarker::new().and_then(|mtm| {
                     NSScreen::screens(mtm)
                         .iter()
                         .find(|s| id(s) == Some(id_to_find))
                         .map(|screen| {
-                            OUTPUT.with(|slot| {
-                                if let Some(w) = slot.borrow().as_ref() {
-                                    let frame = screen.frame();
-                                    if w.frame() != frame {
-                                        w.setFrame_display(frame, true);
-                                    }
+                            let issue = OUTPUT.with(|slot| {
+                                let mut state = slot.borrow_mut();
+                                let Some(w) = state.as_mut() else { return Some("has no audience window") };
+                                if !w.stage.styleMask().contains(NSWindowStyleMask::FullScreen)
+                                    || !w.stage.screen().is_some_and(|s| id(&s) == Some(id_to_find))
+                                    || !on_screen_bounds(w.stage.windowNumber()).is_some_and(|rect| fills_display(rect, id_to_find)) {
+                                    return Some("does not have a visible fullscreen audience window covering its display bounds");
                                 }
+                                // Restore input to the performance desk once, when TSS still owns focus.
+                                // AppKit owns window placement throughout the fullscreen transition.
+                                if w.entering {
+                                    w.entering = false;
+                                    if w.stage.isKeyWindow() { w.editor.makeKeyAndOrderFront(None) }
+                                }
+                                if w.original_behavior.is_some() && !w.editor.isMiniaturized()
+                                    && (!w.editor.screen().is_some_and(|s|builtin(&s)) || on_screen_bounds(w.editor.windowNumber()).is_none()) {
+                                    return Some("is fullscreen, but the MacBook performance window is unavailable in the shared Space");
+                                }
+                                None
                             });
-                            pixel_size(&screen)
+                            (pixel_size(&screen), issue)
                         })
                 });
-                let _ = tx.send(size);
+                let _ = tx.send(placement);
             })
             .map_err(|e| e.to_string())?;
-        self.size = rx
+        let (size, issue) = rx
             .recv()
             .map_err(|e| e.to_string())?
             .ok_or("The external stereo display disconnected")?;
+        self.size = size;
+        // Space animations can briefly remove a window from the on-screen list.
+        // Keep the operator's keyboard focus and allow a sleeping TV to resume.
+        if let Some(issue) = issue.filter(|_| unsafe { CGDisplayIsAsleep(self.display_id) } == 0) {
+            if self
+                .off_space_since
+                .get_or_insert_with(Instant::now)
+                .elapsed()
+                >= Duration::from_secs(8)
+            {
+                return Err(format!("{} {}.", self.name, issue));
+            }
+        } else {
+            self.off_space_since = None;
+        }
         Ok(())
     }
 }
