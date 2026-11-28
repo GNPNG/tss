@@ -154,6 +154,20 @@ vec3 linearToSRGB(vec3 radiance) {
 
 vec4 hook() {
     vec2 uv = HOOKED_pos;
+#if defined(TSS_FILM_PLANES) && defined(TSS_LIVE_FOOTPRINT)
+    // Rectified parallel eyes. Each independent film is sampled at its own
+    // depth before transmission. Zero eye scale is the normal projector.
+    if (mat.geometry.w != 0.0 && mat.lens.z == mat.lens.w) {
+        float plane = mix(mat.geometry.x, mat.geometry.y, mat.lens.z);
+        float convergence = 0.5 * (mat.geometry.x + mat.geometry.y);
+        // The liquid midpoint recedes by half the gap lost to pressure.
+        // Invert the projected X locally for the non-planar pressed surface.
+        for (int i = 0; i < 3; ++i) {
+            float z = plane + 0.5 * (1.0 - pressureGap(uv,false));
+            uv.x = HOOKED_pos.x - mat.geometry.w * (1.0/z - 1.0/convergence);
+        }
+    }
+#endif
     vec2 delta = 1.5 / slideUnits;
     vec2 dx = distanceAt(uv + vec2(delta.x, 0.0)) - distanceAt(uv - vec2(delta.x, 0.0));
     vec2 dy = distanceAt(uv + vec2(0.0, delta.y)) - distanceAt(uv - vec2(0.0, delta.y));
@@ -242,6 +256,7 @@ vec4 hook() {
 #endif
     trans /= 24.0;
 
+    uv = HOOKED_pos; // Illumination and the incident beam stay in screen coordinates.
     vec2 offset = (uv - vec2(0.56, 0.43)) * vec2(1.57, 1.35);
     float radius2 = dot(offset, offset);
     float irradiance = 0.80 / (1.0 + 0.75 * radius2);

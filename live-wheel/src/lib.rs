@@ -288,6 +288,8 @@ pub struct LiveWheel {
     evolving: HashMap<u64, evolving::Source>,
     #[cfg(feature = "live-solver")]
     presentation: u64,
+    #[cfg(test)]
+    stereo_eye_scale: f32,
     active: u64,
     stack: Vec<WheelLayer>,
     stack_times: HashMap<u64, [f64; 2]>,
@@ -604,6 +606,8 @@ impl LiveWheel {
             evolving: HashMap::new(),
             #[cfg(feature = "live-solver")]
             presentation: 0,
+            #[cfg(test)]
+            stereo_eye_scale: 0.,
             active: 0,
             stack: Vec::new(),
             stack_times: HashMap::new(),
@@ -923,6 +927,10 @@ impl LiveWheel {
         let mut material = self.active_material;
         material.lamp = self.lamp_gain;
         material.geometry = lens::GateLens::for_projector(self.carousel_lenses[0]).uniform();
+        #[cfg(test)]
+        {
+            material.geometry[3] = self.stereo_eye_scale;
+        }
         let depth = self.film_depths.get(&self.active);
         let [rear, front] = depth.map_or(pair, |d| [*d; 2]);
         material.lens = [
@@ -1585,6 +1593,8 @@ mod footprint_test;
 mod pressure_test;
 #[cfg(all(test, feature = "live-solver"))]
 mod single_film_capture;
+#[cfg(all(test, feature = "live-solver"))]
+mod stereo_capture;
 #[cfg(test)]
 mod software_test;
 #[cfg(test)]

@@ -226,6 +226,11 @@ impl Source {
         }
     }
 
+    #[cfg(test)]
+    pub(super) fn displayed_tick(&self) -> f64 {
+        self.shared.0.lock().unwrap().shown
+    }
+
     pub fn set_rate(&mut self, rate: f64) {
         self.shared.0.lock().unwrap().set_rate(rate);
     }
